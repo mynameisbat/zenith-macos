@@ -1,0 +1,6 @@
+import Foundation
+import AppKit
+import GoldenGateCore
+
+public typealias KeyboardNavigationEngine = GoldenGateCore.KeyboardNavigationEngine
+public typealias ClipboardHistoryViewModel = GoldenGateCore.ClipboardHistoryViewModel

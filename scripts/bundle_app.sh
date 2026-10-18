@@ -1,0 +1,85 @@
+#!/bin/bash
+set -e
+
+# Zenith 2.0 macOS Application Bundler
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+BUILD_DIR="$PROJECT_ROOT/.build/release"
+APP_DIR="$PROJECT_ROOT/Zenith.app"
+CONTENTS_DIR="$APP_DIR/Contents"
+MACOS_DIR="$CONTENTS_DIR/MacOS"
+RESOURCES_DIR="$CONTENTS_DIR/Resources"
+
+echo "==> Building Zenith in Release configuration..."
+cd "$PROJECT_ROOT"
+swift build -c release
+
+echo "==> Constructing Zenith.app bundle structure..."
+rm -rf "$APP_DIR"
+mkdir -p "$MACOS_DIR"
+mkdir -p "$RESOURCES_DIR"
+
+echo "==> Copying binary..."
+cp "$BUILD_DIR/GoldenGateApp" "$MACOS_DIR/Zenith"
+chmod +x "$MACOS_DIR/Zenith"
+
+echo "==> Copying Zenith AppIcon.icns..."
+if [ -f "$PROJECT_ROOT/AppIcon.icns" ]; then
+    cp "$PROJECT_ROOT/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+fi
+
+echo "==> Generating Info.plist for Zenith..."
+cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Zenith</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.zenith.workspace</string>
+    <key>CFBundleName</key>
+    <string>Zenith</string>
+    <key>CFBundleDisplayName</key>
+    <string>Zenith</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>2.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>2</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSSupportsAutomaticTermination</key>
+    <false/>
+    <key>NSSupportsSuddenTermination</key>
+    <false/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Zenith requires Accessibility permissions to automatically paste clipboard history items into your active application.</string>
+</dict>
+</plist>
+EOF
+
+echo "==> Performing ad-hoc code signature..."
+codesign --force --deep --sign - "$APP_DIR"
+
+echo "==> Mirroring to GoldenGate.app for backwards compatibility..."
+rm -rf "$PROJECT_ROOT/GoldenGate.app"
+cp -R "$APP_DIR" "$PROJECT_ROOT/GoldenGate.app"
+# Also provide GoldenGateApp executable in GoldenGate.app for legacy scripts
+cp "$MACOS_DIR/Zenith" "$PROJECT_ROOT/GoldenGate.app/Contents/MacOS/GoldenGateApp"
+codesign --force --deep --sign - "$PROJECT_ROOT/GoldenGate.app"
+
+echo "==> Registering with macOS LaunchServices & refreshing icon cache..."
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_DIR" || true
+touch "$APP_DIR"
+touch "$PROJECT_ROOT/GoldenGate.app"
+
+echo "==> Zenith.app created successfully at: $APP_DIR"
+echo "==> You can now launch it via: open Zenith.app"

@@ -1,0 +1,37 @@
+# macOS System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Swift Package Manager & Build Artifacts
+.build/
+Packages/
+Package.pins
+build/
+DerivedData/
+
+# Xcode & AppCode / Rider Metadata
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+*.moved-aside
+*.xcuserstate
+.idea/
+
+# Compiled Application Bundles & Binaries
+*.app/
+*.dSYM/
+main
+test_output.txt
+
+# Local Environment & Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Agent / Tooling Workspaces
+.agents/
