@@ -24,6 +24,7 @@ xcuserdata/
 # Compiled Application Bundles & Binaries
 *.app/
 *.dSYM/
+*.dmg
 main
 test_output.txt
 
