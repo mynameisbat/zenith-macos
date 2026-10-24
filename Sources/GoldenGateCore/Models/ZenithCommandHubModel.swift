@@ -69,6 +69,7 @@ public final class ZenithCommandHubState: ObservableObject {
     @Published public var hoveredActionId: String? = nil
     @Published public var hoveredClipId: UUID? = nil
     @Published public var hoveredFooterId: String? = nil
+    @Published public var quickLookItem: ClipboardItem? = nil
     @Published public var presentationID: UUID = UUID()
 
     public init() {}
@@ -112,6 +113,7 @@ public final class ZenithCommandHubState: ObservableObject {
         hoveredActionId = nil
         hoveredClipId = nil
         hoveredFooterId = nil
+        quickLookItem = nil
         presentationID = UUID()
     }
 }

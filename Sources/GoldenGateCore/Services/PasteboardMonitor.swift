@@ -193,6 +193,7 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
         types: [NSPasteboard.PasteboardType],
         pngData: Data?,
         tiffData: Data?,
+        fileImageData: (data: Data, width: Int, height: Int)? = nil,
         rtfData: Data?,
         plainText: String?
     ) -> ClipboardItem? {
@@ -215,12 +216,17 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
             }
         }
 
-        // 3. Rich Text (RTF)
+        // 3. Image file copied from Finder (fileURL)
+        if let fileImg = fileImageData {
+            return ClipboardItem.image(data: fileImg.data, width: fileImg.width, height: fileImg.height)
+        }
+
+        // 4. Rich Text (RTF)
         if let rtfData = rtfData, !rtfData.isEmpty {
             return ClipboardItem.richText(rtfData: rtfData, plainText: plainText ?? "")
         }
 
-        // 4. Plain Text
+        // 5. Plain Text
         if let text = plainText, !text.isEmpty {
             return ClipboardItem.text(text)
         }
@@ -246,6 +252,25 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
 
             let pngData = types.contains(.png) ? pb.data(forType: .png) : nil
             let tiffData = (pngData == nil && types.contains(.tiff)) ? pb.data(forType: .tiff) : nil
+
+            var fileImageData: (data: Data, width: Int, height: Int)? = nil
+            if pngData == nil && tiffData == nil && (types.contains(.fileURL) || types.map(\.rawValue).contains("public.file-url")) {
+                if let fileURL = pb.readObjects(forClasses: [NSURL.self], options: nil)?.first as? URL,
+                   fileURL.isFileURL {
+                    let ext = fileURL.pathExtension.lowercased()
+                    let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "heic", "tiff", "gif", "webp", "bmp"]
+                    if imageExtensions.contains(ext),
+                       let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe),
+                       !data.isEmpty,
+                       data.count <= 25 * 1024 * 1024 {
+                        let (w, h) = extractDimensions(from: data)
+                        if w > 0 && h > 0 {
+                            fileImageData = (data: data, width: w, height: h)
+                        }
+                    }
+                }
+            }
+
             let rtfData = types.contains(.rtf) ? pb.data(forType: .rtf) : nil
             let plainText = (types.contains(.string) || rtfData != nil) ? pb.string(forType: .string) : nil
 
@@ -253,6 +278,7 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
                 types: types,
                 pngData: pngData,
                 tiffData: tiffData,
+                fileImageData: fileImageData,
                 rtfData: rtfData,
                 plainText: plainText
             )

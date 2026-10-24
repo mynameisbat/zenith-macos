@@ -60,8 +60,26 @@ public struct ZenithCommandHubView: View {
         .padding(10)
         .frame(width: 320)
         .background(.ultraThinMaterial)
+        .popover(item: $hubState.quickLookItem, arrowEdge: .trailing) { item in
+            QuickLookPreviewCard(
+                item: item,
+                onCopy: {
+                    clipboardStore.selectAndRestoreItem(item)
+                    ToastHUDController.shared.show(message: "Copied to Clipboard", icon: "doc.on.clipboard")
+                    hubState.quickLookItem = nil
+                    onClose()
+                },
+                onClose: {
+                    hubState.quickLookItem = nil
+                }
+            )
+        }
         .onExitCommand {
-            onClose()
+            if hubState.quickLookItem != nil {
+                hubState.quickLookItem = nil
+            } else {
+                onClose()
+            }
         }
         .onAppear {
             isSearchFocused = true
@@ -277,24 +295,83 @@ public struct ZenithCommandHubView: View {
 
     @ViewBuilder
     private func clipRow(index: Int, item: ClipboardItem) -> some View {
+        let isHovered = hubState.hoveredClipId == item.id
         let button = Button {
             clipboardStore.selectAndRestoreItem(item)
             ToastHUDController.shared.show(message: "Copied to Clipboard", icon: "doc.on.clipboard")
             onClose()
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: iconForType(item.itemType))
-                    .font(.system(size: 11.5))
-                    .foregroundColor(item.isPinned ? .orange : .secondary)
-                    .frame(width: 16)
+            HStack(spacing: 9) {
+                // Leading Icon / Thumbnail
+                if item.itemType == .image {
+                    ThumbnailPreviewView(item: item, size: 28, cornerRadius: 5)
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(Color.primary.opacity(0.04))
+                        Image(systemName: iconForType(item.itemType))
+                            .font(.system(size: 11.5))
+                            .foregroundColor(item.isPinned ? .orange : .secondary)
+                    }
+                    .frame(width: 28, height: 28)
+                }
 
-                Text(item.previewText)
-                    .font(.system(size: 12))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                // Title / Content / Dimension Badges
+                if item.itemType == .image {
+                    VStack(alignment: .leading, spacing: 1.5) {
+                        Text("Image")
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundColor(.primary)
 
-                Spacer()
+                        HStack(spacing: 4) {
+                            Text(imageDimensionString(for: item))
+                                .font(.system(size: 9.5))
+                                .monospacedDigit()
+                                .foregroundColor(.secondary)
+
+                            Text("•")
+                                .font(.system(size: 8))
+                                .foregroundColor(.secondary.opacity(0.4))
+
+                            Text(SystemCleanerService.formatBytes(Int64(item.byteSize)))
+                                .font(.system(size: 9.5))
+                                .monospacedDigit()
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                } else {
+                    Text(item.previewText)
+                        .font(.system(size: 12))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+
+                Spacer(minLength: 4)
+
+                // Quick preview eye button on hover for image clips
+                if item.itemType == .image && isHovered {
+                    Button {
+                        hubState.quickLookItem = item
+                    } label: {
+                        Image(systemName: "eye")
+                            .font(.system(size: 10.5))
+                            .foregroundColor(.secondary)
+                            .padding(3)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(Color.primary.opacity(0.08))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Quick Preview")
+                }
+
+                if item.isPinned {
+                    Image(systemName: "pin.fill")
+                        .font(.system(size: 8.5))
+                        .foregroundColor(.orange)
+                }
 
                 if index < 4 {
                     Text("⌘\(index + 1)")
@@ -309,28 +386,35 @@ public struct ZenithCommandHubView: View {
                 }
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.vertical, 4.5)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.primary.opacity(hubState.hoveredClipId == item.id ? 0.06 : 0.0))
+                    .fill(Color.primary.opacity(isHovered ? 0.06 : 0.0))
             )
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
-        .onHover { isHovered in
-            if isHovered {
+        .onHover { hovered in
+            if hovered {
                 hubState.setHoveredClip(item.id)
             } else {
                 hubState.clearHoveredClip(ifCurrent: item.id)
             }
         }
-        .animation(.easeInOut(duration: 0.12), value: hubState.hoveredClipId == item.id)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
 
         if index < 4 {
             button.keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
         } else {
             button
         }
+    }
+
+    private func imageDimensionString(for item: ClipboardItem) -> String {
+        if case .image(_, let width, let height) = item.payload {
+            return "\(width) × \(height)"
+        }
+        return ""
     }
 
     private func iconForType(_ type: ClipboardItemType) -> String {

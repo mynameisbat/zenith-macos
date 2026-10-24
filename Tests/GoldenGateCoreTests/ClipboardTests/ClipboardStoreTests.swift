@@ -230,4 +230,26 @@ struct ClipboardStoreTests {
 
         #expect(store.items.count <= 30)
     }
+
+    // MARK: - Image Thumbnail & Command Hub Preview State
+    @Test("ImageThumbnailService defaults to 128px for sharp Retina thumbnails")
+    func testImageThumbnailServiceDefaultMaxDimension() {
+        let service = ImageThumbnailService.shared
+        #expect(service.defaultMaxPixelDimension == 128)
+    }
+
+    @Test("ZenithCommandHubState quickLookItem can be set and is cleared on reset")
+    @MainActor
+    func testZenithCommandHubStateQuickLookItem() {
+        let state = ZenithCommandHubState.shared
+        state.reset()
+        #expect(state.quickLookItem == nil)
+
+        let dummyItem = ClipboardItem.image(data: Data([0x01, 0x02]), width: 100, height: 100)
+        state.quickLookItem = dummyItem
+        #expect(state.quickLookItem?.id == dummyItem.id)
+
+        state.reset()
+        #expect(state.quickLookItem == nil)
+    }
 }
