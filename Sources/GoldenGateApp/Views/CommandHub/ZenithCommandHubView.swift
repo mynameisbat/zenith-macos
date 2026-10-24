@@ -61,9 +61,15 @@ public struct ZenithCommandHubView: View {
 
             hairlineDivider
 
+            // INLINE CONFIRMATION (for destructive footer / drawer actions)
+            if let confirmation = hubState.pendingConfirmation {
+                confirmationBar(confirmation)
+            }
+
             // 4. SUBTLE STATUS & CONTROL FOOTER
             footerRow
         }
+        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: hubState.pendingConfirmation)
         .padding(10)
         .frame(width: 320)
         .background(.ultraThinMaterial)
@@ -82,7 +88,9 @@ public struct ZenithCommandHubView: View {
             )
         }
         .onExitCommand {
-            if hubState.quickLookItem != nil {
+            if hubState.pendingConfirmation != nil {
+                hubState.cancelConfirmation()
+            } else if hubState.quickLookItem != nil {
                 hubState.quickLookItem = nil
             } else {
                 onClose()
@@ -99,6 +107,9 @@ public struct ZenithCommandHubView: View {
         }
         .onChange(of: hubState.presentationID) { _, _ in
             isSearchFocused = true
+        }
+        .onChange(of: hubState.searchText) { _, _ in
+            hubState.clearSelection()
         }
     }
 
@@ -142,12 +153,21 @@ public struct ZenithCommandHubView: View {
     }
 
     private func handleSubmit() {
-        let query = hubState.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let confirmation = hubState.pendingConfirmation {
+            performConfirmation(confirmation)
+            return
+        }
+
+        let entries = hubState.entries(in: clipboardStore.items)
+        if let index = hubState.selectedEntryIndex, index < entries.count {
+            activate(entries[index])
+            return
+        }
+
+        let query = hubState.trimmedQuery
         if query.isEmpty {
             if let firstClip = filteredClips.first {
-                clipboardStore.selectAndRestoreItem(firstClip)
-                ToastHUDController.shared.show(message: "Copied to Clipboard", icon: "doc.on.clipboard")
-                onClose()
+                copyClip(firstClip)
             } else if let firstAction = matchingActions.first {
                 executeAction(firstAction)
             }
@@ -158,9 +178,7 @@ public struct ZenithCommandHubView: View {
         if let firstAction = matchingActions.first, matchingActions.count < ZenithHubAction.allCases.count {
             executeAction(firstAction)
         } else if let firstClip = filteredClips.first {
-            clipboardStore.selectAndRestoreItem(firstClip)
-            ToastHUDController.shared.show(message: "Copied to Clipboard", icon: "doc.on.clipboard")
-            onClose()
+            copyClip(firstClip)
         } else if let firstAction = matchingActions.first {
             executeAction(firstAction)
         }
@@ -169,11 +187,29 @@ public struct ZenithCommandHubView: View {
     // MARK: - 2. Quick Actions List
 
     private var matchingActions: [ZenithHubAction] {
-        let query = hubState.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.isEmpty {
-            return ZenithHubAction.allCases
+        hubState.matchingActions
+    }
+
+    /// Whether `entry` is the row currently chosen with the arrow keys.
+    private func isKeyboardSelected(_ entry: ZenithHubEntry) -> Bool {
+        guard let index = hubState.selectedEntryIndex else { return false }
+        let entries = hubState.entries(in: clipboardStore.items)
+        guard index < entries.count else { return false }
+        switch (entries[index], entry) {
+        case (.action(let lhs), .action(let rhs)):
+            return lhs == rhs
+        case (.clip(let lhs), .clip(let rhs)):
+            return lhs.id == rhs.id
+        default:
+            return false
         }
-        return ZenithHubAction.allCases.filter { $0.matches(query: query) }
+    }
+
+    private func rowFill(isSelected: Bool, isHovered: Bool) -> Color {
+        if isSelected {
+            return Color.accentColor.opacity(0.18)
+        }
+        return Color.primary.opacity(isHovered ? 0.06 : 0.0)
     }
 
     private var quickActionsList: some View {
@@ -185,7 +221,9 @@ public struct ZenithCommandHubView: View {
     }
 
     private func quickActionRow(action: ZenithHubAction) -> some View {
-        Button {
+        let isSelected = isKeyboardSelected(.action(action))
+        let isHovered = hubState.hoveredActionId == action.rawValue
+        return Button {
             executeAction(action)
         } label: {
             HStack(spacing: 8) {
@@ -214,7 +252,7 @@ public struct ZenithCommandHubView: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.primary.opacity(hubState.hoveredActionId == action.rawValue ? 0.06 : 0.0))
+                    .fill(rowFill(isSelected: isSelected, isHovered: isHovered))
             )
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
@@ -230,7 +268,22 @@ public struct ZenithCommandHubView: View {
                 hubState.clearHoveredAction(ifCurrent: action.rawValue)
             }
         }
-        .animation(.easeInOut(duration: 0.12), value: hubState.hoveredActionId == action.rawValue)
+        .animation(.easeInOut(duration: 0.12), value: isHovered || isSelected)
+    }
+
+    private func activate(_ entry: ZenithHubEntry) {
+        switch entry {
+        case .action(let action):
+            executeAction(action)
+        case .clip(let item):
+            copyClip(item)
+        }
+    }
+
+    private func copyClip(_ item: ClipboardItem) {
+        clipboardStore.selectAndRestoreItem(item)
+        ToastHUDController.shared.show(message: "Copied to Clipboard", icon: "doc.on.clipboard")
+        onClose()
     }
 
     private func executeAction(_ action: ZenithHubAction) {
@@ -246,17 +299,11 @@ public struct ZenithCommandHubView: View {
     // MARK: - 3. Recent Clips / Search Results Section
 
     private var allMatchedClips: [ClipboardItem] {
-        let query = hubState.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return [] }
-        return FuzzySearchEngine().search(query: query, in: clipboardStore.items)
+        hubState.allMatchedClips(in: clipboardStore.items)
     }
 
     private var filteredClips: [ClipboardItem] {
-        let query = hubState.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.isEmpty {
-            return Array(clipboardStore.items.prefix(4))
-        }
-        return Array(allMatchedClips.prefix(5))
+        hubState.visibleClips(in: clipboardStore.items)
     }
 
     private var sectionHeaderTitle: String {
@@ -304,10 +351,9 @@ public struct ZenithCommandHubView: View {
     @ViewBuilder
     private func clipRow(index: Int, item: ClipboardItem) -> some View {
         let isHovered = hubState.hoveredClipId == item.id
+        let isSelected = isKeyboardSelected(.clip(item))
         let button = Button {
-            clipboardStore.selectAndRestoreItem(item)
-            ToastHUDController.shared.show(message: "Copied to Clipboard", icon: "doc.on.clipboard")
-            onClose()
+            copyClip(item)
         } label: {
             HStack(spacing: 9) {
                 // Leading Icon / Thumbnail
@@ -397,7 +443,7 @@ public struct ZenithCommandHubView: View {
             .padding(.vertical, 4.5)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.primary.opacity(isHovered ? 0.06 : 0.0))
+                    .fill(rowFill(isSelected: isSelected, isHovered: isHovered))
             )
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
@@ -409,7 +455,7 @@ public struct ZenithCommandHubView: View {
                 hubState.clearHoveredClip(ifCurrent: item.id)
             }
         }
-        .animation(.easeInOut(duration: 0.12), value: isHovered)
+        .animation(.easeInOut(duration: 0.12), value: isHovered || isSelected)
 
         if index < 4 {
             button.keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
@@ -436,282 +482,336 @@ public struct ZenithCommandHubView: View {
     // MARK: - 4. Subtle Status & Control Footer
 
     private var footerRow: some View {
-        VStack(spacing: 6) {
-            // Top telemetry sub-row: CPU, RAM, Battery, SSD Free Space, and Peripherals
-            HStack(spacing: 8) {
-                // CPU status
-                HStack(spacing: 3) {
-                    Image(systemName: "cpu")
-                        .font(.system(size: 9.5))
-                        .foregroundColor(hubState.hardwareSnapshot.cpu.totalUsagePercent > 75 ? .red : (hubState.hardwareSnapshot.cpu.totalUsagePercent > 40 ? .orange : .secondary))
-                    Text("\(Int(round(hubState.hardwareSnapshot.cpu.totalUsagePercent)))%")
-                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-                        .foregroundColor(.secondary)
-                }
-                .help("CPU Usage: \(String(format: "%.1f", hubState.hardwareSnapshot.cpu.totalUsagePercent))% across \(hubState.hardwareSnapshot.cpu.coreCount) cores")
-
-                // RAM status with pressure indicator
-                HStack(spacing: 3) {
-                    Image(systemName: "memorychip")
-                        .font(.system(size: 9.5))
-                        .foregroundColor(hubState.hardwareSnapshot.memory.pressureLevel == .critical ? .red : (hubState.hardwareSnapshot.memory.pressureLevel == .warning ? .orange : .secondary))
-                    Text("\(Int(round(hubState.hardwareSnapshot.memory.usedPercent)))%")
-                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-                        .foregroundColor(.secondary)
-                }
-                .help("Memory: \(HardwareTelemetryService.formatBytes(hubState.hardwareSnapshot.memory.usedBytes)) used of \(HardwareTelemetryService.formatBytes(hubState.hardwareSnapshot.memory.totalBytes)) (\(hubState.hardwareSnapshot.memory.pressureLevel.rawValue.capitalized) pressure)")
-
-                // Battery status
-                if hubState.hardwareSnapshot.battery.hasBattery {
-                    HStack(spacing: 3) {
-                        Image(systemName: hubState.hardwareSnapshot.battery.isCharging ? "battery.100.bolt" : "battery.75")
-                            .font(.system(size: 9.5))
-                            .foregroundColor(hubState.hardwareSnapshot.battery.isCharging ? .green : (hubState.hardwareSnapshot.battery.percentage <= 20 ? .red : .secondary))
-                        Text("\(hubState.hardwareSnapshot.battery.percentage)%")
-                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-                            .foregroundColor(.secondary)
-                    }
-                    .help("Battery: \(hubState.hardwareSnapshot.battery.percentage)%, Condition: \(hubState.hardwareSnapshot.battery.condition), Cycles: \(hubState.hardwareSnapshot.battery.cycleCount ?? 0)")
-                }
-
-                // Storage status
-                HStack(spacing: 3) {
-                    Image(systemName: "internaldrive")
-                        .font(.system(size: 9.5))
-                        .foregroundColor(.secondary)
-                    Text("\(hubState.hardwareSnapshot.disk.freeBytes / 1_073_741_824)G free")
-                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-                        .foregroundColor(.secondary)
-                }
-                .help("\(hubState.hardwareSnapshot.disk.volumeName): \(hubState.hardwareSnapshot.disk.freeBytes / 1_073_741_824) GB free of \(hubState.hardwareSnapshot.disk.totalBytes / 1_073_741_824) GB")
-
-                // Connected Bluetooth accessories
-                ForEach(hubState.hardwareSnapshot.bluetoothDevices) { dev in
-                    HStack(spacing: 3) {
-                        Image(systemName: dev.icon)
-                            .font(.system(size: 9.5))
-                            .foregroundColor(.secondary)
-                        Text("\(dev.batteryPercent)%")
-                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-                            .foregroundColor(.secondary)
-                    }
-                    .help("\(dev.name): \(dev.batteryPercent)%")
-                }
-
-                Spacer()
-
-                // Settings & Quit
-                HStack(spacing: 4) {
-                    Button {
-                        onClose()
-                        onOpenPreferences()
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 11))
-                            Text("⌘,")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(Color.secondary.opacity(0.6))
-                        }
-                        .foregroundColor(hubState.hoveredFooterId == "settings" ? .primary : .secondary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 3.5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(Color.primary.opacity(hubState.hoveredFooterId == "settings" ? 0.08 : 0.0))
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(",", modifiers: .command)
-                    .help("Settings (⌘,)")
-                    .onHover { isHovered in
-                        if isHovered {
-                            hubState.setHoveredFooter("settings")
-                        } else {
-                            hubState.clearHoveredFooter(ifCurrent: "settings")
-                        }
-                    }
-
-                    Button {
-                        onQuit()
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "power")
-                                .font(.system(size: 11))
-                            Text("⌘Q")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(Color.secondary.opacity(0.6))
-                        }
-                        .foregroundColor(hubState.hoveredFooterId == "quit" ? .red : .secondary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 3.5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(Color.red.opacity(hubState.hoveredFooterId == "quit" ? 0.12 : 0.0))
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut("q", modifiers: .command)
-                    .help("Quit Zenith (⌘Q)")
-                    .onHover { isHovered in
-                        if isHovered {
-                            hubState.setHoveredFooter("quit")
-                        } else {
-                            hubState.clearHoveredFooter(ifCurrent: "quit")
-                        }
-                    }
-                }
-            }
-
-            // Bottom action tools row: DoH Shield, System Cleaner & Optimizer
-            HStack(spacing: 6) {
-                // DoH Shield Toggle
-                Button {
-                    privacyController.toggle()
-                } label: {
-                    HStack(spacing: 4.5) {
-                        Circle()
-                            .fill(privacyController.isRunning ? Color(red: 0.18, green: 0.8, blue: 0.44) : Color.secondary.opacity(0.4))
-                            .frame(width: 6, height: 6)
-
-                        Text("DoH Shield")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(privacyController.isRunning ? .primary : .secondary)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(hubState.hoveredFooterId == "doh" ? 0.08 : 0.04))
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .disabled(privacyController.isTransitioning)
-                .help(privacyController.isRunning ? "DNS Protection Active (Click to disable)" : "DNS Protection Disabled (Click to enable)")
-                .onHover { isHovered in
-                    if isHovered {
-                        hubState.setHoveredFooter("doh")
-                    } else {
-                        hubState.clearHoveredFooter(ifCurrent: "doh")
-                    }
-                }
-
-                // System Cleaner Badge
-                Button {
-                    Task {
-                        let freed = await cleaner.cleanSelected()
-                        if freed > 0 {
-                            ToastHUDController.shared.show(
-                                message: "Freed \(SystemCleanerService.formatBytes(freed))",
-                                icon: "broom.fill"
-                            )
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "broom.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(cleaner.selectedJunkSize > 0 ? Color.orange : Color.secondary)
-
-                        Text(cleaner.isCleaning ? "Cleaning..." : (cleaner.isScanning ? "Scanning..." : (cleaner.selectedJunkSize > 0 ? cleaner.formattedSelectedJunkSize : "Clean")))
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(cleaner.selectedJunkSize > 0 ? .primary : .secondary)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(hubState.hoveredFooterId == "cleaner" ? 0.08 : 0.04))
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .disabled(cleaner.isCleaning || cleaner.isScanning || cleaner.selectedJunkSize == 0)
-                .help(cleaner.selectedJunkSize > 0 ? "Clean \(cleaner.formattedSelectedJunkSize) system junk" : (historyTracker.totalSessions > 0 ? historyTracker.summaryHeadline : "System junk is clean"))
-                .onHover { isHovered in
-                    if isHovered {
-                        hubState.setHoveredFooter("cleaner")
-                    } else {
-                        hubState.clearHoveredFooter(ifCurrent: "cleaner")
-                    }
-                }
-
-                // System Optimizer Button
-                Button {
-                    Task {
-                        _ = try? SystemOptimizerService.shared.execute(taskId: .preventNetworkDsStore)
-                        _ = try? SystemOptimizerService.shared.execute(taskId: .quickLookCacheRefresh)
-                        _ = try? SystemOptimizerService.shared.execute(taskId: .dnsCacheFlush)
-                        ToastHUDController.shared.show(message: "System Optimized & DNS Flushed", icon: "sparkles")
-                        hubState.refreshHardwareSnapshot()
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 9.5))
-                            .foregroundColor(Color.cyan)
-                        Text("Optimize")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.primary)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(hubState.hoveredFooterId == "optimizer" ? 0.08 : 0.04))
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .help("Run System Maintenance (Flush DNS, Clean QuickLook, Disable .DS_Store on USB/Network)")
-                .onHover { isHovered in
-                    if isHovered {
-                        hubState.setHoveredFooter("optimizer")
-                    } else {
-                        hubState.clearHoveredFooter(ifCurrent: "optimizer")
-                    }
-                }
-
-                // Top CPU Hogs Toggle
-                Button {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                        hubState.toggleTopHogs()
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 9.5))
-                            .foregroundColor(hubState.showTopHogs ? .red : (hubState.hardwareSnapshot.cpu.totalUsagePercent > 50 ? .orange : .secondary))
-                        Text(hubState.showTopHogs ? "Hide Hogs" : "Top Hogs")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(hubState.showTopHogs ? .primary : .secondary)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(hubState.showTopHogs ? Color.red.opacity(0.12) : Color.primary.opacity(hubState.hoveredFooterId == "hogs" ? 0.08 : 0.04))
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .help("Inspect and kill heavy CPU processes")
-                .onHover { isHovered in
-                    if isHovered {
-                        hubState.setHoveredFooter("hogs")
-                    } else {
-                        hubState.clearHoveredFooter(ifCurrent: "hogs")
-                    }
-                }
-
-                Spacer()
-            }
+        VStack(spacing: 7) {
+            telemetryRow
+            footerActionsRow
         }
         .padding(.horizontal, 2)
         .padding(.top, 1)
+    }
+
+    /// Read-only status line: CPU, memory, battery, free disk space and the lowest accessory battery.
+    private var telemetryRow: some View {
+        let snapshot = hubState.hardwareSnapshot
+        let cpuPercent = snapshot.cpu.totalUsagePercent
+        let memory = snapshot.memory
+        let battery = snapshot.battery
+        let disk = snapshot.disk
+        let lowestAccessory = snapshot.bluetoothDevices.min { $0.batteryPercent < $1.batteryPercent }
+
+        return HStack(spacing: 10) {
+            telemetryItem(
+                icon: "cpu",
+                value: "\(Int(round(cpuPercent)))%",
+                tint: cpuPercent > 75 ? .red : (cpuPercent > 40 ? .orange : .secondary),
+                help: "CPU Usage: \(String(format: "%.1f", cpuPercent))% across \(snapshot.cpu.coreCount) cores"
+            )
+
+            telemetryItem(
+                icon: "memorychip",
+                value: "\(Int(round(memory.usedPercent)))%",
+                tint: memory.pressureLevel == .critical ? .red : (memory.pressureLevel == .warning ? .orange : .secondary),
+                help: "Memory: \(HardwareTelemetryService.formatBytes(memory.usedBytes)) used of \(HardwareTelemetryService.formatBytes(memory.totalBytes)) (\(memory.pressureLevel.rawValue.capitalized) pressure)"
+            )
+
+            if battery.hasBattery {
+                telemetryItem(
+                    icon: battery.isCharging ? "battery.100.bolt" : "battery.75",
+                    value: "\(battery.percentage)%",
+                    tint: battery.isCharging ? .green : (battery.percentage <= 20 ? .red : .secondary),
+                    help: "Battery: \(battery.percentage)%, Condition: \(battery.condition), Cycles: \(battery.cycleCount ?? 0)"
+                )
+            }
+
+            telemetryItem(
+                icon: "internaldrive",
+                value: "\(disk.freeBytes / 1_073_741_824) GB",
+                tint: .secondary,
+                help: "\(disk.volumeName): \(disk.freeBytes / 1_073_741_824) GB free of \(disk.totalBytes / 1_073_741_824) GB"
+            )
+
+            if let accessory = lowestAccessory {
+                telemetryItem(
+                    icon: accessory.icon,
+                    value: "\(accessory.batteryPercent)%",
+                    tint: accessory.batteryPercent <= 20 ? .red : .secondary,
+                    help: snapshot.bluetoothDevices
+                        .map { "\($0.name): \($0.batteryPercent)%" }
+                        .joined(separator: "\n")
+                )
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private func telemetryItem(icon: String, value: String, tint: Color, help: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 10.5))
+                .foregroundColor(tint)
+            Text(value)
+                .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                .foregroundColor(.secondary)
+        }
+        .help(help)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(help)
+    }
+
+    /// Action line: DoH Shield, cleaner and CPU drawer on the left; overflow menu, Settings and Quit on the right.
+    private var footerActionsRow: some View {
+        HStack(spacing: 6) {
+            // DoH Shield Toggle
+            footerChip(
+                id: "doh",
+                help: privacyController.isRunning ? "DNS Protection Active (Click to disable)" : "DNS Protection Disabled (Click to enable)",
+                action: { privacyController.toggle() }
+            ) {
+                HStack(spacing: 4.5) {
+                    Circle()
+                        .fill(privacyController.isRunning ? ZenithTheme.success : Color.secondary.opacity(0.4))
+                        .frame(width: 6, height: 6)
+
+                    Text("DoH")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(privacyController.isRunning ? .primary : .secondary)
+                }
+            }
+            .disabled(privacyController.isTransitioning)
+
+            // System Cleaner (asks for confirmation before deleting anything)
+            footerChip(
+                id: "cleaner",
+                help: cleaner.selectedJunkSize > 0 ? "Clean \(cleaner.formattedSelectedJunkSize) system junk" : (historyTracker.totalSessions > 0 ? historyTracker.summaryHeadline : "System junk is clean"),
+                action: { hubState.requestConfirmation(.cleanJunk(formattedSize: cleaner.formattedSelectedJunkSize)) }
+            ) {
+                HStack(spacing: 4) {
+                    Image(systemName: "broom.fill")
+                        .font(.system(size: 10.5))
+                        .foregroundColor(cleaner.selectedJunkSize > 0 ? Color.orange : Color.secondary)
+
+                    Text(cleaner.isCleaning ? "Cleaning…" : (cleaner.isScanning ? "Scanning…" : (cleaner.selectedJunkSize > 0 ? cleaner.formattedSelectedJunkSize : "Clean")))
+                        .font(.system(size: 11, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundColor(cleaner.selectedJunkSize > 0 ? .primary : .secondary)
+                }
+            }
+            .disabled(cleaner.isCleaning || cleaner.isScanning || cleaner.selectedJunkSize == 0)
+
+            // Top CPU Hogs Toggle
+            footerChip(
+                id: "hogs",
+                help: hubState.showTopHogs ? "Hide heavy CPU processes" : "Inspect and quit heavy CPU processes",
+                selectedFill: hubState.showTopHogs ? Color.red.opacity(0.12) : nil,
+                action: {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                        hubState.toggleTopHogs()
+                    }
+                }
+            ) {
+                HStack(spacing: 4) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 10.5))
+                        .foregroundColor(hubState.showTopHogs ? .red : (hubState.hardwareSnapshot.cpu.totalUsagePercent > 50 ? .orange : .secondary))
+                    Text("CPU")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(hubState.showTopHogs ? .primary : .secondary)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            // Overflow: less frequent actions
+            Menu {
+                Button {
+                    hubState.requestConfirmation(.optimizeSystem)
+                } label: {
+                    Label("Optimize System…", systemImage: "sparkles")
+                }
+
+                Divider()
+
+                Button {
+                    onOpenClipboard()
+                } label: {
+                    Label("Clipboard History", systemImage: "list.clipboard")
+                }
+                .keyboardShortcut("v", modifiers: [.command, .shift])
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("More actions")
+            .accessibilityLabel("More actions")
+
+            footerIconButton(id: "settings", systemImage: "gearshape", help: "Settings (⌘,)", hoverTint: .primary, hoverFill: Color.primary.opacity(0.08)) {
+                onClose()
+                onOpenPreferences()
+            }
+            .keyboardShortcut(",", modifiers: .command)
+
+            footerIconButton(id: "quit", systemImage: "power", help: "Quit Zenith (⌘Q)", hoverTint: .red, hoverFill: Color.red.opacity(0.12)) {
+                onQuit()
+            }
+            .keyboardShortcut("q", modifiers: .command)
+        }
+    }
+
+    private func footerChip<Content: View>(
+        id: String,
+        help: String,
+        selectedFill: Color? = nil,
+        action: @escaping () -> Void,
+        @ViewBuilder label: () -> Content
+    ) -> some View {
+        let isHovered = hubState.hoveredFooterId == id
+        let content = label()
+        return Button(action: action) {
+            content
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(selectedFill ?? Color.primary.opacity(isHovered ? 0.08 : 0.04))
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .onHover { hovering in
+            if hovering {
+                hubState.setHoveredFooter(id)
+            } else {
+                hubState.clearHoveredFooter(ifCurrent: id)
+            }
+        }
+    }
+
+    private func footerIconButton(
+        id: String,
+        systemImage: String,
+        help: String,
+        hoverTint: Color,
+        hoverFill: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        let isHovered = hubState.hoveredFooterId == id
+        return Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12))
+                .foregroundColor(isHovered ? hoverTint : .secondary)
+                .frame(width: 22, height: 20)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(isHovered ? hoverFill : Color.clear)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(help)
+        .onHover { hovering in
+            if hovering {
+                hubState.setHoveredFooter(id)
+            } else {
+                hubState.clearHoveredFooter(ifCurrent: id)
+            }
+        }
+    }
+
+    // MARK: - Inline Confirmation
+
+    private func confirmationBar(_ confirmation: ZenithHubConfirmation) -> some View {
+        let tint: Color = confirmation.isDestructive ? .red : .accentColor
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: confirmation.icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(tint)
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(confirmation.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Text(confirmation.message)
+                        .font(.system(size: 10.5))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 6) {
+                Text("↵ confirm  ⎋ cancel")
+                    .font(.system(size: 9.5, design: .monospaced))
+                    .foregroundColor(Color.secondary.opacity(0.7))
+
+                Spacer()
+
+                Button("Cancel") {
+                    hubState.cancelConfirmation()
+                }
+                .controlSize(.small)
+
+                Button(role: confirmation.isDestructive ? ButtonRole.destructive : nil) {
+                    performConfirmation(confirmation)
+                } label: {
+                    Text(confirmation.confirmTitle)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(tint)
+                .controlSize(.small)
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(tint.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(tint.opacity(0.25), lineWidth: 0.5)
+        )
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
+    private func performConfirmation(_ confirmation: ZenithHubConfirmation) {
+        hubState.cancelConfirmation()
+        switch confirmation {
+        case .cleanJunk:
+            Task {
+                let freed = await cleaner.cleanSelected()
+                if freed > 0 {
+                    ToastHUDController.shared.show(
+                        message: "Freed \(SystemCleanerService.formatBytes(freed))",
+                        icon: "broom.fill"
+                    )
+                }
+            }
+        case .optimizeSystem:
+            Task {
+                _ = try? SystemOptimizerService.shared.execute(taskId: .preventNetworkDsStore)
+                _ = try? SystemOptimizerService.shared.execute(taskId: .quickLookCacheRefresh)
+                _ = try? SystemOptimizerService.shared.execute(taskId: .dnsCacheFlush)
+                ToastHUDController.shared.show(message: "System Optimized & DNS Flushed", icon: "sparkles")
+                hubState.refreshHardwareSnapshot()
+            }
+        case .terminateProcess(let pid, let name):
+            hubState.killProcess(pid: pid)
+            ToastHUDController.shared.show(message: "Terminated \(name)", icon: "xmark.circle.fill")
+        case .purgeZombies:
+            _ = try? SystemOptimizerService().execute(taskId: .zombieProcessCleanup)
+            hubState.refreshHardwareSnapshot()
+            ToastHUDController.shared.show(message: "Zombies Purged", icon: "bolt.fill")
+        }
     }
 
     // MARK: - Top CPU Hogs Section
@@ -766,8 +866,7 @@ public struct ZenithCommandHubView: View {
                             )
 
                         Button {
-                            hubState.killProcess(pid: hog.pid)
-                            ToastHUDController.shared.show(message: "Terminated \(hog.name)", icon: "xmark.circle.fill")
+                            hubState.requestConfirmation(.terminateProcess(pid: hog.pid, name: hog.name))
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 13))
@@ -795,9 +894,7 @@ public struct ZenithCommandHubView: View {
                         .foregroundColor(.secondary)
                     Spacer()
                     Button("Purge") {
-                        _ = try? SystemOptimizerService().execute(taskId: .zombieProcessCleanup)
-                        hubState.refreshHardwareSnapshot()
-                        ToastHUDController.shared.show(message: "Zombies Purged", icon: "bolt.fill")
+                        hubState.requestConfirmation(.purgeZombies(count: hubState.hardwareSnapshot.cpu.zombieProcesses.count))
                     }
                     .font(.system(size: 9, weight: .bold))
                     .buttonStyle(.borderedProminent)

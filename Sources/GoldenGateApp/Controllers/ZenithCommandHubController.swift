@@ -116,9 +116,25 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let relevantModifiers = modifiers.subtracting([.capsLock, .numericPad, .function])
 
-        // Escape: Dismiss popover
+        let state = ZenithCommandHubState.shared
+
+        // Escape: cancel a pending confirmation or Quick Look first, otherwise dismiss popover
         if relevantModifiers.isEmpty && event.keyCode == 53 {
-            close()
+            if state.pendingConfirmation != nil {
+                state.cancelConfirmation()
+            } else if state.quickLookItem != nil {
+                state.quickLookItem = nil
+            } else {
+                close()
+            }
+            return true
+        }
+
+        // ↓ / ↑: move keyboard selection through actions and clips
+        if relevantModifiers.isEmpty && (event.keyCode == 125 || event.keyCode == 126) {
+            guard state.pendingConfirmation == nil else { return true }
+            let entryCount = state.entries(in: ClipboardStore.shared.items).count
+            state.moveSelection(by: event.keyCode == 125 ? 1 : -1, entryCount: entryCount)
             return true
         }
 
@@ -184,14 +200,7 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
     }
 
     private func selectClipAtIndex(_ index: Int) -> Bool {
-        let query = ZenithCommandHubState.shared.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let items: [ClipboardItem]
-        if query.isEmpty {
-            items = Array(ClipboardStore.shared.items.prefix(4))
-        } else {
-            let matched = FuzzySearchEngine().search(query: query, in: ClipboardStore.shared.items)
-            items = Array(matched.prefix(5))
-        }
+        let items = ZenithCommandHubState.shared.visibleClips(in: ClipboardStore.shared.items)
 
         guard index >= 0 && index < items.count else { return true }
         let item = items[index]

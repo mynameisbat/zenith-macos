@@ -60,6 +60,63 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
     }
 }
 
+/// A row in the Command Hub that can be reached with the arrow keys.
+public enum ZenithHubEntry: Equatable, Sendable {
+    case action(ZenithHubAction)
+    case clip(ClipboardItem)
+}
+
+/// Potentially destructive Command Hub operations that require an inline confirmation before running.
+public enum ZenithHubConfirmation: Equatable, Sendable {
+    case cleanJunk(formattedSize: String)
+    case optimizeSystem
+    case terminateProcess(pid: Int, name: String)
+    case purgeZombies(count: Int)
+
+    public var title: String {
+        switch self {
+        case .cleanJunk(let formattedSize): return "Clean \(formattedSize) of junk?"
+        case .optimizeSystem: return "Run system maintenance?"
+        case .terminateProcess(_, let name): return "Quit \(name)?"
+        case .purgeZombies(let count): return "Purge \(count) zombie process\(count == 1 ? "" : "es")?"
+        }
+    }
+
+    public var message: String {
+        switch self {
+        case .cleanJunk: return "Selected caches and logs will be permanently deleted."
+        case .optimizeSystem: return "Flushes DNS, refreshes QuickLook and stops .DS_Store on network drives."
+        case .terminateProcess(let pid, _): return "Unsaved work in this app may be lost (PID \(pid))."
+        case .purgeZombies: return "Signals the parent processes to reap defunct children."
+        }
+    }
+
+    public var confirmTitle: String {
+        switch self {
+        case .cleanJunk: return "Clean"
+        case .optimizeSystem: return "Run"
+        case .terminateProcess: return "Quit Process"
+        case .purgeZombies: return "Purge"
+        }
+    }
+
+    public var icon: String {
+        switch self {
+        case .cleanJunk: return "broom.fill"
+        case .optimizeSystem: return "sparkles"
+        case .terminateProcess: return "xmark.octagon.fill"
+        case .purgeZombies: return "bolt.fill"
+        }
+    }
+
+    public var isDestructive: Bool {
+        switch self {
+        case .optimizeSystem: return false
+        default: return true
+        }
+    }
+}
+
 /// State controller for hover states, active search query, and selections in Zenith Command Hub.
 @MainActor
 public final class ZenithCommandHubState: ObservableObject {
@@ -73,8 +130,74 @@ public final class ZenithCommandHubState: ObservableObject {
     @Published public var presentationID: UUID = UUID()
     @Published public var hardwareSnapshot: HardwareSnapshot = HardwareTelemetryService.shared.fetchSnapshot()
     @Published public var showTopHogs: Bool = false
+    /// Keyboard (arrow key) selection into `entries(in:)`; nil when nothing is selected.
+    @Published public var selectedEntryIndex: Int? = nil
+    @Published public var pendingConfirmation: ZenithHubConfirmation? = nil
 
     public init() {}
+
+    // MARK: - Visible Content
+
+    public var trimmedQuery: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    public var matchingActions: [ZenithHubAction] {
+        let query = trimmedQuery
+        if query.isEmpty {
+            return ZenithHubAction.allCases
+        }
+        return ZenithHubAction.allCases.filter { $0.matches(query: query) }
+    }
+
+    /// All clips matching the current query (empty when there is no query).
+    public func allMatchedClips(in items: [ClipboardItem]) -> [ClipboardItem] {
+        let query = trimmedQuery
+        guard !query.isEmpty else { return [] }
+        return FuzzySearchEngine().search(query: query, in: items)
+    }
+
+    /// Clips shown in the hub: the 4 most recent, or the top 5 search results.
+    public func visibleClips(in items: [ClipboardItem]) -> [ClipboardItem] {
+        if trimmedQuery.isEmpty {
+            return Array(items.prefix(4))
+        }
+        return Array(allMatchedClips(in: items).prefix(5))
+    }
+
+    /// Rows reachable with the arrow keys, in on-screen order.
+    public func entries(in items: [ClipboardItem]) -> [ZenithHubEntry] {
+        matchingActions.map { ZenithHubEntry.action($0) } + visibleClips(in: items).map { ZenithHubEntry.clip($0) }
+    }
+
+    // MARK: - Keyboard Selection
+
+    /// Moves the arrow-key selection, wrapping around at both ends.
+    public func moveSelection(by delta: Int, entryCount: Int) {
+        guard entryCount > 0 else {
+            selectedEntryIndex = nil
+            return
+        }
+        guard let current = selectedEntryIndex, current < entryCount else {
+            selectedEntryIndex = delta >= 0 ? 0 : entryCount - 1
+            return
+        }
+        selectedEntryIndex = ((current + delta) % entryCount + entryCount) % entryCount
+    }
+
+    public func clearSelection() {
+        selectedEntryIndex = nil
+    }
+
+    // MARK: - Confirmation
+
+    public func requestConfirmation(_ confirmation: ZenithHubConfirmation) {
+        pendingConfirmation = confirmation
+    }
+
+    public func cancelConfirmation() {
+        pendingConfirmation = nil
+    }
 
     public func refreshHardwareSnapshot() {
         hardwareSnapshot = HardwareTelemetryService.shared.fetchSnapshot()
@@ -92,6 +215,7 @@ public final class ZenithCommandHubState: ObservableObject {
 
     public func setSearchText(_ text: String) {
         searchText = text
+        selectedEntryIndex = nil
     }
 
     public func setHoveredAction(_ id: String?) {
@@ -130,6 +254,8 @@ public final class ZenithCommandHubState: ObservableObject {
         hoveredClipId = nil
         hoveredFooterId = nil
         quickLookItem = nil
+        selectedEntryIndex = nil
+        pendingConfirmation = nil
         presentationID = UUID()
     }
 }

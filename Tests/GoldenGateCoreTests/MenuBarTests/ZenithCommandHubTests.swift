@@ -156,4 +156,86 @@ struct ZenithCommandHubTests {
         state.reset()
         #expect(state.presentationID != initialID)
     }
+
+    private func textItem(_ text: String) -> ClipboardItem {
+        ClipboardItem(itemType: .plainText, payload: .plainText(text), previewText: text, byteSize: text.utf8.count)
+    }
+
+    @Test("HUB-09: Arrow-key selection starts at the ends and wraps around")
+    @MainActor
+    func testKeyboardSelectionWrapping() {
+        let state = ZenithCommandHubState()
+        #expect(state.selectedEntryIndex == nil)
+
+        state.moveSelection(by: 1, entryCount: 3)
+        #expect(state.selectedEntryIndex == 0)
+        state.moveSelection(by: 1, entryCount: 3)
+        state.moveSelection(by: 1, entryCount: 3)
+        #expect(state.selectedEntryIndex == 2)
+        state.moveSelection(by: 1, entryCount: 3)
+        #expect(state.selectedEntryIndex == 0)
+        state.moveSelection(by: -1, entryCount: 3)
+        #expect(state.selectedEntryIndex == 2)
+
+        state.clearSelection()
+        state.moveSelection(by: -1, entryCount: 3)
+        #expect(state.selectedEntryIndex == 2)
+
+        // A stale index past the end restarts from the edge; empty lists clear selection
+        state.moveSelection(by: 1, entryCount: 2)
+        #expect(state.selectedEntryIndex == 0)
+        state.moveSelection(by: 1, entryCount: 0)
+        #expect(state.selectedEntryIndex == nil)
+    }
+
+    @Test("HUB-10: Entries list actions first, then the visible clips")
+    @MainActor
+    func testEntriesOrdering() {
+        let state = ZenithCommandHubState()
+        let items = (1...6).map { textItem("clip \($0)") }
+
+        let entries = state.entries(in: items)
+        #expect(entries.count == ZenithHubAction.allCases.count + 4)
+        #expect(entries.first == .action(.area))
+        #expect(entries[ZenithHubAction.allCases.count] == .clip(items[0]))
+
+        state.setSearchText("nonexistent_query_xyz")
+        #expect(state.entries(in: items).isEmpty)
+    }
+
+    @Test("HUB-11: Changing the query or resetting clears selection and pending confirmation")
+    @MainActor
+    func testSelectionAndConfirmationReset() {
+        let state = ZenithCommandHubState()
+        state.moveSelection(by: 1, entryCount: 3)
+        state.setSearchText("cap")
+        #expect(state.selectedEntryIndex == nil)
+
+        state.requestConfirmation(.optimizeSystem)
+        #expect(state.pendingConfirmation == .optimizeSystem)
+        state.cancelConfirmation()
+        #expect(state.pendingConfirmation == nil)
+
+        state.moveSelection(by: 1, entryCount: 3)
+        state.requestConfirmation(.terminateProcess(pid: 42, name: "Xcode"))
+        state.reset()
+        #expect(state.selectedEntryIndex == nil)
+        #expect(state.pendingConfirmation == nil)
+    }
+
+    @Test("HUB-12: Confirmation copy describes the action and flags destructive ones")
+    func testConfirmationCopy() {
+        let clean = ZenithHubConfirmation.cleanJunk(formattedSize: "1.2 GB")
+        #expect(clean.title == "Clean 1.2 GB of junk?")
+        #expect(clean.isDestructive)
+
+        let kill = ZenithHubConfirmation.terminateProcess(pid: 42, name: "Xcode")
+        #expect(kill.title == "Quit Xcode?")
+        #expect(kill.message.contains("42"))
+        #expect(kill.isDestructive)
+
+        #expect(ZenithHubConfirmation.purgeZombies(count: 1).title == "Purge 1 zombie process?")
+        #expect(ZenithHubConfirmation.purgeZombies(count: 3).title == "Purge 3 zombie processes?")
+        #expect(!ZenithHubConfirmation.optimizeSystem.isDestructive)
+    }
 }
