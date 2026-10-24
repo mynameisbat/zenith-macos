@@ -9,13 +9,6 @@ public struct ZenithPreferencesView: View {
         self.viewModel = viewModel
     }
 
-    private func closeSettings() {
-        SettingsWindowController.shared.dismiss()
-        for win in NSApp.windows where win is SettingsWindow {
-            win.orderOut(nil)
-        }
-    }
-
     public var body: some View {
         HStack(spacing: 0) {
             // 1. Left Sidebar (Navigation Pane)
@@ -39,6 +32,7 @@ public struct ZenithPreferencesView: View {
                 .allowsHitTesting(false)
         )
         .frame(minWidth: 680, maxWidth: .infinity, minHeight: 490, maxHeight: .infinity)
+        .ignoresSafeArea()
     }
 
 
@@ -46,42 +40,7 @@ public struct ZenithPreferencesView: View {
 
     private var sidebarView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Top Window Traffic Light Controls Bar
-            HStack(spacing: 7) {
-                Button {
-                    closeSettings()
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color(nsColor: .systemRed).opacity(0.9))
-                            .frame(width: 12, height: 12)
-                        Image(systemName: "xmark")
-                            .font(.system(size: 7, weight: .black))
-                            .foregroundColor(Color.black.opacity(0.65))
-                            .opacity(viewModel.isCloseHovered ? 1 : 0)
-                    }
-                }
-                .buttonStyle(.plain)
-                .onHover { hovering in
-                    viewModel.isCloseHovered = hovering
-                }
-                .help("Close Settings Studio (Esc)")
-
-                Circle()
-                    .fill(Color.secondary.opacity(0.22))
-                    .frame(width: 12, height: 12)
-
-                Circle()
-                    .fill(Color.secondary.opacity(0.22))
-                    .frame(width: 12, height: 12)
-
-                Spacer()
-            }
-            .padding(.leading, 16)
-            .padding(.top, 14)
-            .padding(.bottom, 6)
-
-            // App Brand Header
+            // App Brand Header with macOS native traffic-light inset
             HStack(spacing: 12) {
                 if let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage {
                     Image(nsImage: appIcon)
@@ -105,8 +64,8 @@ public struct ZenithPreferencesView: View {
                 Spacer()
             }
             .padding(.horizontal, 16)
-            .padding(.top, 6)
-            .padding(.bottom, 12)
+            .padding(.top, 40)
+            .padding(.bottom, 14)
 
             // Search Filter
             HStack(spacing: 6) {
@@ -271,7 +230,7 @@ public struct ZenithPreferencesView: View {
                 Spacer()
             }
             .padding(.horizontal, 24)
-            .padding(.top, 24)
+            .padding(.top, 38)
             .padding(.bottom, 14)
 
             Rectangle()
