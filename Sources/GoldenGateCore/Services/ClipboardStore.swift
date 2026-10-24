@@ -95,7 +95,7 @@ public struct FuzzySearchEngine: Sendable {
                     score = 1000
                 } else if normPreview.hasPrefix(lowerQuery) {
                     score = 500
-                } else if let range = normPreview.range(of: lowerQuery) {
+                } else if let range = normPreview.range(of: lowerQuery, options: .literal) {
                     let isWordBoundary: Bool = {
                         if range.lowerBound == normPreview.startIndex { return true }
                         let prevChar = normPreview[normPreview.index(before: range.lowerBound)]
@@ -115,7 +115,7 @@ public struct FuzzySearchEngine: Sendable {
                     score = 1000
                 } else if foldedPreview.hasPrefix(foldedQuery) {
                     score = 500
-                } else if let range = foldedPreview.range(of: foldedQuery) {
+                } else if let range = foldedPreview.range(of: foldedQuery, options: .literal) {
                     let isWordBoundary: Bool = {
                         if range.lowerBound == foldedPreview.startIndex { return true }
                         let prevChar = foldedPreview[foldedPreview.index(before: range.lowerBound)]
@@ -141,12 +141,12 @@ public struct FuzzySearchEngine: Sendable {
         // 3. Substring in body content (only if preview didn't match and content exists)
         if score == 0, let contentPrefix = item.searchContentPrefix, queryLen <= item.searchContentPrefixCount {
             if isPureASCII {
-                if let range = contentPrefix.range(of: lowerQuery) {
+                if let range = contentPrefix.range(of: lowerQuery, options: .literal) {
                     let distance = contentPrefix.utf8.distance(from: contentPrefix.utf8.startIndex, to: range.lowerBound.samePosition(in: contentPrefix.utf8) ?? contentPrefix.utf8.startIndex)
                     score = 150 + max(0, 30 - distance)
                 }
             } else if let foldedContent = item.foldedContentPrefix {
-                if let range = foldedContent.range(of: foldedQuery) {
+                if let range = foldedContent.range(of: foldedQuery, options: .literal) {
                     let distance = foldedContent.utf8.distance(from: foldedContent.utf8.startIndex, to: range.lowerBound.samePosition(in: foldedContent.utf8) ?? foldedContent.utf8.startIndex)
                     score = 150 + max(0, 30 - distance)
                 }

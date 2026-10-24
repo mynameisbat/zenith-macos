@@ -11,8 +11,10 @@ struct KeyboardNavigationEngineTests {
         let mockPasteboard = MockPasteboardService()
         let mockSound = MockSoundService()
         var items: [ClipboardItem] = []
-        for i in 1...count {
-            items.append(ClipboardItem.text("Item \(i)"))
+        if count > 0 {
+            for i in 1...count {
+                items.append(ClipboardItem.text("Item \(i)"))
+            }
         }
 
         let viewModel = ClipboardHistoryViewModel(
@@ -304,4 +306,319 @@ struct KeyboardNavigationEngineTests {
         #expect(handledForwardDelete == true)
         #expect(viewModel.items.count == 2)
     }
+
+    // MARK: - Pinning Shortcut Tests
+
+    @Test("Command + P (⌘P) toggles pin status on selected item")
+    func testCommandPTogglesPinStatus() {
+        let (engine, viewModel, _, _) = makeEngineWithItems(count: 3)
+        #expect(viewModel.filteredItems[0].isPinned == false)
+
+        // Press ⌘P to pin item at index 0
+        let handled1 = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(handled1 == true)
+        #expect(viewModel.filteredItems[0].isPinned == true)
+
+        // Press ⌘P again to unpin item at index 0
+        let handled2 = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(handled2 == true)
+        #expect(viewModel.filteredItems[0].isPinned == false)
+
+        // Move to index 1 and toggle pin
+        viewModel.selectedIndex = 1
+        #expect(viewModel.filteredItems[1].isPinned == false)
+        let handled3 = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(handled3 == true)
+        #expect(viewModel.filteredItems[1].isPinned == true)
+        #expect(viewModel.filteredItems[0].isPinned == false)
+    }
+
+    @Test("Command + P (⌘P) safe handling with empty list and store integration")
+    func testCommandPSafeHandlingAndStoreIntegration() {
+        let (engine, viewModel, _, _) = makeEngineWithItems(count: 0)
+        #expect(viewModel.filteredItems.isEmpty)
+
+        // Should return true (consumed) safely without crash on empty list
+        let handledEmpty = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(handledEmpty == true)
+
+        // Test with real store attached
+        let store = ClipboardStore(capacity: 20)
+        let itemA = ClipboardItem.text("Store Item A")
+        let itemB = ClipboardItem.text("Store Item B")
+        store.add(itemA)
+        store.add(itemB)
+
+        let storeViewModel = ClipboardHistoryViewModel(store: store)
+        engine.activeViewModel = storeViewModel
+        #expect(storeViewModel.filteredItems.count == 2)
+        #expect(storeViewModel.filteredItems[0].isPinned == false)
+
+        let handledStore = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(handledStore == true)
+        #expect(storeViewModel.filteredItems[0].isPinned == true)
+        #expect(store.items[0].isPinned == true)
+
+        let handledStoreUnpin = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(handledStoreUnpin == true)
+        #expect(storeViewModel.filteredItems[0].isPinned == false)
+        #expect(store.items[0].isPinned == false)
+    }
+
+    @Test("togglePinSelectedItem safely guards against corrupted selectedIndex (-1, 999)")
+    func testCorruptedSelectedIndexSafety() {
+        let (engine, viewModel, _, _) = makeEngineWithItems(count: 1)
+        #expect(viewModel.filteredItems.count == 1)
+
+        // Force out-of-bounds selectedIndex
+        viewModel.selectedIndex = -1
+        viewModel.togglePinSelectedItem()
+        #expect(viewModel.filteredItems[0].isPinned == false)
+
+        viewModel.selectedIndex = 999
+        viewModel.togglePinSelectedItem()
+        #expect(viewModel.filteredItems[0].isPinned == false)
+
+        // Restore valid selectedIndex and verify normal toggle works
+        viewModel.selectedIndex = 0
+        let handled = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(handled == true)
+        #expect(viewModel.filteredItems[0].isPinned == true)
+    }
+
+    @Test("Rapid 1,000 pin toggle cycles preserves exact toggle parity without latency spikes")
+    func testRapidPinTogglingParity() {
+        let (engine, viewModel, _, _) = makeEngineWithItems(count: 1)
+        #expect(viewModel.filteredItems[0].isPinned == false)
+
+        let start = DispatchTime.now()
+        let cycles = 1000
+        for _ in 0..<cycles {
+            let handled = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+            #expect(handled == true)
+        }
+        let elapsedNanos = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+        let totalMs = Double(elapsedNanos) / 1_000_000.0
+
+        // 1000 even toggles should return to false
+        #expect(viewModel.filteredItems[0].isPinned == false)
+        #expect(totalMs < 500.0, "1,000 toggles took \(totalMs)ms, exceeding SLA")
+
+        // 1 more toggle -> true
+        _ = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(viewModel.filteredItems[0].isPinned == true)
+    }
+
+    @Test("⌘P with active search query targets filtered item at selectedIndex, not unfiltered index")
+    func testPinningUnderActiveSearchQuery() {
+        let store = ClipboardStore(capacity: 20)
+        let item1 = ClipboardItem.text("Alpha target one")
+        let item2 = ClipboardItem.text("Beta unrelated item")
+        let item3 = ClipboardItem.text("Alpha target two")
+        let item4 = ClipboardItem.text("Gamma unrelated item")
+
+        store.add(item4)
+        store.add(item3)
+        store.add(item2)
+        store.add(item1)
+
+        let viewModel = ClipboardHistoryViewModel(store: store)
+        let engine = KeyboardNavigationEngine()
+        engine.activeViewModel = viewModel
+
+        // Filter for "Alpha"
+        viewModel.searchText = "Alpha"
+        #expect(viewModel.filteredItems.count == 2)
+
+        // Select first filtered item
+        viewModel.selectedIndex = 0
+        let targetItem = viewModel.filteredItems[0]
+
+        // Press ⌘P
+        let handled = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(handled == true)
+        #expect(viewModel.filteredItems[0].id == targetItem.id)
+        #expect(viewModel.filteredItems[0].isPinned == true)
+        #expect(store.items.first(where: { $0.id == targetItem.id })?.isPinned == true)
+
+        // Select second filtered item and pin it as well
+        viewModel.selectedIndex = 1
+        let secondTarget = viewModel.filteredItems[1]
+        let handled2 = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(handled2 == true)
+        #expect(viewModel.filteredItems[1].isPinned == true)
+        #expect(store.items.first(where: { $0.id == secondTarget.id })?.isPinned == true)
+
+        // Clear search and verify pinning state persists across full list
+        viewModel.searchText = ""
+        #expect(viewModel.filteredItems.count == 4)
+        #expect(viewModel.filteredItems.first(where: { $0.id == targetItem.id })?.isPinned == true)
+        #expect(viewModel.filteredItems.first(where: { $0.id == secondTarget.id })?.isPinned == true)
+    }
+
+    @Test("Shortcut disambiguation: ⌘P vs Ctrl+P vs ⌘⇧P vs ⌘⌥P")
+    func testShortcutDisambiguation() {
+        let (engine, viewModel, _, _) = makeEngineWithItems(count: 3)
+        viewModel.selectedIndex = 1 // Start at Item 2
+
+        // 1. Ctrl+P: Emacs navigation up (should decrement selectedIndex, NOT toggle pin)
+        let handledCtrlP = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.control])
+        #expect(handledCtrlP == true)
+        #expect(viewModel.selectedIndex == 0)
+        #expect(viewModel.filteredItems[0].isPinned == false)
+        #expect(viewModel.filteredItems[1].isPinned == false)
+
+        // 2. ⌘⇧P: Command + Shift + P should be passed through (false) and NOT toggle pin
+        let handledCmdShiftP = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command, .shift])
+        #expect(handledCmdShiftP == false)
+        #expect(viewModel.filteredItems[0].isPinned == false)
+
+        // 3. ⌘⌥P: Command + Option + P should be passed through (false)
+        let handledCmdOptP = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command, .option])
+        #expect(handledCmdOptP == false)
+        #expect(viewModel.filteredItems[0].isPinned == false)
+
+        // 4. ⌘⌃P: Command + Control + P should be passed through (false)
+        let handledCmdCtrlP = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command, .control])
+        #expect(handledCmdCtrlP == false)
+        #expect(viewModel.filteredItems[0].isPinned == false)
+
+        // 5. ⌘P with CapsLock flag: Should correctly toggle pin (CapsLock is stripped)
+        let handledCmdCapsLockP = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command, .capsLock])
+        #expect(handledCmdCapsLockP == true)
+        #expect(viewModel.filteredItems[0].isPinned == true)
+
+        // 6. ⌘P with Function / NumericPad flags (hardware keyboard artifact)
+        let handledCmdHardwareP = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command, .function, .numericPad])
+        #expect(handledCmdHardwareP == true)
+        #expect(viewModel.filteredItems[0].isPinned == false)
+    }
+
+    @Test("Pinned items are strictly protected against LRU/FIFO eviction")
+    func testPinnedItemsSurviveEviction() {
+        let store = ClipboardStore(capacity: 3)
+        let item1 = ClipboardItem.text("First (to be pinned)")
+        let item2 = ClipboardItem.text("Second")
+        let item3 = ClipboardItem.text("Third")
+
+        store.add(item1)
+        store.add(item2)
+        store.add(item3)
+
+        let viewModel = ClipboardHistoryViewModel(store: store)
+        let engine = KeyboardNavigationEngine()
+        engine.activeViewModel = viewModel
+
+        // Move to item1 (at index 2)
+        viewModel.selectedIndex = 2
+        #expect(viewModel.filteredItems[2].previewText == "First (to be pinned)")
+
+        // Pin item1 via ⌘P
+        let handled = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(handled == true)
+        #expect(store.items.first(where: { $0.id == item1.id })?.isPinned == true)
+
+        // Add 5 more items to overflow capacity (capacity = 3)
+        for i in 4...8 {
+            store.add(ClipboardItem.text("Overflow Item \(i)"))
+        }
+
+        viewModel.syncWithStore()
+
+        // Pinned item1 MUST still be in store.items!
+        let pinnedStillExists = store.items.contains(where: { $0.id == item1.id })
+        #expect(pinnedStillExists == true, "Pinned item must survive store capacity eviction!")
+
+        // Unpinned item2 must have been evicted
+        let unpinnedEvicted = !store.items.contains(where: { $0.id == item2.id })
+        #expect(unpinnedEvicted == true, "Unpinned old item must be evicted when capacity is reached")
+    }
+
+    @Test("clearUnpinnedHistory preserves ⌘P-pinned items and purges unpinned")
+    func testClearUnpinnedHistoryPreservesPinned() {
+        let store = ClipboardStore(capacity: 20)
+        for i in 1...5 {
+            store.add(ClipboardItem.text("Item \(i)"))
+        }
+        let viewModel = ClipboardHistoryViewModel(store: store)
+        let engine = KeyboardNavigationEngine()
+        engine.activeViewModel = viewModel
+
+        #expect(viewModel.filteredItems.count == 5)
+
+        // Pin Item at index 0 and index 2
+        viewModel.selectedIndex = 0
+        _ = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        viewModel.selectedIndex = 2
+        _ = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+
+        #expect(viewModel.filteredItems[0].isPinned == true)
+        #expect(viewModel.filteredItems[2].isPinned == true)
+
+        // Clear unpinned history via viewModel
+        viewModel.clearHistory(includePinned: false)
+
+        #expect(viewModel.filteredItems.count == 2)
+        #expect(store.items.count == 2)
+        #expect(viewModel.filteredItems.allSatisfy { $0.isPinned })
+        #expect(store.items.allSatisfy { $0.isPinned })
+    }
+
+    @Test("Explicit user deletion (⌘⌫) deletes pinned item")
+    func testExplicitDeletionOfPinnedItem() {
+        let (engine, viewModel, _, _) = makeEngineWithItems(count: 2)
+
+        // Pin Item 1
+        viewModel.selectedIndex = 0
+        _ = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(viewModel.filteredItems[0].isPinned == true)
+
+        // Explicitly delete selected item with ⌘⌫
+        let deleteHandled = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.deleteKey, modifiers: [.command])
+        #expect(deleteHandled == true)
+
+        #expect(viewModel.filteredItems.count == 1)
+        #expect(viewModel.filteredItems[0].previewText == "Item 2")
+    }
+
+    @Test("Engine handleKey returns false when activeViewModel is nil")
+    func testEngineWithoutViewModel() {
+        let engine = KeyboardNavigationEngine()
+        engine.activeViewModel = nil
+
+        let pHandled = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.keyP, modifiers: [.command])
+        #expect(pHandled == false)
+
+        let downHandled = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.downArrow, modifiers: [])
+        #expect(downHandled == false)
+
+        let enterHandled = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.returnKey, modifiers: [])
+        #expect(enterHandled == false)
+    }
+
+    @Test("handleKeyEvent processes synthetic NSEvent with ⌘P properly")
+    func testSyntheticNSEventHandling() {
+        let (engine, viewModel, _, _) = makeEngineWithItems(count: 1)
+
+        let event = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [.command],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: "p",
+            charactersIgnoringModifiers: "p",
+            isARepeat: false,
+            keyCode: KeyboardNavigationEngine.KeyCodes.keyP
+        )
+
+        #expect(event != nil)
+        if let event = event {
+            let handled = engine.handleKeyEvent(event)
+            #expect(handled == true)
+            #expect(viewModel.filteredItems[0].isPinned == true)
+        }
+    }
 }
+

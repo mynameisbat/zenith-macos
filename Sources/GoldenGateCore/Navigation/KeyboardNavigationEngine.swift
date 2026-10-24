@@ -176,6 +176,11 @@ public final class ClipboardHistoryViewModel: ObservableObject {
         }
     }
 
+    public func togglePinSelectedItem() {
+        guard !filteredItems.isEmpty, selectedIndex >= 0, selectedIndex < filteredItems.count else { return }
+        togglePin(item: filteredItems[selectedIndex])
+    }
+
     // MARK: - Deletion
 
     public func deleteItem(_ item: ClipboardItem) {
@@ -311,6 +316,12 @@ public final class KeyboardNavigationEngine {
         // 3. Command + Backspace (⌘⌫) or Command + Forward Delete: Delete selected item
         if relevantModifiers == [.command] && (keyCode == KeyCodes.deleteKey || keyCode == KeyCodes.forwardDelete) {
             viewModel.deleteSelectedItem()
+            return true
+        }
+
+        // 3a. Command + P: Toggle pin status on selected item
+        if relevantModifiers == [.command] && keyCode == KeyCodes.keyP {
+            viewModel.togglePinSelectedItem()
             return true
         }
 
