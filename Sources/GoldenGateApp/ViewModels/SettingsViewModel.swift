@@ -49,6 +49,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
 public final class SettingsViewModel: ObservableObject {
     @Published public var selectedTab: SettingsTab = .general
     @Published public var hoveredTab: SettingsTab? = nil
+    @Published public var isCloseHovered: Bool = false
     @Published public var searchText: String = ""
     @Published public var launchAtLoginError: String? = nil
     @Published public var screenRecordingGranted: Bool = false

@@ -195,12 +195,88 @@ struct SettingsWindowControllerTests {
         #expect(window.canBecomeKey == true)
         #expect(window.canBecomeMain == true)
 
+        // 1. Test cancelOperation (Escape)
         controller.show()
         #expect(controller.isVisible == true)
-
-        // Test cancelOperation (Escape)
         window.cancelOperation(nil)
         #expect(controller.isVisible == false)
+
+        // 2. Test sendEvent with Escape key (keyCode 53)
+        controller.show()
+        #expect(controller.isVisible == true)
+        if let escEvt = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber,
+            context: nil,
+            characters: "\u{1b}",
+            charactersIgnoringModifiers: "\u{1b}",
+            isARepeat: false,
+            keyCode: 53
+        ) {
+            window.sendEvent(escEvt)
+            #expect(controller.isVisible == false)
+        }
+
+        // 3. Test sendEvent with ⌘W
+        controller.show()
+        #expect(controller.isVisible == true)
+        if let cmdWEvt = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [.command],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber,
+            context: nil,
+            characters: "w",
+            charactersIgnoringModifiers: "w",
+            isARepeat: false,
+            keyCode: 13
+        ) {
+            window.sendEvent(cmdWEvt)
+            #expect(controller.isVisible == false)
+        }
+
+        // 4. Test keyDown directly with Escape
+        controller.show()
+        #expect(controller.isVisible == true)
+        if let escEvt = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber,
+            context: nil,
+            characters: "\u{1b}",
+            charactersIgnoringModifiers: "\u{1b}",
+            isARepeat: false,
+            keyCode: 53
+        ) {
+            window.keyDown(with: escEvt)
+            #expect(controller.isVisible == false)
+        }
+
+        // 5. Test performKeyEquivalent with ⌘W
+        controller.show()
+        #expect(controller.isVisible == true)
+        if let cmdWEvt = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [.command],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber,
+            context: nil,
+            characters: "w",
+            charactersIgnoringModifiers: "w",
+            isARepeat: false,
+            keyCode: 13
+        ) {
+            let handled = window.performKeyEquivalent(with: cmdWEvt)
+            #expect(handled == true)
+            #expect(controller.isVisible == false)
+        }
     }
 
     @Test("SW-08: Traffic Light Zone Mouse Event Dismissal")

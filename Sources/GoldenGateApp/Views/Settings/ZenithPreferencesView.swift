@@ -9,6 +9,13 @@ public struct ZenithPreferencesView: View {
         self.viewModel = viewModel
     }
 
+    private func closeSettings() {
+        SettingsWindowController.shared.dismiss()
+        for win in NSApp.windows where win is SettingsWindow {
+            win.orderOut(nil)
+        }
+    }
+
     public var body: some View {
         HStack(spacing: 0) {
             // 1. Left Sidebar (Navigation Pane)
@@ -32,28 +39,6 @@ public struct ZenithPreferencesView: View {
                 .allowsHitTesting(false)
         )
         .frame(minWidth: 680, maxWidth: .infinity, minHeight: 490, maxHeight: .infinity)
-        .overlay(alignment: .topTrailing) {
-            // Hidden keyboard shortcut triggers ensuring ⌘W and Esc always close the window
-            Group {
-                Button("") {
-                    SettingsWindowController.shared.dismiss()
-                }
-                .keyboardShortcut("w", modifiers: .command)
-
-                Button("") {
-                    SettingsWindowController.shared.dismiss()
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Button("") {
-                    SettingsWindowController.shared.dismiss()
-                }
-                .keyboardShortcut(.escape, modifiers: [])
-            }
-            .opacity(0)
-            .allowsHitTesting(false)
-            .frame(width: 0, height: 0)
-        }
     }
 
 
@@ -61,13 +46,48 @@ public struct ZenithPreferencesView: View {
 
     private var sidebarView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // App Brand Header with macOS traffic-light button inset
+            // Top Window Traffic Light Controls Bar
+            HStack(spacing: 7) {
+                Button {
+                    closeSettings()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color(nsColor: .systemRed).opacity(0.9))
+                            .frame(width: 12, height: 12)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 7, weight: .black))
+                            .foregroundColor(Color.black.opacity(0.65))
+                            .opacity(viewModel.isCloseHovered ? 1 : 0)
+                    }
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    viewModel.isCloseHovered = hovering
+                }
+                .help("Close Settings Studio (Esc)")
+
+                Circle()
+                    .fill(Color.secondary.opacity(0.22))
+                    .frame(width: 12, height: 12)
+
+                Circle()
+                    .fill(Color.secondary.opacity(0.22))
+                    .frame(width: 12, height: 12)
+
+                Spacer()
+            }
+            .padding(.leading, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 6)
+
+            // App Brand Header
             HStack(spacing: 12) {
                 if let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage {
                     Image(nsImage: appIcon)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 34, height: 34)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .shadow(color: Color.black.opacity(0.18), radius: 3, x: 0, y: 1.5)
                 }
@@ -85,8 +105,8 @@ public struct ZenithPreferencesView: View {
                 Spacer()
             }
             .padding(.horizontal, 16)
-            .padding(.top, 38)
-            .padding(.bottom, 14)
+            .padding(.top, 6)
+            .padding(.bottom, 12)
 
             // Search Filter
             HStack(spacing: 6) {
@@ -128,15 +148,30 @@ public struct ZenithPreferencesView: View {
 
             Spacer()
 
-            // Footer Version Info
+            // Footer Version Info & Close Button
             HStack {
                 Text("Zenith v\(ZenithTheme.appVersion)")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(.secondary.opacity(0.7))
                 Spacer()
+                Button {
+                    closeSettings()
+                } label: {
+                    Text("Close")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Color.primary.opacity(0.06))
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("Close Settings Studio (Esc)")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
         }
     }
 
@@ -237,7 +272,7 @@ public struct ZenithPreferencesView: View {
     private var detailPaneView: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header Bar
-            HStack {
+            HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(viewModel.selectedTab.rawValue)
                         .font(.system(size: 17, weight: .bold))
@@ -249,9 +284,44 @@ public struct ZenithPreferencesView: View {
                 }
 
                 Spacer()
+
+                // Explicit, clickable Close Button with keyboard shortcuts
+                Button {
+                    closeSettings()
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("esc")
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(
+                                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                                    .fill(Color.primary.opacity(0.08))
+                            )
+                    }
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Color.primary.opacity(0.05))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .keyboardShortcut("w", modifiers: .command)
+                .keyboardShortcut(.escape, modifiers: [])
+                .help("Close Settings Studio (Esc)")
             }
             .padding(.horizontal, 24)
-            .padding(.top, 36)
+            .padding(.top, 18)
             .padding(.bottom, 12)
 
             Rectangle()

@@ -7,7 +7,31 @@ public final class SettingsWindow: NSWindow {
     public override var canBecomeKey: Bool { true }
     public override var canBecomeMain: Bool { true }
 
+    public func dismissWindow() {
+        if let controller = delegate as? SettingsWindowController {
+            controller.dismiss()
+        } else {
+            orderOut(nil)
+        }
+    }
+
     public override func sendEvent(_ event: NSEvent) {
+        // Intercept keyboard dismissal before any first responder / text field consumes it
+        if event.type == .keyDown {
+            // Escape key (keyCode 53) ALWAYS dismisses
+            if event.keyCode == 53 {
+                dismissWindow()
+                return
+            }
+            // ⌘W ALWAYS dismisses
+            if event.modifierFlags.contains(.command),
+               let chars = event.charactersIgnoringModifiers?.lowercased(),
+               chars == "w" {
+                dismissWindow()
+                return
+            }
+        }
+
         if event.type == .leftMouseDown || event.type == .leftMouseUp {
             let loc = event.locationInWindow
             var isCloseHit = false
@@ -27,27 +51,27 @@ public final class SettingsWindow: NSWindow {
             }
 
             if isCloseHit {
-                if let controller = delegate as? SettingsWindowController {
-                    controller.dismiss()
-                } else {
-                    orderOut(nil)
-                }
+                dismissWindow()
                 return
             }
         }
         super.sendEvent(event)
     }
 
-    public override func performClose(_ sender: Any?) {
-        if let controller = delegate as? SettingsWindowController {
-            controller.dismiss()
-        } else {
-            orderOut(nil)
+    public override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 || (event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "w") {
+            dismissWindow()
+            return
         }
+        super.keyDown(with: event)
+    }
+
+    public override func performClose(_ sender: Any?) {
+        dismissWindow()
     }
 
     public override func close() {
-        (delegate as? SettingsWindowController)?.dismiss()
+        dismissWindow()
         super.close()
     }
 
@@ -56,19 +80,19 @@ public final class SettingsWindow: NSWindow {
             NSApp.terminate(nil)
             return true
         }
-        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" {
-            performClose(nil)
+        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "w" {
+            dismissWindow()
             return true
         }
         if event.keyCode == 53 { // Escape
-            performClose(nil)
+            dismissWindow()
             return true
         }
         return super.performKeyEquivalent(with: event)
     }
 
     public override func cancelOperation(_ sender: Any?) {
-        performClose(nil)
+        dismissWindow()
     }
 }
 
