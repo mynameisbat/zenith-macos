@@ -148,30 +148,15 @@ public struct ZenithPreferencesView: View {
 
             Spacer()
 
-            // Footer Version Info & Close Button
+            // Footer Version Info
             HStack {
                 Text("Zenith v\(ZenithTheme.appVersion)")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(.secondary.opacity(0.7))
                 Spacer()
-                Button {
-                    closeSettings()
-                } label: {
-                    Text("Close")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(Color.primary.opacity(0.06))
-                        )
-                }
-                .buttonStyle(.plain)
-                .help("Close Settings Studio (Esc)")
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
     }
 
@@ -284,45 +269,10 @@ public struct ZenithPreferencesView: View {
                 }
 
                 Spacer()
-
-                // Explicit, clickable Close Button with keyboard shortcuts
-                Button {
-                    closeSettings()
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
-                        Text("esc")
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(
-                                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                                    .fill(Color.primary.opacity(0.08))
-                            )
-                    }
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(Color.primary.opacity(0.05))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
-                    )
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.cancelAction)
-                .keyboardShortcut("w", modifiers: .command)
-                .keyboardShortcut(.escape, modifiers: [])
-                .help("Close Settings Studio (Esc)")
             }
             .padding(.horizontal, 24)
-            .padding(.top, 18)
-            .padding(.bottom, 12)
+            .padding(.top, 24)
+            .padding(.bottom, 14)
 
             Rectangle()
                 .fill(Color.primary.opacity(0.08))
