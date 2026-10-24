@@ -258,6 +258,14 @@ public final class BinarySlimmerService: @unchecked Sendable {
         try? codesign.run()
         codesign.waitUntilExit()
 
+        if totalSaved > 0 {
+            SystemCleaningHistoryTracker.shared.record(
+                operationName: "Binary Slimming (\(plan.appName))",
+                bytesFreed: totalSaved,
+                itemCount: plan.binaries.count
+            )
+        }
+
         return totalSaved
     }
 

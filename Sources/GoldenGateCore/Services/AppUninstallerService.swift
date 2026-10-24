@@ -351,6 +351,14 @@ public final class AppUninstallerService: @unchecked Sendable {
             try deleteOrTrash(path: plan.app.bundlePath, moveToTrash: moveToTrash)
         }
 
+        if totalFreed > 0 {
+            SystemCleaningHistoryTracker.shared.record(
+                operationName: "App Uninstallation (\(plan.app.displayName))",
+                bytesFreed: totalFreed,
+                itemCount: itemsToDelete.count + 1
+            )
+        }
+
         return totalFreed
     }
 
@@ -421,6 +429,17 @@ public final class AppUninstallerService: @unchecked Sendable {
         if prohibitedRoots.contains(canonical) {
             return false
         }
+
+        // Apple Neural Engine (ANE) compiled model cache protection
+        if canonical.contains("com.apple.e5rt.e5bundlecache") {
+            return false
+        }
+
+        // Steam & Epic Games installed game libraries protection
+        if canonical.contains("/Steam/steamapps") || canonical.contains("/Epic Games") {
+            return false
+        }
+
         return true
     }
 

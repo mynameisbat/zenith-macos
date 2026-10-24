@@ -328,5 +328,12 @@ struct SystemCleanerServiceTests {
         #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Downloads/ImportantDoc.pdf", home: home) == false)
         #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Downloads/Photos", home: home) == false)
         #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Downloads", home: home) == false)
+
+        // Apple Neural Engine (ANE) e5bundlecache MUST be BLOCKED (prevents CPU spikes & background re-compilation)
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Library/Caches/com.apple.e5rt.e5bundlecache/model.e5", home: home) == false)
+
+        // Steam & Epic Games installed game libraries MUST be BLOCKED
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Library/Application Support/Steam/steamapps/common/HalfLife", home: home) == false)
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Library/Application Support/Epic Games/UnrealTournament", home: home) == false)
     }
 }

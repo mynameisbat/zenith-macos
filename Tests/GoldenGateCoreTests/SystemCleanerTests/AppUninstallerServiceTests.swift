@@ -85,6 +85,11 @@ struct AppUninstallerServiceTests {
         #expect(service.isSafeLeftoverPath("\(home)/Library/Caches/com.tinyspeck.slackmacgap") == true)
         #expect(service.isSafeLeftoverPath("\(home)/Library/Preferences/com.spotify.client.plist") == true)
 
+        // Apple Neural Engine and Steam/Epic game libraries must be protected
+        #expect(service.isSafeLeftoverPath("\(home)/Library/Caches/com.apple.e5rt.e5bundlecache") == false)
+        #expect(service.isSafeLeftoverPath("\(home)/Library/Application Support/Steam/steamapps/common/Game") == false)
+        #expect(service.isSafeLeftoverPath("\(home)/Library/Application Support/Epic Games/Game") == false)
+
         // Attempting to uninstall a protected system app throws error
         let systemPlan = AppUninstallPlan(
             app: InstalledAppInfo(

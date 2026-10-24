@@ -568,6 +568,16 @@ public final class SystemCleanerService: ObservableObject {
             }
         }
 
+        // Apple Neural Engine (ANE) compiled model cache protection (prevents CPU spikes & background model re-compilation)
+        if candidate.contains("com.apple.e5rt.e5bundlecache") {
+            return false
+        }
+
+        // Steam & Epic Games installed game libraries protection (prevent deleting heavy game files)
+        if candidate.contains("/Steam/steamapps") || candidate.contains("/Epic Games") {
+            return false
+        }
+
         // Must not be a protected system bundle (HIGH-10)
         if isProtectedBundle(nameOrPath: candidate) {
             return false
@@ -638,6 +648,14 @@ public final class SystemCleanerService: ObservableObject {
         self.lastFreedBytes = freed
         self.isCleaning = false
         self.statusMessage = "Successfully freed \(Self.formatBytes(freed))!"
+
+        if freed > 0 {
+            SystemCleaningHistoryTracker.shared.record(
+                operationName: "System Caches & Junk",
+                bytesFreed: freed,
+                itemCount: itemsToDelete.count
+            )
+        }
 
         // Re-scan to update remaining sizes
         await scan()

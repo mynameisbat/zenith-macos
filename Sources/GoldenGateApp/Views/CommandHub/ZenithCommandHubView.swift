@@ -10,6 +10,7 @@ public struct ZenithCommandHubView: View {
     @ObservedObject public var clipboardStore: ClipboardStore = .shared
     @ObservedObject public var privacyController: PrivacyShieldController = .shared
     @ObservedObject public var cleaner: SystemCleanerService = .shared
+    @ObservedObject public var historyTracker: SystemCleaningHistoryTracker = .shared
 
     @FocusState private var isSearchFocused: Bool
 
@@ -601,7 +602,7 @@ public struct ZenithCommandHubView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(cleaner.isCleaning || cleaner.isScanning || cleaner.selectedJunkSize == 0)
-                .help(cleaner.selectedJunkSize > 0 ? "Clean \(cleaner.formattedSelectedJunkSize) system junk" : "System junk is clean")
+                .help(cleaner.selectedJunkSize > 0 ? "Clean \(cleaner.formattedSelectedJunkSize) system junk" : (historyTracker.totalSessions > 0 ? historyTracker.summaryHeadline : "System junk is clean"))
                 .onHover { isHovered in
                     if isHovered {
                         hubState.setHoveredFooter("cleaner")
