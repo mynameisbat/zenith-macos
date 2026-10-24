@@ -269,15 +269,30 @@ public final class SystemCleanerService: ObservableObject {
                 result.append(cat)
             }
 
-            // 5. Developer Artifacts & Package Caches (CocoaPods, Gradle, Cargo, Homebrew, SwiftPM, npm)
+            // 5. Developer Artifacts & Package Caches
             var devItems: [JunkItem] = []
             let devPaths: [(String, String)] = [
                 ("CocoaPods Cache", "\(home)/Library/Caches/CocoaPods"),
                 ("Gradle Cache", "\(home)/.gradle/caches"),
                 ("Cargo Registry Cache", "\(home)/.cargo/registry/cache"),
+                ("Cargo Git DB Cache", "\(home)/.cargo/git/db"),
                 ("Homebrew Cache", "\(home)/Library/Caches/Homebrew"),
                 ("Swift Package Manager Cache", "\(home)/Library/Caches/org.swift.swiftpm"),
-                ("npm Cache", "\(home)/.npm/_cacache")
+                ("npm Cache", "\(home)/.npm/_cacache"),
+                ("pnpm Store", "\(home)/Library/pnpm/store"),
+                ("pnpm Global Cache", "\(home)/.pnpm-store"),
+                ("Yarn Cache", "\(home)/Library/Caches/Yarn"),
+                ("Bun Cache", "\(home)/.bun/install/cache"),
+                ("Go Build Cache", "\(home)/Library/Caches/go-build"),
+                ("Go Module Cache", "\(home)/go/pkg/mod/cache"),
+                ("Python pip Cache", "\(home)/Library/Caches/pip"),
+                ("Python uv Cache", "\(home)/.cache/uv"),
+                ("Python Poetry Cache", "\(home)/Library/Caches/pypoetry"),
+                ("Android SDK & Build Cache", "\(home)/.android/cache"),
+                ("JetBrains IDE Caches", "\(home)/Library/Caches/JetBrains"),
+                ("Docker Container VM Cache", "\(home)/Library/Containers/com.docker.docker/Data/vms"),
+                ("Cursor AI Editor Cache", "\(home)/Library/Application Support/Cursor/Cache"),
+                ("Claude Desktop App Cache", "\(home)/Library/Caches/com.anthropic.claudedesktop")
             ]
             for (label, p) in devPaths {
                 if fm.fileExists(atPath: p) {
@@ -291,9 +306,87 @@ public final class SystemCleanerService: ObservableObject {
                 result.append(JunkCategory(
                     id: "developer_package_caches",
                     title: "Package & Dependency Caches",
-                    description: "Downloaded build dependencies and package caches (CocoaPods, Gradle, Cargo, SPM, Homebrew, npm).",
+                    description: "Downloaded build dependencies, compiler caches, and language package stores (Node, Python, Go, Rust, Gradle, Xcode, Docker, JetBrains).",
                     icon: "shippingbox.fill",
                     items: devItems
+                ))
+            }
+
+            // 6. Saved Application State (Window states from closed applications)
+            let savedStatePath = "\(home)/Library/Saved Application State"
+            if let cat = Self.scanTopDirectories(
+                id: "saved_application_state",
+                title: "Saved Application State",
+                description: "Preserved window states and restoration snapshots from closed applications.",
+                icon: "macwindow.on.rectangle",
+                basePath: savedStatePath,
+                limit: 25,
+                fileManager: fm
+            ) {
+                result.append(cat)
+            }
+
+            // 7. Incomplete & Stale Downloads (*.download, *.crdownload, *.part)
+            let downloadsPath = "\(home)/Downloads"
+            if fm.fileExists(atPath: downloadsPath),
+               let downloadFiles = try? fm.contentsOfDirectory(atPath: downloadsPath) {
+                var staleDownloads: [JunkItem] = []
+                for file in downloadFiles {
+                    let ext = (file as NSString).pathExtension.lowercased()
+                    if ["download", "crdownload", "part"].contains(ext) {
+                        let fullPath = "\(downloadsPath)/\(file)"
+                        let s = Self.calculateSize(of: fullPath, fileManager: fm)
+                        if s > 1024 {
+                            staleDownloads.append(JunkItem(name: file, path: fullPath, size: s))
+                        }
+                    }
+                }
+                if !staleDownloads.isEmpty {
+                    result.append(JunkCategory(
+                        id: "incomplete_downloads",
+                        title: "Incomplete Downloads",
+                        description: "Interrupted and abandoned web downloads (.download, .crdownload, .part) in ~/Downloads.",
+                        icon: "arrow.down.circle.fill",
+                        items: staleDownloads
+                    ))
+                }
+            }
+
+            // 8. Mail Downloads Cache
+            let mailDownloadsPath = "\(home)/Library/Containers/com.apple.mail/Data/Library/Mail Downloads"
+            if let cat = Self.scanDirectoryItems(
+                id: "mail_downloads",
+                title: "Mail Attachments Cache",
+                description: "Locally cached copies of email attachments opened from Apple Mail.",
+                icon: "envelope.open.fill",
+                basePath: mailDownloadsPath,
+                fileManager: fm
+            ) {
+                result.append(cat)
+            }
+
+            // 9. Cached iOS / iPadOS Firmware Updates (IPSW)
+            var ipswItems: [JunkItem] = []
+            let ipswPaths = [
+                "\(home)/Library/iTunes/iPhone Software Updates",
+                "\(home)/Library/iTunes/iPad Software Updates"
+            ]
+            for p in ipswPaths {
+                if fm.fileExists(atPath: p) {
+                    let s = Self.calculateSize(of: p, fileManager: fm)
+                    if s > 1024 * 1024 {
+                        let name = (p as NSString).lastPathComponent
+                        ipswItems.append(JunkItem(name: name, path: p, size: s))
+                    }
+                }
+            }
+            if !ipswItems.isEmpty {
+                result.append(JunkCategory(
+                    id: "ios_firmware_updates",
+                    title: "iOS Device Firmware (IPSW)",
+                    description: "Cached iOS/iPadOS device firmware update images downloaded via Finder or iTunes.",
+                    icon: "externaldrive.badge.icloud",
+                    items: ipswItems
                 ))
             }
 
@@ -355,6 +448,11 @@ public final class SystemCleanerService: ObservableObject {
 
     /// Helper to determine if a bundle identifier or directory name corresponds to a protected system bundle.
     nonisolated public static func isProtectedBundle(nameOrPath: String) -> Bool {
+        // Explicitly allow ephemeral Mail Downloads attachment cache while preserving all mailboxes
+        if nameOrPath.contains("/Containers/com.apple.mail/Data/Library/Mail Downloads") {
+            return false
+        }
+
         let components = URL(fileURLWithPath: nameOrPath).pathComponents.map { $0.lowercased() }
         for comp in components {
             for bundle in protectedBundleIdentifiers {
@@ -372,6 +470,19 @@ public final class SystemCleanerService: ObservableObject {
         return false
     }
 
+    /// Checks if a directory contains a valid CACHEDIR.TAG conforming to the FreeDesktop Cache Directory Tagging Standard.
+    /// Directories marked with this tag are guaranteed to contain only regenerable cached data.
+    nonisolated public static func hasValidCacheDirTag(atPath path: String) -> Bool {
+        let tagPath = (path as NSString).appendingPathComponent("CACHEDIR.TAG")
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: tagPath), options: .alwaysMapped) else {
+            return false
+        }
+        guard let prefix = String(data: data.prefix(43), encoding: .utf8) else {
+            return false
+        }
+        return prefix.hasPrefix("Signature: 8a477f597d28d172789f06886806bc55")
+    }
+
     /// Canonical safe directory roots where deletions are allowed.
     nonisolated public static func safeDirectoryRoots(home: String) -> [String] {
         [
@@ -381,11 +492,25 @@ public final class SystemCleanerService: ObservableObject {
             "\(home)/Library/Developer/CoreSimulator",
             "\(home)/Library/Developer/CoreSimulator/Caches",
             "\(home)/Library/Logs",
+            "\(home)/Library/Saved Application State",
+            "\(home)/Library/pnpm",
+            "\(home)/Library/iTunes",
+            "\(home)/Library/Containers/com.docker.docker/Data/vms",
+            "\(home)/Library/Containers/com.apple.mail/Data/Library/Mail Downloads",
+            "\(home)/Library/Application Support/Cursor/Cache",
             "\(home)/.Trash",
             "\(home)/.npm",
+            "\(home)/.pnpm-store",
+            "\(home)/.yarn",
+            "\(home)/.bun",
+            "\(home)/.cache",
+            "\(home)/.cargo",
             "\(home)/.cargo/registry",
             "\(home)/.gradle",
             "\(home)/.gradle/caches",
+            "\(home)/.android",
+            "\(home)/go/pkg/mod/cache",
+            "\(home)/Downloads",
             NSTemporaryDirectory()
         ].map { URL(fileURLWithPath: $0).standardizedFileURL.path }
     }
@@ -432,6 +557,15 @@ public final class SystemCleanerService: ObservableObject {
 
         guard isStrictlyInside else {
             return false
+        }
+
+        // Special protection for ~/Downloads: only allow deletion of partial/incomplete downloads (*.download, *.crdownload, *.part)
+        let downloadsPrefix = "\(home)/Downloads/"
+        if candidate.hasPrefix(downloadsPrefix) {
+            let ext = (candidate as NSString).pathExtension.lowercased()
+            guard ["download", "crdownload", "part"].contains(ext) else {
+                return false
+            }
         }
 
         // Must not be a protected system bundle (HIGH-10)
@@ -612,8 +746,8 @@ public final class SystemCleanerService: ObservableObject {
         var items: [JunkItem] = []
         for name in contents {
             guard !name.hasPrefix(".") else { continue }
-            if isProtectedBundle(nameOrPath: name) { continue }
             let fullPath = "\(basePath)/\(name)"
+            if isProtectedBundle(nameOrPath: name) && !hasValidCacheDirTag(atPath: fullPath) { continue }
             var statBuf = stat()
             if lstat(fullPath, &statBuf) == 0 && (statBuf.st_mode & S_IFMT) == S_IFLNK {
                 continue
@@ -644,8 +778,8 @@ public final class SystemCleanerService: ObservableObject {
         var items: [JunkItem] = []
         for name in contents {
             guard !name.hasPrefix(".") else { continue }
-            if isProtectedBundle(nameOrPath: name) { continue }
             let fullPath = "\(basePath)/\(name)"
+            if isProtectedBundle(nameOrPath: name) && !hasValidCacheDirTag(atPath: fullPath) { continue }
             var statBuf = stat()
             if lstat(fullPath, &statBuf) == 0 && (statBuf.st_mode & S_IFMT) == S_IFLNK {
                 continue

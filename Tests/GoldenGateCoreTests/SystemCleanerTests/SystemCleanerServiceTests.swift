@@ -283,4 +283,50 @@ struct SystemCleanerServiceTests {
         #expect(origTypes.count == 10)
         #expect(SensitivePasteboardMarker.allMarkers.count == 10)
     }
+
+    // MARK: - CACHEDIR.TAG & Expanded Mole Clean Categories
+
+    @Test("CLN-11: CACHEDIR.TAG standard detection and verification")
+    func testCacheDirTagDetection() throws {
+        let fm = FileManager.default
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("GG_CacheDirTag_\(UUID().uuidString)")
+        try fm.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: tempDir) }
+
+        // 1. Directory without tag returns false
+        #expect(SystemCleanerService.hasValidCacheDirTag(atPath: tempDir.path) == false)
+
+        // 2. Directory with invalid tag content returns false
+        let tagFile = tempDir.appendingPathComponent("CACHEDIR.TAG")
+        try "Random Header".write(to: tagFile, atomically: true, encoding: .utf8)
+        #expect(SystemCleanerService.hasValidCacheDirTag(atPath: tempDir.path) == false)
+
+        // 3. Directory with valid standard FreeDesktop signature returns true
+        let validTag = "Signature: 8a477f597d28d172789f06886806bc55\n# This file is a cache directory tag."
+        try validTag.write(to: tagFile, atomically: true, encoding: .utf8)
+        #expect(SystemCleanerService.hasValidCacheDirTag(atPath: tempDir.path) == true)
+    }
+
+    @Test("CLN-12: Expanded safe directory roots allow developer caches, saved state, and only incomplete downloads")
+    func testExpandedSafeDirectoryRootsAndDownloadsSafety() {
+        let home = "/Users/testuser"
+
+        // Expanded developer caches
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Library/pnpm/store/v3", home: home) == true)
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/.bun/install/cache/react", home: home) == true)
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/.cache/uv/wheels", home: home) == true)
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/go/pkg/mod/cache/download", home: home) == true)
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Library/Saved Application State/com.apple.Preview.savedState", home: home) == true)
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Library/Containers/com.apple.mail/Data/Library/Mail Downloads/file.pdf", home: home) == true)
+
+        // Downloads folder: ONLY incomplete downloads (.download, .crdownload, .part) allowed
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Downloads/huge_file.dmg.crdownload", home: home) == true)
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Downloads/archive.zip.download", home: home) == true)
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Downloads/linux.iso.part", home: home) == true)
+
+        // Normal files and directories in ~/Downloads MUST be BLOCKED
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Downloads/ImportantDoc.pdf", home: home) == false)
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Downloads/Photos", home: home) == false)
+        #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Downloads", home: home) == false)
+    }
 }
