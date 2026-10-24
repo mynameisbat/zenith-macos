@@ -46,6 +46,15 @@ public final class CaptureOverlayPanel: NSPanel {
             CaptureOverlayController.shared.cancelCapture()
             return
         }
+        if event.modifierFlags.contains(.command) && (event.keyCode == 12 || event.charactersIgnoringModifiers?.lowercased() == "q") {
+            CaptureOverlayController.shared.cancelCapture()
+            NSApp.terminate(nil)
+            return
+        }
+        if event.modifierFlags.contains(.command) && (event.keyCode == 13 || event.charactersIgnoringModifiers?.lowercased() == "w") {
+            CaptureOverlayController.shared.cancelCapture()
+            return
+        }
         super.keyDown(with: event)
     }
 }

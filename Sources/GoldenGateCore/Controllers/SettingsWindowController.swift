@@ -52,6 +52,10 @@ public final class SettingsWindow: NSWindow {
     }
 
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "q" {
+            NSApp.terminate(nil)
+            return true
+        }
         if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" {
             performClose(nil)
             return true

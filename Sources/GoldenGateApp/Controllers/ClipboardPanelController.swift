@@ -46,6 +46,26 @@ final class ClipboardPanel: NSPanel {
     override var canBecomeMain: Bool {
         return false
     }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let relevantModifiers = modifiers.subtracting([.capsLock, .numericPad, .function])
+        if relevantModifiers == [.command] && (event.keyCode == 12 || event.charactersIgnoringModifiers?.lowercased() == "q") { // ⌘Q
+            NSApp.terminate(nil)
+            return true
+        }
+        if relevantModifiers == [.command] && (event.keyCode == 13 || event.charactersIgnoringModifiers?.lowercased() == "w") { // ⌘W
+            ClipboardPanelController.shared.hide()
+            return true
+        }
+        if relevantModifiers == [.command] && (event.keyCode == 43 || event.charactersIgnoringModifiers == ",") { // ⌘,
+            ClipboardPanelController.shared.hide()
+            SettingsWindowController.shared.configureDefaultContent()
+            SettingsWindowController.shared.show()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
 }
 
 /// Floating panel controller presenting clipboard history with frosted glass aesthetics.

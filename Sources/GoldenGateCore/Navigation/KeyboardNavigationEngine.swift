@@ -268,6 +268,11 @@ public final class KeyboardNavigationEngine {
         public static let keyJ: UInt16 = 38
         public static let keyK: UInt16 = 40
 
+        // System & Menu shortcuts
+        public static let keyQ: UInt16 = 12
+        public static let keyW: UInt16 = 13
+        public static let comma: UInt16 = 43
+
         // Number row keys 1...9
         public static let key1: UInt16 = 18
         public static let key2: UInt16 = 19
@@ -291,13 +296,39 @@ public final class KeyboardNavigationEngine {
         // Note: macOS hardware keyboards set .numericPad and .function on arrow keys, home, end, pageUp, pageDown
         let relevantModifiers = modifiers.subtracting([.capsLock, .numericPad, .function])
 
-        // 1. Check Escape key dismissal
+        // 1. Check Escape or ⌘W dismissal
         if relevantModifiers.isEmpty && keyCode == KeyCodes.escapeKey {
             if let dismiss = dismissHandler {
                 dismiss()
             } else {
                 activeViewModel?.onDismiss?()
             }
+            return true
+        }
+
+        if relevantModifiers == [.command] && keyCode == KeyCodes.keyW {
+            if let dismiss = dismissHandler {
+                dismiss()
+            } else {
+                activeViewModel?.onDismiss?()
+            }
+            return true
+        }
+
+        // 1a. Check ⌘Q: terminate application immediately
+        if relevantModifiers == [.command] && keyCode == KeyCodes.keyQ {
+            NSApp.terminate(nil)
+            return true
+        }
+
+        // 1b. Check ⌘,: open Settings window
+        if relevantModifiers == [.command] && keyCode == KeyCodes.comma {
+            if let dismiss = dismissHandler {
+                dismiss()
+            } else {
+                activeViewModel?.onDismiss?()
+            }
+            SettingsWindowController.shared.show()
             return true
         }
 

@@ -141,6 +141,18 @@ public final class AnnotationWindowController: NSObject, NSWindowDelegate, Annot
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let chars = event.charactersIgnoringModifiers ?? ""
 
+        // Cmd+Q: Quit Application
+        if flags == .command && chars.lowercased() == "q" {
+            NSApp.terminate(nil)
+            return true
+        }
+
+        // Cmd+W: Close Editor
+        if flags == .command && chars.lowercased() == "w" {
+            dismiss()
+            return true
+        }
+
         // Cmd+C: Copy & Dismiss
         if flags == .command && chars.lowercased() == "c" {
             vm.copyToClipboard()

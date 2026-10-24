@@ -53,11 +53,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        if Self.isExplicitQuit {
-            return .terminateNow
-        }
-        // Reject unintended automatic termination from macOS TAL subsystem
-        return .terminateCancel
+        // Allow clean termination when requested by user (⌘Q, Quit menu) or macOS System Settings ("Quit & Reopen")
+        return .terminateNow
     }
 
     // MARK: - Menu Bar Routing
