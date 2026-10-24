@@ -24,7 +24,7 @@ public final class ZenithIslandPanel: NSPanel {
         self.hasShadow = false
         self.isReleasedWhenClosed = false
         self.acceptsMouseMovedEvents = true
-        self.ignoresMouseEvents = false
+        self.ignoresMouseEvents = true
         self.animationBehavior = .none
     }
 }
@@ -257,6 +257,8 @@ public final class ZenithIslandWindowController: NSObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var collapseTask: Task<Void, Never>?
+    private var globalMouseMonitor: Any?
+    private var localMouseMonitor: Any?
 
     override private init() {
         self.geometry = ZenithIslandGeometry()
@@ -317,6 +319,59 @@ public final class ZenithIslandWindowController: NSObject {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+
+        // System-wide mouse movement monitors:
+        // Automatically make the window completely transparent to mouse clicks (ignoresMouseEvents = true)
+        // whenever the cursor is outside the visible island. This completely eliminates any dead zones,
+        // allowing 100% of mouse clicks to pass directly through to nearby menu bar icons and windows underneath.
+        self.globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleMouseMoved(screenPoint: NSEvent.mouseLocation)
+            }
+        }
+
+        self.localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] event in
+            self?.handleMouseMoved(screenPoint: NSEvent.mouseLocation)
+            return event
+        }
+
+        handleMouseMoved(screenPoint: NSEvent.mouseLocation)
+    }
+
+    /// Evaluates cursor position to toggle mouse click passthrough.
+    public func handleMouseMoved(screenPoint: NSPoint) {
+        guard let panel = panel else { return }
+        let state = ZenithIslandState.shared
+
+        // Determine current interactive bounds in screen coordinates
+        let activeScreenRect: CGRect
+        if state.isExpanded || state.isDropTargeted {
+            activeScreenRect = geometry.expandedFrame
+        } else if state.activeAlert != nil {
+            activeScreenRect = geometry.alertFrame
+        } else {
+            activeScreenRect = geometry.idleFrame
+        }
+
+        let isInside = activeScreenRect.contains(screenPoint)
+
+        if isInside {
+            // Inside active island area: enable mouse interaction
+            if panel.ignoresMouseEvents {
+                panel.ignoresMouseEvents = false
+            }
+            if !state.isHovered && !state.isDraggingOut {
+                state.onMouseEnter()
+            }
+        } else {
+            // Outside: immediately pass 100% of clicks through to menubar icons & underlying windows
+            if !panel.ignoresMouseEvents {
+                panel.ignoresMouseEvents = true
+            }
+            if state.isHovered && !state.isDropTargeted && !state.isDraggingOut {
+                state.onMouseLeave()
+            }
+        }
     }
 
     private func handleStateChange(isExpanded: Bool, hasActiveAlert: Bool, isDropTargeted: Bool) {
@@ -356,6 +411,12 @@ public final class ZenithIslandWindowController: NSObject {
         if !panel.frame.equalTo(targetFrame) {
             panel.setFrame(targetFrame, display: false)
         }
+        if newMode == .idle {
+            let mouseLoc = NSEvent.mouseLocation
+            if !geometry.idleFrame.contains(mouseLoc) {
+                panel.ignoresMouseEvents = true
+            }
+        }
         panel.orderFrontRegardless()
     }
 
@@ -373,6 +434,14 @@ public final class ZenithIslandWindowController: NSObject {
     /// Teardown dynamic island panel when quitting.
     public func teardown() {
         NotificationCenter.default.removeObserver(self, name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        if let monitor = globalMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalMouseMonitor = nil
+        }
+        if let monitor = localMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            localMouseMonitor = nil
+        }
         collapseTask?.cancel()
         collapseTask = nil
         cancellables.removeAll()
@@ -380,7 +449,13 @@ public final class ZenithIslandWindowController: NSObject {
         panel = nil
     }
 
-    deinit {
+    isolated deinit {
         NotificationCenter.default.removeObserver(self)
+        if let monitor = globalMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        if let monitor = localMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
     }
 }

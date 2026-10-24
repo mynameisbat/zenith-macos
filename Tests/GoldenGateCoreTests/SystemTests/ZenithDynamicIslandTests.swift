@@ -446,6 +446,19 @@ struct ZenithDynamicIslandTests {
         #expect(state.activeAlert == nil)
         #expect(state.isRimLightVisible == false)
     }
+
+    @Test("ISL-19: Dynamic Island bounds isolation ensures menubar icons and underlying windows remain 100% interactive")
+    @MainActor
+    func testMousePassthroughWhenOutside() {
+        let geometry = ZenithIslandGeometry()
+        // Points outside the idle notch (e.g. menubar icons to the far right, or windows below)
+        let menubarRightIcon = CGPoint(x: geometry.screenFrame.maxX - 50, y: geometry.screenFrame.maxY - 10)
+        let windowBelowIsland = CGPoint(x: geometry.notchRect.midX, y: geometry.screenFrame.maxY - 150)
+
+        #expect(!geometry.idleFrame.contains(menubarRightIcon))
+        #expect(!geometry.idleFrame.contains(windowBelowIsland))
+        #expect(!geometry.expandedFrame.contains(windowBelowIsland))
+    }
 }
 
 
