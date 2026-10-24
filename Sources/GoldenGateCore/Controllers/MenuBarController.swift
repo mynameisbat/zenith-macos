@@ -272,6 +272,34 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
+    /// Dynamically updates the menu bar status button tooltip and optional title with live CPU and RAM telemetry.
+    public func updateStatusBarTelemetry(showInTitle: Bool = false) {
+        guard let button = statusItem?.button else { return }
+        let snap = HardwareTelemetryService.shared.fetchSnapshot()
+        let cpu = Int(round(snap.cpu.totalUsagePercent))
+        let ram = Int(round(snap.memory.usedPercent))
+
+        if showInTitle {
+            button.imagePosition = .imageLeft
+            button.title = "\(cpu)% CPU • \(ram)% RAM"
+        } else {
+            button.imagePosition = .imageOnly
+            button.title = ""
+        }
+
+        var tip = "Zenith\nCPU: \(cpu)% • RAM: \(ram)%"
+        if snap.battery.hasBattery {
+            tip += "\nBattery: \(snap.battery.percentage)%"
+            if let cycles = snap.battery.cycleCount {
+                tip += " (Cycles: \(cycles))"
+            }
+        }
+        if let topHog = snap.cpu.topHogs.first {
+            tip += "\nTop Hog: \(topHog.name) (\(String(format: "%.1f", topHog.cpuPercent))%)"
+        }
+        button.toolTip = tip
+    }
+
     public func statisticsTitle(for count: Int) -> String {
         if count == 0 {
             return "Clipboard: Empty"

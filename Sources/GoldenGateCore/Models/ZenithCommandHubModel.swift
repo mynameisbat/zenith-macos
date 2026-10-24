@@ -72,11 +72,22 @@ public final class ZenithCommandHubState: ObservableObject {
     @Published public var quickLookItem: ClipboardItem? = nil
     @Published public var presentationID: UUID = UUID()
     @Published public var hardwareSnapshot: HardwareSnapshot = HardwareTelemetryService.shared.fetchSnapshot()
+    @Published public var showTopHogs: Bool = false
 
     public init() {}
 
     public func refreshHardwareSnapshot() {
         hardwareSnapshot = HardwareTelemetryService.shared.fetchSnapshot()
+    }
+
+    public func toggleTopHogs() {
+        showTopHogs.toggle()
+        refreshHardwareSnapshot()
+    }
+
+    public func killProcess(pid: Int) {
+        HardwareTelemetryService.shared.killProcess(pid: pid, force: false)
+        refreshHardwareSnapshot()
     }
 
     public func setSearchText(_ text: String) {

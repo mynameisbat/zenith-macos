@@ -50,6 +50,12 @@ public struct ZenithCommandHubView: View {
                 hairlineDivider
             }
 
+            // TOP CPU HOGS DRAWER (when toggled)
+            if hubState.showTopHogs {
+                topCpuHogsSection
+                hairlineDivider
+            }
+
             // 3. RECENT CLIPS / SEARCH RESULTS SECTION
             recentClipsSection
 
@@ -431,8 +437,30 @@ public struct ZenithCommandHubView: View {
 
     private var footerRow: some View {
         VStack(spacing: 6) {
-            // Top telemetry sub-row: Battery, SSD Free Space, and Peripherals
+            // Top telemetry sub-row: CPU, RAM, Battery, SSD Free Space, and Peripherals
             HStack(spacing: 8) {
+                // CPU status
+                HStack(spacing: 3) {
+                    Image(systemName: "cpu")
+                        .font(.system(size: 9.5))
+                        .foregroundColor(hubState.hardwareSnapshot.cpu.totalUsagePercent > 75 ? .red : (hubState.hardwareSnapshot.cpu.totalUsagePercent > 40 ? .orange : .secondary))
+                    Text("\(Int(round(hubState.hardwareSnapshot.cpu.totalUsagePercent)))%")
+                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                .help("CPU Usage: \(String(format: "%.1f", hubState.hardwareSnapshot.cpu.totalUsagePercent))% across \(hubState.hardwareSnapshot.cpu.coreCount) cores")
+
+                // RAM status with pressure indicator
+                HStack(spacing: 3) {
+                    Image(systemName: "memorychip")
+                        .font(.system(size: 9.5))
+                        .foregroundColor(hubState.hardwareSnapshot.memory.pressureLevel == .critical ? .red : (hubState.hardwareSnapshot.memory.pressureLevel == .warning ? .orange : .secondary))
+                    Text("\(Int(round(hubState.hardwareSnapshot.memory.usedPercent)))%")
+                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                .help("Memory: \(HardwareTelemetryService.formatBytes(hubState.hardwareSnapshot.memory.usedBytes)) used of \(HardwareTelemetryService.formatBytes(hubState.hardwareSnapshot.memory.totalBytes)) (\(hubState.hardwareSnapshot.memory.pressureLevel.rawValue.capitalized) pressure)")
+
                 // Battery status
                 if hubState.hardwareSnapshot.battery.hasBattery {
                     HStack(spacing: 3) {
@@ -647,11 +675,147 @@ public struct ZenithCommandHubView: View {
                     }
                 }
 
+                // Top CPU Hogs Toggle
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                        hubState.toggleTopHogs()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(hubState.showTopHogs ? .red : (hubState.hardwareSnapshot.cpu.totalUsagePercent > 50 ? .orange : .secondary))
+                        Text(hubState.showTopHogs ? "Hide Hogs" : "Top Hogs")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(hubState.showTopHogs ? .primary : .secondary)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3.5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(hubState.showTopHogs ? Color.red.opacity(0.12) : Color.primary.opacity(hubState.hoveredFooterId == "hogs" ? 0.08 : 0.04))
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("Inspect and kill heavy CPU processes")
+                .onHover { isHovered in
+                    if isHovered {
+                        hubState.setHoveredFooter("hogs")
+                    } else {
+                        hubState.clearHoveredFooter(ifCurrent: "hogs")
+                    }
+                }
+
                 Spacer()
             }
         }
         .padding(.horizontal, 2)
         .padding(.top, 1)
+    }
+
+    // MARK: - Top CPU Hogs Section
+
+    private var topCpuHogsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("TOP CPU CONSUMERS")
+                    .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                    .foregroundColor(Color.secondary.opacity(0.7))
+                Spacer()
+                Text("\(hubState.hardwareSnapshot.cpu.coreCount) Cores • \(Int(round(hubState.hardwareSnapshot.cpu.totalUsagePercent)))% Total")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 4)
+
+            let hogs = Array(hubState.hardwareSnapshot.cpu.topHogs.prefix(4))
+            if hogs.isEmpty {
+                Text("Zero heavy CPU consumers")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 6)
+            } else {
+                ForEach(hogs) { hog in
+                    HStack(spacing: 6) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            HStack(spacing: 4) {
+                                Text(hog.name)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .lineLimit(1)
+                                Text("(\(hog.pid))")
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+                            Text(HardwareTelemetryService.formatBytes(hog.memoryBytes))
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Text("\(String(format: "%.1f", hog.cpuPercent))%")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundColor(hog.cpuPercent > 50 ? .red : (hog.cpuPercent > 20 ? .orange : .primary))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(Color.primary.opacity(0.05))
+                            )
+
+                        Button {
+                            hubState.killProcess(pid: hog.pid)
+                            ToastHUDController.shared.show(message: "Terminated \(hog.name)", icon: "xmark.circle.fill")
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 13))
+                                .foregroundColor(.red.opacity(0.8))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Terminate process \(hog.name) (PID \(hog.pid))")
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3.5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.primary.opacity(0.03))
+                    )
+                }
+            }
+
+            if !hubState.hardwareSnapshot.cpu.zombieProcesses.isEmpty {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.yellow)
+                        .font(.system(size: 10))
+                    Text("\(hubState.hardwareSnapshot.cpu.zombieProcesses.count) Defunct Zombie(s)")
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Button("Purge") {
+                        _ = try? SystemOptimizerService().execute(taskId: .zombieProcessCleanup)
+                        hubState.refreshHardwareSnapshot()
+                        ToastHUDController.shared.show(message: "Zombies Purged", icon: "bolt.fill")
+                    }
+                    .font(.system(size: 9, weight: .bold))
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.mini)
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+            }
+        }
+        .padding(6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.02))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+                )
+        )
     }
 
     // MARK: - Hairline Divider

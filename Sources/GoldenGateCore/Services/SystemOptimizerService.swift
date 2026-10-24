@@ -8,6 +8,8 @@ public enum OptimizationTaskId: String, CaseIterable, Sendable, Equatable {
     case preventNetworkDsStore = "prevent_network_dsstore"
     case quickLookCacheRefresh = "quicklook_cache_refresh"
     case dnsCacheFlush = "dns_cache_flush"
+    case launchServicesRebuild = "launch_services_rebuild"
+    case zombieProcessCleanup = "zombie_process_cleanup"
 
     public var title: String {
         switch self {
@@ -17,6 +19,8 @@ public enum OptimizationTaskId: String, CaseIterable, Sendable, Equatable {
         case .preventNetworkDsStore: return "Prevent Network & USB .DS_Store"
         case .quickLookCacheRefresh: return "QuickLook & Thumbnail Cache"
         case .dnsCacheFlush: return "Flush System DNS Cache"
+        case .launchServicesRebuild: return "Rebuild LaunchServices Database"
+        case .zombieProcessCleanup: return "Purge Zombie / Defunct Processes"
         }
     }
 
@@ -28,6 +32,8 @@ public enum OptimizationTaskId: String, CaseIterable, Sendable, Equatable {
         case .preventNetworkDsStore: return "externaldrive.fill.badge.minus"
         case .quickLookCacheRefresh: return "eye.slash.fill"
         case .dnsCacheFlush: return "network.badge.shield.half.filled"
+        case .launchServicesRebuild: return "arrow.triangle.2.circlepath.circle.fill"
+        case .zombieProcessCleanup: return "exclamationmark.triangle.fill"
         }
     }
 }
@@ -109,6 +115,24 @@ public final class SystemOptimizerService: @unchecked Sendable {
             description: "Clear stale domain resolution entries and mDNS responder state.",
             details: "Ready to flush",
             status: .ready
+        ))
+
+        // 7. LaunchServices Database
+        tasks.append(OptimizationTaskItem(
+            id: .launchServicesRebuild,
+            description: "Rebuilds application associations to fix duplicate, stale, or missing Open With icons.",
+            details: "Ready to rebuild",
+            status: .ready
+        ))
+
+        // 8. Zombie Process Cleanup
+        let zombies = HardwareTelemetryService.shared.readCPUTelemetry().zombieProcesses
+        tasks.append(OptimizationTaskItem(
+            id: .zombieProcessCleanup,
+            description: "Terminates defunct/zombie processes lingering in the kernel process table.",
+            itemCount: zombies.count,
+            details: zombies.isEmpty ? "Clean — zero zombie processes discovered" : "\(zombies.count) defunct zombie(s) found",
+            status: zombies.isEmpty ? .optimized : .ready
         ))
 
         return tasks
@@ -260,6 +284,22 @@ public final class SystemOptimizerService: @unchecked Sendable {
             mdns.arguments = ["-HUP", "mDNSResponder"]
             try? mdns.run()
             mdns.waitUntilExit()
+
+        case .launchServicesRebuild:
+            let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+            if fileManager.fileExists(atPath: lsregister) {
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: lsregister)
+                proc.arguments = ["-kill", "-r", "-domain", "local", "-domain", "system", "-domain", "user"]
+                try? proc.run()
+                proc.waitUntilExit()
+            }
+
+        case .zombieProcessCleanup:
+            let zombies = HardwareTelemetryService.shared.readCPUTelemetry().zombieProcesses
+            for z in zombies {
+                HardwareTelemetryService.shared.killProcess(pid: z.pid, force: true)
+            }
         }
 
         return freedBytes

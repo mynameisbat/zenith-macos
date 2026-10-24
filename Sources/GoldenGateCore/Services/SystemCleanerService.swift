@@ -578,6 +578,11 @@ public final class SystemCleanerService: ObservableObject {
             return false
         }
 
+        // User Custom & Statutory Whitelist
+        if CleanerWhitelistService.shared.isWhitelisted(path: candidate) {
+            return false
+        }
+
         // Must not be a protected system bundle (HIGH-10)
         if isProtectedBundle(nameOrPath: candidate) {
             return false

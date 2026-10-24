@@ -292,6 +292,11 @@ public final class ProjectPurgeService: @unchecked Sendable {
             return false
         }
 
+        // Custom user and statutory whitelist
+        if CleanerWhitelistService.shared.isWhitelisted(path: canonical) {
+            return false
+        }
+
         // Last component must strictly be a known artifact directory name
         let lastComp = (canonical as NSString).lastPathComponent
         guard PurgeArtifactType.allCases.contains(where: { $0.rawValue == lastComp }) else {
