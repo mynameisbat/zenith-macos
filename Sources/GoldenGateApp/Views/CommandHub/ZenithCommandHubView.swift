@@ -83,6 +83,7 @@ public struct ZenithCommandHubView: View {
         }
         .onAppear {
             isSearchFocused = true
+            hubState.refreshHardwareSnapshot()
             if cleaner.categories.isEmpty && !cleaner.isScanning {
                 Task {
                     await cleaner.scan()
@@ -428,8 +429,114 @@ public struct ZenithCommandHubView: View {
     // MARK: - 4. Subtle Status & Control Footer
 
     private var footerRow: some View {
-        HStack(spacing: 8) {
-            // Left side: Privacy Shield & Cleaner Badges
+        VStack(spacing: 6) {
+            // Top telemetry sub-row: Battery, SSD Free Space, and Peripherals
+            HStack(spacing: 8) {
+                // Battery status
+                if hubState.hardwareSnapshot.battery.hasBattery {
+                    HStack(spacing: 3) {
+                        Image(systemName: hubState.hardwareSnapshot.battery.isCharging ? "battery.100.bolt" : "battery.75")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(hubState.hardwareSnapshot.battery.isCharging ? .green : (hubState.hardwareSnapshot.battery.percentage <= 20 ? .red : .secondary))
+                        Text("\(hubState.hardwareSnapshot.battery.percentage)%")
+                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+                    .help("Battery: \(hubState.hardwareSnapshot.battery.percentage)%, Condition: \(hubState.hardwareSnapshot.battery.condition), Cycles: \(hubState.hardwareSnapshot.battery.cycleCount ?? 0)")
+                }
+
+                // Storage status
+                HStack(spacing: 3) {
+                    Image(systemName: "internaldrive")
+                        .font(.system(size: 9.5))
+                        .foregroundColor(.secondary)
+                    Text("\(hubState.hardwareSnapshot.disk.freeBytes / 1_073_741_824)G free")
+                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                .help("\(hubState.hardwareSnapshot.disk.volumeName): \(hubState.hardwareSnapshot.disk.freeBytes / 1_073_741_824) GB free of \(hubState.hardwareSnapshot.disk.totalBytes / 1_073_741_824) GB")
+
+                // Connected Bluetooth accessories
+                ForEach(hubState.hardwareSnapshot.bluetoothDevices) { dev in
+                    HStack(spacing: 3) {
+                        Image(systemName: dev.icon)
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.secondary)
+                        Text("\(dev.batteryPercent)%")
+                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+                    .help("\(dev.name): \(dev.batteryPercent)%")
+                }
+
+                Spacer()
+
+                // Settings & Quit
+                HStack(spacing: 4) {
+                    Button {
+                        onClose()
+                        onOpenPreferences()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 11))
+                            Text("⌘,")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(Color.secondary.opacity(0.6))
+                        }
+                        .foregroundColor(hubState.hoveredFooterId == "settings" ? .primary : .secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 3.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Color.primary.opacity(hubState.hoveredFooterId == "settings" ? 0.08 : 0.0))
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(",", modifiers: .command)
+                    .help("Settings (⌘,)")
+                    .onHover { isHovered in
+                        if isHovered {
+                            hubState.setHoveredFooter("settings")
+                        } else {
+                            hubState.clearHoveredFooter(ifCurrent: "settings")
+                        }
+                    }
+
+                    Button {
+                        onQuit()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "power")
+                                .font(.system(size: 11))
+                            Text("⌘Q")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(Color.secondary.opacity(0.6))
+                        }
+                        .foregroundColor(hubState.hoveredFooterId == "quit" ? .red : .secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 3.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Color.red.opacity(hubState.hoveredFooterId == "quit" ? 0.12 : 0.0))
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut("q", modifiers: .command)
+                    .help("Quit Zenith (⌘Q)")
+                    .onHover { isHovered in
+                        if isHovered {
+                            hubState.setHoveredFooter("quit")
+                        } else {
+                            hubState.clearHoveredFooter(ifCurrent: "quit")
+                        }
+                    }
+                }
+            }
+
+            // Bottom action tools row: DoH Shield, System Cleaner & Optimizer
             HStack(spacing: 6) {
                 // DoH Shield Toggle
                 Button {
@@ -441,7 +548,7 @@ public struct ZenithCommandHubView: View {
                             .frame(width: 6, height: 6)
 
                         Text("DoH Shield")
-                            .font(.system(size: 10.5, weight: .medium))
+                            .font(.system(size: 10, weight: .medium))
                             .foregroundColor(privacyController.isRunning ? .primary : .secondary)
                     }
                     .padding(.horizontal, 6)
@@ -502,72 +609,44 @@ public struct ZenithCommandHubView: View {
                         hubState.clearHoveredFooter(ifCurrent: "cleaner")
                     }
                 }
-            }
 
-            Spacer()
-
-            // Right side: Settings & Quit
-            HStack(spacing: 4) {
+                // System Optimizer Button
                 Button {
-                    onClose()
-                    onOpenPreferences()
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 11))
-                        Text("⌘,")
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(Color.secondary.opacity(0.6))
+                    Task {
+                        _ = try? SystemOptimizerService.shared.execute(taskId: .preventNetworkDsStore)
+                        _ = try? SystemOptimizerService.shared.execute(taskId: .quickLookCacheRefresh)
+                        _ = try? SystemOptimizerService.shared.execute(taskId: .dnsCacheFlush)
+                        ToastHUDController.shared.show(message: "System Optimized & DNS Flushed", icon: "sparkles")
+                        hubState.refreshHardwareSnapshot()
                     }
-                    .foregroundColor(hubState.hoveredFooterId == "settings" ? .primary : .secondary)
-                    .padding(.horizontal, 5)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(Color.cyan)
+                        Text("Optimize")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.primary)
+                    }
+                    .padding(.horizontal, 6)
                     .padding(.vertical, 3.5)
                     .background(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(Color.primary.opacity(hubState.hoveredFooterId == "settings" ? 0.08 : 0.0))
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.primary.opacity(hubState.hoveredFooterId == "optimizer" ? 0.08 : 0.04))
                     )
-                    .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .keyboardShortcut(",", modifiers: .command)
-                .help("Settings (⌘,)")
+                .help("Run System Maintenance (Flush DNS, Clean QuickLook, Disable .DS_Store on USB/Network)")
                 .onHover { isHovered in
                     if isHovered {
-                        hubState.setHoveredFooter("settings")
+                        hubState.setHoveredFooter("optimizer")
                     } else {
-                        hubState.clearHoveredFooter(ifCurrent: "settings")
+                        hubState.clearHoveredFooter(ifCurrent: "optimizer")
                     }
                 }
 
-                Button {
-                    onQuit()
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "power")
-                            .font(.system(size: 11))
-                        Text("⌘Q")
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(Color.secondary.opacity(0.6))
-                    }
-                    .foregroundColor(hubState.hoveredFooterId == "quit" ? .red : .secondary)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 3.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(Color.red.opacity(hubState.hoveredFooterId == "quit" ? 0.12 : 0.0))
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut("q", modifiers: .command)
-                .help("Quit Zenith (⌘Q)")
-                .onHover { isHovered in
-                    if isHovered {
-                        hubState.setHoveredFooter("quit")
-                    } else {
-                        hubState.clearHoveredFooter(ifCurrent: "quit")
-                    }
-                }
+                Spacer()
             }
         }
         .padding(.horizontal, 2)

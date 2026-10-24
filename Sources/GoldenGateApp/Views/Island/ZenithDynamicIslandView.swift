@@ -268,6 +268,62 @@ public struct ZenithDynamicIslandView: View {
             islandState.beginDragOut()
             return makeItemProvider(for: item)
         }
+        .contextMenu {
+            if let url = item.fileURL, url.pathExtension.lowercased() == "app" {
+                Button {
+                    Task {
+                        if let plan = AppUninstallerService.shared.analyzeApp(atPath: url.path) {
+                            do {
+                                let freed = try AppUninstallerService.shared.uninstall(plan: plan, moveToTrash: true)
+                                ToastHUDController.shared.show(
+                                    message: "Uninstalled \(plan.app.displayName) (Freed \(SystemCleanerService.formatBytes(freed)))",
+                                    icon: "trash.fill"
+                                )
+                                islandState.removeItem(id: item.id)
+                            } catch {
+                                ToastHUDController.shared.show(message: "Uninstall error: \(error.localizedDescription)", icon: "exclamationmark.triangle")
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Deep Uninstall App & Leftovers", systemImage: "trash.fill")
+                }
+
+                Button {
+                    Task {
+                        if let plan = BinarySlimmerService.shared.scanApp(atPath: url.path) {
+                            do {
+                                let saved = try BinarySlimmerService.shared.slimApp(plan: plan)
+                                ToastHUDController.shared.show(
+                                    message: "Slimmed \(plan.appName) (Saved \(SystemCleanerService.formatBytes(saved)))",
+                                    icon: "scissors"
+                                )
+                            } catch {
+                                ToastHUDController.shared.show(message: "Slimming error: \(error.localizedDescription)", icon: "exclamationmark.triangle")
+                            }
+                        } else {
+                            ToastHUDController.shared.show(message: "Already native Apple Silicon binary", icon: "checkmark.seal")
+                        }
+                    }
+                } label: {
+                    Label("Slim Universal App (Strip Intel code)", systemImage: "scissors")
+                }
+
+                Divider()
+            }
+
+            Button {
+                copyItemToClipboard(item: item)
+            } label: {
+                Label("Copy to Clipboard", systemImage: "doc.on.clipboard")
+            }
+
+            Button(role: .destructive) {
+                islandState.removeItem(id: item.id)
+            } label: {
+                Label("Remove from Shelf", systemImage: "xmark")
+            }
+        }
     }
 
     private func copyItemToClipboard(item: IslandDropItem) {

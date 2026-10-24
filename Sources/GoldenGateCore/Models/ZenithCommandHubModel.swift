@@ -71,8 +71,13 @@ public final class ZenithCommandHubState: ObservableObject {
     @Published public var hoveredFooterId: String? = nil
     @Published public var quickLookItem: ClipboardItem? = nil
     @Published public var presentationID: UUID = UUID()
+    @Published public var hardwareSnapshot: HardwareSnapshot = HardwareTelemetryService.shared.fetchSnapshot()
 
     public init() {}
+
+    public func refreshHardwareSnapshot() {
+        hardwareSnapshot = HardwareTelemetryService.shared.fetchSnapshot()
+    }
 
     public func setSearchText(_ text: String) {
         searchText = text
