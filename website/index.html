@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Zenith — Precision Mac Workspace</title>
-  <meta name="description" content="A native macOS utility living in your menu bar with smart clipboard history, precision screen capture, notch HUD, and DoH privacy protection.">
+  <title>Zenith — Precision macOS Powerhouse</title>
+  <meta name="description" content="A native, zero-bloat macOS powerhouse utility. Smart clipboard manager, pixel-perfect screen capture & loupe, MacBook dynamic island shelf, developer cache purge, and encrypted DNS shield.">
   <link rel="icon" type="image/png" href="assets/app-icon.png">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -20,122 +20,235 @@
 
       <nav aria-label="Primary navigation">
         <ul class="nav-links">
-          <li class="nav-item"><a href="#capabilities">Capabilities</a></li>
-          <li class="nav-item"><a href="#interactive">Interactive Demo</a></li>
-          <li class="nav-item"><a href="#architecture">Architecture</a></li>
-          <li class="nav-item"><a href="#download">Download</a></li>
+          <li class="nav-item"><a href="#clipboard">Clipboard</a></li>
+          <li class="nav-item"><a href="#capture">Capture &amp; Loupe</a></li>
+          <li class="nav-item"><a href="#shelf">Notch Shelf</a></li>
+          <li class="nav-item"><a href="#cleaner">Deep Purge</a></li>
+          <li class="nav-item"><a href="#privacy">Privacy Shield</a></li>
+          <li class="nav-item"><a href="#comparison">Specs</a></li>
         </ul>
       </nav>
 
-      <a href="https://github.com/mynameisbat/zenith-macos" class="nav-cta" target="_blank" rel="noopener">
-        GitHub
-      </a>
+      <div class="nav-actions">
+        <a href="https://github.com/mynameisbat/zenith-macos" class="nav-secondary-btn" target="_blank" rel="noopener">
+          GitHub
+        </a>
+        <a href="#download" class="nav-cta">
+          Download
+        </a>
+      </div>
     </div>
   </header>
 
   <main>
-    <!-- 1. Hero Section: product-performs -->
+    <!-- 1. Hero Section -->
     <section class="hero">
-      <div class="container hero-grid">
-        <div class="hero-content fade-up">
-          <h1 class="hero-title">Your Mac, Sharper.</h1>
+      <div class="container hero-container">
+        
+        <div class="hero-header fade-up">
+          <div class="hero-status-pill">
+            <span class="badge-dot"></span>
+            <span>Native Swift 6 · macOS 14 Sonoma &amp; 15 Sequoia</span>
+          </div>
+          <h1 class="hero-title">Your Mac, five times sharper.</h1>
           <p class="hero-desc">
-            Zenith lives quietly in your menu bar with instant clipboard recall, pixel-precision screen capture, Dynamic Island alerts, and encrypted DNS shield.
+            Zenith consolidates your clipboard manager, screenshot optics, MacBook notch shelf, developer cache purge, and anti-DPI encrypted DNS into a single 28MB native Swift binary. Zero Electron. Zero telemetry.
           </p>
 
           <div class="hero-actions">
-            <a href="https://github.com/mynameisbat/zenith/releases/download/v2.0.0/Zenith-2.0.0.dmg" class="btn-primary">
+            <a href="https://github.com/mynameisbat/zenith-macos/releases/latest" class="btn-primary">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
               </svg>
-              Download Zenith DMG
+              Download Zenith for Mac
             </a>
-            <a href="https://github.com/mynameisbat/zenith-macos" class="btn-secondary" target="_blank" rel="noopener">
-              Source Code
-            </a>
-          </div>
-
-          <div class="hero-specs">
-            <div class="hero-spec-item">
-              <span class="hero-spec-dot"></span>
-              <span>macOS 14+ Sonoma & Sequoia</span>
-            </div>
-            <div class="hero-spec-item">
-              <span class="hero-spec-dot"></span>
-              <span>Swift 6 Native</span>
+            
+            <div class="brew-box" id="brew-box" title="Click to copy Homebrew command">
+              <code>brew install --cask zenith</code>
+              <button class="brew-copy-btn" id="brew-copy" aria-label="Copy brew command">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
 
-        <!-- Live Fragment: Interactive Popover on Stage -->
-        <div class="hero-stage fade-up" data-ui>
-          <!-- Interactive Notch HUD -->
-          <div class="notch-hud" id="notch-hud" title="Click notch to test alert HUD">
-            <span class="notch-dot"></span>
-            <span class="notch-text" id="notch-text">Zenith 2.0</span>
-          </div>
+        <!-- Realistic macOS Window Mockup of Zenith Command Hub -->
+        <div class="hero-window-wrapper fade-up">
+          <div class="macos-window" data-ui>
+            <!-- Window Titlebar with Traffic Lights -->
+            <div class="window-titlebar">
+              <div class="traffic-lights">
+                <span class="light close"></span>
+                <span class="light minimize"></span>
+                <span class="light zoom"></span>
+              </div>
+              <div class="window-title">Zenith Command Hub — ⌥Space</div>
+              <div class="window-telemetry">
+                <code class="telemetry-pill">CPU 0.2%</code>
+                <code class="telemetry-pill">RAM 28 MB</code>
+              </div>
+            </div>
 
-          <!-- Live Command Hub View -->
-          <div class="live-popover" role="region" aria-label="Interactive Command Hub Demo">
-            <div class="popover-search">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <!-- Search Field -->
+            <div class="window-search-bar">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="search-icon">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
-              <input type="text" id="hub-search-input" class="popover-input" placeholder="Type to search clips..." aria-label="Search clips in demo">
+              <input type="text" id="hub-search-input" class="window-search-input" placeholder="Search clips, execute actions, or press ⌘1...⌘9 to paste" aria-label="Search clips">
+              <kbd class="keycap">⌘K</kbd>
             </div>
 
-            <div class="popover-actions">
-              <div class="action-row">
-                <span>Capture Area</span>
-                <span class="keycap">⌘⇧2</span>
-              </div>
-              <div class="action-row">
-                <span>Capture Screen</span>
-                <span class="keycap">⌘⇧1</span>
-              </div>
+            <!-- Quick Action Pills -->
+            <div class="window-quick-actions">
+              <div class="action-chip active" data-filter="all">All Clips (42)</div>
+              <div class="action-chip" data-filter="code">Code Snippets</div>
+              <div class="action-chip" data-filter="image">Retina Screenshots</div>
+              <div class="action-chip" data-filter="color">Color Tokens</div>
             </div>
 
-            <div class="popover-header-row">Recent Clips</div>
-
-            <div class="clips-list" id="hub-clips-list">
-              <div class="clip-row" data-search="curl -sSL https://zenith.app/install.sh" data-clip="curl -sSL https://zenith.app/install.sh">
-                <div class="clip-content">
-                  <span class="clip-badge">TXT</span>
-                  <span>curl -sSL https://zenith.app/install.sh</span>
+            <!-- Real Clipboard Rows -->
+            <div class="window-clips-stream" id="hub-clips-list">
+              <!-- Clip 1: Shell command -->
+              <div class="clip-card" data-category="code" data-clip="curl -sSL https://get.zenith.sh | bash">
+                <code class="clip-indicator code">CODE</code>
+                <div class="clip-body">
+                  <div class="clip-text"><code>curl -sSL https://get.zenith.sh | bash</code></div>
+                  <div class="clip-meta">Copied from Terminal · 2 minutes ago · 38 bytes</div>
                 </div>
-                <span class="keycap">⌘1</span>
-              </div>
-              <div class="clip-row" data-search="#147BFA Sapphire Blue Theme Token" data-clip="#147BFA">
-                <div class="clip-content">
-                  <span class="clip-badge">HEX</span>
-                  <span>#147BFA Sapphire Blue</span>
+                <div class="clip-action">
+                  <kbd class="keycap">⌘1</kbd>
                 </div>
-                <span class="keycap">⌘2</span>
               </div>
-              <div class="clip-row" data-search="git checkout -b release/2.0.0" data-clip="git checkout -b release/2.0.0">
-                <div class="clip-content">
-                  <span class="clip-badge">CMD</span>
-                  <span>git checkout -b release/2.0.0</span>
+
+              <!-- Clip 2: Color token -->
+              <div class="clip-card" data-category="color" data-clip="#0F62FE">
+                <code class="clip-indicator color" style="background-color: #0F62FE;">HEX</code>
+                <div class="clip-body">
+                  <div class="clip-text"><strong>#0F62FE</strong> — Apple Precision Sapphire Blue</div>
+                  <div class="clip-meta">Copied via Loupe Magnifier · 14 minutes ago · Pinned</div>
                 </div>
-                <span class="keycap">⌘3</span>
+                <div class="clip-action">
+                  <span class="pin-tag">PIN</span>
+                  <kbd class="keycap">⌘2</kbd>
+                </div>
+              </div>
+
+              <!-- Clip 3: Screenshot thumbnail -->
+              <div class="clip-card" data-category="image" data-clip="Retina_Annotation_4K.png">
+                <code class="clip-indicator image">IMG</code>
+                <div class="clip-body">
+                  <div class="clip-text"><strong>Retina_Screen_Crop.png</strong> — 2880 × 1800 @2x</div>
+                  <div class="clip-meta">Area Capture with Vector Arrow &amp; Redaction · 45 minutes ago · 1.4 MB</div>
+                </div>
+                <div class="clip-action">
+                  <kbd class="keycap">⌘3</kbd>
+                </div>
+              </div>
+
+              <!-- Clip 4: JSON response -->
+              <div class="clip-card" data-category="code" data-clip="{ &quot;status&quot;: &quot;active&quot;, &quot;doh_resolver&quot;: &quot;cloudflare-1.1.1.1&quot; }">
+                <code class="clip-indicator code">JSON</code>
+                <div class="clip-body">
+                  <div class="clip-text"><code>{ "status": "active", "doh_resolver": "cloudflare-1.1.1.1", "latency_ms": 1.2 }</code></div>
+                  <div class="clip-meta">Copied from Postman · 1 hour ago · 78 bytes</div>
+                </div>
+                <div class="clip-action">
+                  <kbd class="keycap">⌘4</kbd>
+                </div>
               </div>
             </div>
 
-            <div class="popover-footer">
-              <div class="telemetry-item">
-                <span>CPU</span>
-                <strong>4%</strong>
+            <!-- Window Footer with System Status -->
+            <div class="window-footer">
+              <div class="footer-status-group">
+                <span class="status-indicator online"></span>
+                <span>Privacy Shield Active (DoH + TLS Chunker)</span>
               </div>
-              <div class="telemetry-item">
-                <span>RAM</span>
-                <strong>42%</strong>
+              <div class="footer-hint">
+                <span>Select with <code>↑</code> <code>↓</code> · Paste with <code>↵</code> · Dismiss with <code>Esc</code></span>
               </div>
-              <div class="telemetry-item">
-                <span>DoH Shield</span>
-                <span style="color: var(--success);">Active</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 2. Feature 1: Smart Clipboard Manager -->
+    <section class="feature-section" id="clipboard">
+      <div class="container">
+        <div class="feature-two-col">
+          <div class="feature-narrative fade-up">
+            <h2 class="feature-heading">Sub-millisecond smart clipboard.</h2>
+            <p class="feature-body">
+              Never lose a copied code snippet, link, or design asset again. Zenith indexes your clipboard in-memory with custom UTF-8 Boyer-Moore and Unicode fuzzy search for instant recall under 1 millisecond.
+            </p>
+            
+            <div class="feature-checklist">
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>Zero-Leak In-Memory Eviction</strong>
+                  <p>Configurable history limit (20 to 500 items). Excess unpinned items are automatically evicted via thread-safe FIFO without memory bloating.</p>
+                </div>
+              </div>
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>Automatic Password &amp; Keychain Exclusion</strong>
+                  <p>Intelligently ignores transient data copied from 1Password, Bitwarden, Apple Keychain, and incognito browser tabs via macOS ConcealedType markers.</p>
+                </div>
+              </div>
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>Keyboard-Driven Workflow</strong>
+                  <p>Full support for <code>⌘1</code>–<code>⌘9</code> instant paste, <code>⌘P</code> pin toggle, <code>⌘⌫</code> delete, and Emacs navigation (<code>Ctrl+N</code> / <code>Ctrl+P</code>).</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="feature-visual fade-up">
+            <div class="ui-preview-card" data-ui>
+              <div class="preview-header">
+                <div class="preview-title">In-Memory Search Benchmarks</div>
+                <span class="bench-pill">&lt; 0.65ms</span>
+              </div>
+              <div class="benchmark-bars">
+                <div class="bench-row">
+                  <div class="bench-label">Zenith (Native Swift 6)</div>
+                  <div class="bench-track">
+                    <div class="bench-fill zenith" style="width: 12%;">0.65 ms</div>
+                  </div>
+                </div>
+                <div class="bench-row">
+                  <div class="bench-label">Raycast (SQLite + Node)</div>
+                  <div class="bench-track">
+                    <div class="bench-fill" style="width: 48%;">4.8 ms</div>
+                  </div>
+                </div>
+                <div class="bench-row">
+                  <div class="bench-label">Electron Clipboard Tools</div>
+                  <div class="bench-track">
+                    <div class="bench-fill" style="width: 95%;">18.2 ms</div>
+                  </div>
+                </div>
+              </div>
+              <div class="preview-note">
+                Tested with 500 clipboard entries containing Unicode text, code blocks, and 4K images on Apple Silicon M3 Pro.
               </div>
             </div>
           </div>
@@ -143,248 +256,476 @@
       </div>
     </section>
 
-    <!-- 2. Intro Section: Lead line over four columns -->
-    <section class="intro" id="capabilities">
+    <!-- 3. Feature 2: Screen Capture & Loupe Magnifier -->
+    <section class="feature-section alt-bg" id="capture">
+      <div class="container">
+        <div class="feature-two-col reversed">
+          <div class="feature-narrative fade-up">
+            <h2 class="feature-heading">Precision optics and 16x Loupe.</h2>
+            <p class="feature-body">
+              Engineered for engineers, designers, and documentation creators. Capture screen regions with sub-pixel alignment, sample raw RGB/HEX color codes, and mark up screenshots instantly.
+            </p>
+
+            <div class="feature-checklist">
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>Live 16x Pixel Loupe with HEX Sampler</strong>
+                  <p>Hovering over any pixel renders a real-time magnified grid with center crosshairs and formatted color values ready to copy in one keypress.</p>
+                </div>
+              </div>
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>Built-in Vector Annotation Studio</strong>
+                  <p>Add crisp vector arrows, numbered step bubbles (1, 2, 3), highlight boxes, text callouts, and pixelated blur redaction.</p>
+                </div>
+              </div>
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>Uncompressed Retina Export</strong>
+                  <p>Exports directly to PNG or high-quality JPEG without downsampling or compression artifacts. Copies directly to pasteboard on <code>⌘C</code>.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="feature-visual fade-up">
+            <!-- Interactive Loupe Canvas Demo -->
+            <div class="loupe-demo-stage" id="loupe-stage" data-ui>
+              <div class="capture-marquee-box">
+                <code class="marquee-badge">840 × 520 pt · Retina @2x</code>
+                <div class="annotation-arrow-demo"></div>
+                <div class="step-badge-demo">1</div>
+                <div class="blur-box-demo">Sensitive Token</div>
+              </div>
+
+              <!-- Floating Loupe Lens -->
+              <div class="interactive-loupe-lens" id="loupe-lens">
+                <div class="loupe-grid">
+                  <div class="pixel-row"><span></span><span></span><span></span><span></span><span></span></div>
+                  <div class="pixel-row"><span></span><span></span><span class="center-target"></span><span></span><span></span></div>
+                  <div class="pixel-row"><span></span><span></span><span></span><span></span><span></span></div>
+                </div>
+                <code class="loupe-hud-text">
+                  <span class="loupe-hex">#0F62FE</span>
+                  <span class="loupe-rgb">15, 98, 254</span>
+                </code>
+              </div>
+            </div>
+            <div class="caption-under">
+              Move your mouse inside the box to test the 16x Loupe coordinate tracking.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Feature 3: MacBook Dynamic Island & Shelf -->
+    <section class="feature-section" id="shelf">
+      <div class="container">
+        <div class="feature-two-col">
+          <div class="feature-narrative fade-up">
+            <h2 class="feature-heading">Your notch as a drop shelf.</h2>
+            <p class="feature-body">
+              Instead of an empty black notch, Zenith transforms the top center of your display into an active drop shelf. Drag files, images, or snippets up to the notch to hold them between workspaces and multi-monitor setups.
+            </p>
+
+            <div class="feature-checklist">
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>Magnetic Drop &amp; Shelf Staging</strong>
+                  <p>Drag any file onto the notch; it expands with Apple-native spring physics. Switch spaces, open your email or Slack, and drag them right out.</p>
+                </div>
+              </div>
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>Transient Status HUD Capsules</strong>
+                  <p>Displays elegant pill alerts directly around the camera notch when screenshots are captured, items are copied, or memory is freed.</p>
+                </div>
+              </div>
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>Zero Mini-LED Light Bleed</strong>
+                  <p>Engineered with deep obsidian pitch-black #06070a to match MacBook Liquid Retina XDR Mini-LED bezels without glowing halos.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="feature-visual fade-up">
+            <div class="notch-shelf-simulator" data-ui>
+              <!-- Notch Capsule -->
+              <div class="hardware-notch" id="interactive-notch">
+                <div class="camera-lens"></div>
+                <div class="notch-label" id="interactive-notch-label">Zenith Shelf · 2 items parked</div>
+              </div>
+
+              <!-- Shelf Contents -->
+              <div class="shelf-drawer" id="shelf-drawer">
+                <div class="shelf-item">
+                  <span class="shelf-tag">PDF</span>
+                  <div class="shelf-meta">
+                    <span class="shelf-name">Architecture_Spec.pdf</span>
+                    <span class="shelf-size">3.4 MB</span>
+                  </div>
+                </div>
+                <div class="shelf-item">
+                  <span class="shelf-tag">PNG</span>
+                  <div class="shelf-meta">
+                    <span class="shelf-name">Zenith_AppIcon_1024.png</span>
+                    <span class="shelf-size">2.6 MB</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="shelf-controls">
+                <button class="btn-shelf-action" id="btn-trigger-alert">Simulate Notch Copy Alert</button>
+                <button class="btn-shelf-action" id="btn-toggle-shelf">Toggle Drop Shelf</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Feature 4: Developer Deep Purge -->
+    <section class="feature-section alt-bg" id="cleaner">
+      <div class="container">
+        <div class="feature-two-col reversed">
+          <div class="feature-narrative fade-up">
+            <h2 class="feature-heading">Reclaim developer disk space.</h2>
+            <p class="feature-body">
+              Inspired by Mole (mo purge and mo installer), Zenith deeply scans your local development directories, project caches, and installer directories without requiring root or third-party background daemons.
+            </p>
+
+            <div class="feature-checklist">
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>Project Build Artifact Purge</strong>
+                  <p>Recursively purges unused node_modules, Rust targets, Python venvs, and Xcode DerivedData.</p>
+                </div>
+              </div>
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>Stale Installer Hunt (.dmg &amp; .pkg)</strong>
+                  <p>Identifies multi-gigabyte installer archives forgotten in your <code>~/Downloads</code> folder that have already been installed.</p>
+                </div>
+              </div>
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>App Leftover Deep Clean</strong>
+                  <p>Uninstalls applications completely by eradicating hidden caches in <code>~/Library/Application Support</code> and launch agents.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="feature-visual fade-up">
+            <div class="cleaner-dashboard-mockup" data-ui>
+              <div class="cleaner-head">
+                <div>
+                  <div class="cleaner-title">System Storage &amp; Cache Sweep</div>
+                  <div class="cleaner-subtitle">Scanned 4 project directories &amp; Downloads</div>
+                </div>
+                <div class="cleaner-total-badge" id="cleaner-badge">42.0 GB Cleanable</div>
+              </div>
+
+              <div class="cleaner-items-list">
+                <div class="cleaner-row">
+                  <input type="checkbox" checked id="c1" class="cleaner-checkbox">
+                  <label for="c1" class="cleaner-info">
+                    <span class="c-title">node_modules &amp; pnpm store (12 projects)</span>
+                    <span class="c-path">~/RiderProjects, ~/GitHub</span>
+                  </label>
+                  <span class="c-size">18.4 GB</span>
+                </div>
+
+                <div class="cleaner-row">
+                  <input type="checkbox" checked id="c2" class="cleaner-checkbox">
+                  <label for="c2" class="cleaner-info">
+                    <span class="c-title">Xcode DerivedData &amp; Device Simulator Logs</span>
+                    <span class="c-path">~/Library/Developer/Xcode/DerivedData</span>
+                  </label>
+                  <span class="c-size">12.6 GB</span>
+                </div>
+
+                <div class="cleaner-row">
+                  <input type="checkbox" checked id="c3" class="cleaner-checkbox">
+                  <label for="c3" class="cleaner-info">
+                    <span class="c-title">Stale Installers (.dmg / .pkg / .iso)</span>
+                    <span class="c-path">~/Downloads</span>
+                  </label>
+                  <span class="c-size">7.8 GB</span>
+                </div>
+
+                <div class="cleaner-row">
+                  <input type="checkbox" checked id="c4" class="cleaner-checkbox">
+                  <label for="c4" class="cleaner-info">
+                    <span class="c-title">Orphaned Application Leftovers</span>
+                    <span class="c-path">~/Library/Caches</span>
+                  </label>
+                  <span class="c-size">3.2 GB</span>
+                </div>
+              </div>
+
+              <div class="cleaner-foot">
+                <button class="btn-clean-action" id="btn-clean-action">
+                  Purge Selected (42.0 GB)
+                </button>
+                <span class="cleaner-safe-notice">Moves safely to Trash · Reversible</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Feature 5: Privacy Shield -->
+    <section class="feature-section" id="privacy">
+      <div class="container">
+        <div class="feature-two-col">
+          <div class="feature-narrative fade-up">
+            <h2 class="feature-heading">Encrypted DNS and anti-DPI.</h2>
+            <p class="feature-body">
+              Traditional VPNs slow down your entire connection, introduce ping spikes, and tunnel your trusted traffic through unknown data centers. Zenith uses native DNS over HTTPS and TLS ClientHello packet chunking directly on localhost.
+            </p>
+
+            <div class="feature-checklist">
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>DNS over HTTPS (DoH) Resolver</strong>
+                  <p>Encrypts all system DNS queries via Cloudflare (1.1.1.1) or Google DNS (8.8.8.8), preventing your ISP or local network snooper from logging domain names.</p>
+                </div>
+              </div>
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>TLS ClientHello SNI Chunker</strong>
+                  <p>Splits the initial TLS handshake packet into dual micro-chunks. Neutralizes Deep Packet Inspection (DPI) firewalls with 0ms added latency.</p>
+                </div>
+              </div>
+              <div class="check-item">
+                <span class="check-mark">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div>
+                  <strong>100% In-Process Local Proxy</strong>
+                  <p>Runs strictly on <code>127.0.0.1:8080</code> with zero kernel extensions, zero third-party drivers, and auto-restoring network safety guards.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="feature-visual fade-up">
+            <div class="privacy-diagram-card" data-ui>
+              <div class="diagram-step">
+                <div class="diagram-node">Your Mac</div>
+                <div class="diagram-line">
+                  <span class="line-label">Plain SNI Handshake</span>
+                </div>
+                <div class="diagram-node split">Zenith Chunker</div>
+              </div>
+
+              <div class="chunker-viz">
+                <span class="chunk-chip">Chunk 1: [TLS Header + 1 Byte SNI]</span>
+                <span class="chunk-plus">+</span>
+                <span class="chunk-chip">Chunk 2: [Remaining Handshake]</span>
+              </div>
+
+              <div class="diagram-step">
+                <div class="diagram-node split">Zenith Chunker</div>
+                <div class="diagram-line secure">
+                  <span class="line-label">DPI Bypassed · Zero Ping Penalty</span>
+                </div>
+                <div class="diagram-node destination">Target Server</div>
+              </div>
+
+              <div class="privacy-specs-grid">
+                <div class="p-spec">
+                  <span class="p-label">DNS Protocol</span>
+                  <span class="p-val">DoH (RFC 8484)</span>
+                </div>
+                <div class="p-spec">
+                  <span class="p-label">Resolver Ping</span>
+                  <span class="p-val">&lt; 1.8 ms</span>
+                </div>
+                <div class="p-spec">
+                  <span class="p-label">VPN Bandwidth Cap</span>
+                  <span class="p-val">None (Line Rate)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Comparison Table -->
+    <section class="comparison-section alt-bg" id="comparison">
       <div class="container">
         <div class="section-head fade-up">
-          <h2 class="section-title">Built for precision</h2>
+          <h2 class="section-title">Engineered to respect your machine</h2>
           <p class="section-sub">
-            Zenith consolidates scattered utility apps into a lightweight, unified accessory living in your menu bar.
+            How Zenith compares against bloated Electron tools and scattered single-purpose utilities.
           </p>
         </div>
 
-        <div class="intro-grid">
-          <article class="pillar-card fade-up">
-            <div>
-              <h3 class="pillar-name">Smart Clipboard</h3>
-              <p class="pillar-desc">
-                Instant fuzzy search with zero memory leaks. Full formatting support for rich text, image previews, and sensitive item exclusions.
-              </p>
-            </div>
-            <div class="pillar-metric">Sub-millisecond recall</div>
-          </article>
-
-          <article class="pillar-card fade-up">
-            <div>
-              <h3 class="pillar-name">Screen Capture</h3>
-              <p class="pillar-desc">
-                Area cropping with Loupe 16x pixel magnification, coordinate translation, and editable vector annotation arrows.
-              </p>
-            </div>
-            <div class="pillar-metric">Retina 60 FPS crop</div>
-          </article>
-
-          <article class="pillar-card fade-up">
-            <div>
-              <h3 class="pillar-name">Dynamic Island</h3>
-              <p class="pillar-desc">
-                Hardware notch HUD on Apple Silicon displays. Drop files into the notch shelf or view transient status capsules.
-              </p>
-            </div>
-            <div class="pillar-metric">Zero Mini-LED bleed</div>
-          </article>
-
-          <article class="pillar-card fade-up">
-            <div>
-              <h3 class="pillar-name">DoH Privacy Shield</h3>
-              <p class="pillar-desc">
-                DNS-over-HTTPS encrypted resolver with TLS ClientHello chunking to safeguard your traffic against eavesdropping.
-              </p>
-            </div>
-            <div class="pillar-metric">Encrypted DNS resolver</div>
-          </article>
+        <div class="table-wrapper fade-up" data-ui>
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th>Capability / Metric</th>
+                <th class="zenith-col">Zenith 2.0</th>
+                <th>Raycast</th>
+                <th>Shottr</th>
+                <th>CleanMyMac</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Framework &amp; Architecture</strong></td>
+                <td class="zenith-col"><span class="pill-green">100% Native Swift 6</span></td>
+                <td>Node.js + Cocoa Bridge</td>
+                <td>Native Swift</td>
+                <td>Native + Daemons</td>
+              </tr>
+              <tr>
+                <td><strong>Idle RAM Footprint</strong></td>
+                <td class="zenith-col"><span class="highlight-val">~28 MB</span></td>
+                <td>~180–350 MB</td>
+                <td>~45 MB</td>
+                <td>~120 MB</td>
+              </tr>
+              <tr>
+                <td><strong>Clipboard History</strong></td>
+                <td class="zenith-col">In-Memory Fuzzy</td>
+                <td>SQLite</td>
+                <td>None</td>
+                <td>None</td>
+              </tr>
+              <tr>
+                <td><strong>Retina Loupe &amp; Annotations</strong></td>
+                <td class="zenith-col">16x Loupe + Vectors</td>
+                <td>None</td>
+                <td>Area &amp; Loupe</td>
+                <td>None</td>
+              </tr>
+              <tr>
+                <td><strong>Dynamic Island Drop Shelf</strong></td>
+                <td class="zenith-col">Native Notch Shelf</td>
+                <td>None</td>
+                <td>None</td>
+                <td>None</td>
+              </tr>
+              <tr>
+                <td><strong>Developer Project Purge</strong></td>
+                <td class="zenith-col">node_modules, Xcode, DMG</td>
+                <td>Requires Extension</td>
+                <td>None</td>
+                <td>Partial (System Only)</td>
+              </tr>
+              <tr>
+                <td><strong>Privacy Shield (DoH + Anti-DPI)</strong></td>
+                <td class="zenith-col">In-Process Proxy</td>
+                <td>None</td>
+                <td>None</td>
+                <td>None</td>
+              </tr>
+              <tr>
+                <td><strong>Licensing &amp; Price</strong></td>
+                <td class="zenith-col"><span class="pill-green">100% Free &amp; Open Source</span></td>
+                <td>Freemium / $8/mo</td>
+                <td>$12 One-time</td>
+                <td>$39.95/yr</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
 
-    <!-- 3. Features Section: 5/7 split sequence with real imagery -->
-    <section class="features">
-      <div class="container">
-        <div class="section-head fade-up">
-          <h2 class="section-title">Five tools in one quiet bar</h2>
-          <p class="section-sub">
-            Every capability was engineered to perform its job without stealing screen space or draining battery cycles.
-          </p>
+    <!-- 8. Download & Call to Action -->
+    <section class="download-section" id="download">
+      <div class="container download-container fade-up">
+        <h2 class="download-title">Download Zenith for your Mac.</h2>
+        <p class="download-desc">
+          Universal binary compiled for Apple Silicon (M1/M2/M3/M4) and Intel Macs. No telemetry, no account required.
+        </p>
+
+        <div class="download-buttons">
+          <a href="https://github.com/mynameisbat/zenith-macos/releases/latest" class="btn-primary large">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Download Zenith (DMG)
+          </a>
+
+          <a href="https://github.com/mynameisbat/zenith-macos" class="btn-secondary large" target="_blank" rel="noopener">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+            </svg>
+            Star on GitHub
+          </a>
         </div>
 
-        <div class="feature-sequence">
-          <!-- Row 1: Precision Optics & Loupe -->
-          <div class="feature-row fade-up">
-            <div class="feature-info">
-              <h3 class="feature-title">Microscopic pixel sampling</h3>
-              <p class="feature-desc">
-                When capturing UI elements, the Loupe magnifier samples exact RGB coordinates at 16x magnification, copying formatted hex values in one keystroke.
-              </p>
-              <div class="feature-callout">
-                Built-in vector arrow, blur redaction, and callout badges for rapid documentation.
-              </div>
-            </div>
-            <div class="feature-media">
-              <img src="assets/zenith-space-jpg.jpg" width="1920" height="1743" alt="Deep space optical telemetry showing laser precision calibration" loading="lazy" decoding="async">
-            </div>
-          </div>
-
-          <!-- Row 2: Mach Kernel Optimization -->
-          <div class="feature-row reversed fade-up">
-            <div class="feature-info">
-              <h3 class="feature-title">Native system maintenance</h3>
-              <p class="feature-desc">
-                Zenith communicates directly with the Mach kernel to flush memory pressure and purge orphaned application caches without third-party daemons.
-              </p>
-              <div class="feature-callout">
-                Safely cleans developer build directories, Xcode simulator files, and stale system logs.
-              </div>
-            </div>
-            <div class="feature-media">
-              <img src="assets/nebula-jpg.jpg" width="1920" height="1920" alt="Astronomical nebula structure representing clean memory space" loading="lazy" decoding="async">
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 4. Interactive Showcase: Live Loupe Magnifier -->
-    <section class="showcase" id="interactive">
-      <div class="container">
-        <div class="section-head fade-up">
-          <h2 class="section-title">The live command popover</h2>
-          <p class="section-sub">
-            Move your cursor across the canvas below to test Zenith's optical loupe magnifier sampling real color values in real time.
-          </p>
-        </div>
-
-        <div class="loupe-showcase fade-up">
-          <div class="loupe-interactive-canvas" id="loupe-canvas" role="region" aria-label="Interactive Loupe Canvas">
-            <div class="loupe-lens" id="loupe-lens" style="left: 45%; top: 35%;">
-              <div class="loupe-crosshair"></div>
-              <span class="loupe-hex-tag" id="loupe-hex">#147BFA</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 5. How It Works: Call and response column -->
-    <section class="how-it-works" id="architecture">
-      <div class="container">
-        <div class="section-head fade-up">
-          <h2 class="section-title">Engineered with Swift 6</h2>
-          <p class="section-sub">
-            Built from scratch with modern Swift concurrency and zero external dynamic library dependencies.
-          </p>
-        </div>
-
-        <div class="how-column">
-          <div class="step-item fade-up">
-            <div class="step-shortcut">⌘⇧2</div>
-            <div class="step-details">
-              <h3>Direct screen capture pipeline</h3>
-              <p>Captures designated window regions directly using Native ScreenCaptureKit with sub-millisecond frame delivery and Retina fidelity.</p>
-            </div>
-          </div>
-
-          <div class="step-item fade-up">
-            <div class="step-shortcut">⌘V</div>
-            <div class="step-details">
-              <h3>Fuzzy search memory buffer</h3>
-              <p>Keeps up to 500 items in a memory-mapped database with instant keyboard navigation, pinned items, and automatic password exclusion.</p>
-            </div>
-          </div>
-
-          <div class="step-item fade-up">
-            <div class="step-shortcut">⌘,</div>
-            <div class="step-details">
-              <h3>Unified settings studio</h3>
-              <p>Fine-tune privacy shield DoH providers, audio acoustic feedback, and system maintenance parameters with Apple Design Award craftsmanship.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 6. Proof: Large marks on tiles -->
-    <section class="proof">
-      <div class="container">
-        <div class="section-head fade-up">
-          <h2 class="section-title">Zero battery drain</h2>
-          <p class="section-sub">
-            Designed to idle at 0.0% CPU when not in active use, preserving your MacBook battery for what matters.
-          </p>
-        </div>
-
-        <div class="proof-grid">
-          <div class="proof-tile fade-up">
-            <div class="proof-number">0.0%</div>
-            <h3 class="proof-title">Idle CPU impact</h3>
-            <p class="proof-desc">Sleeps cleanly in the background until invoked via hotkey or status bar click.</p>
-          </div>
-
-          <div class="proof-tile fade-up">
-            <div class="proof-number">100%</div>
-            <h3 class="proof-title">Local-first privacy</h3>
-            <p class="proof-desc">No accounts, no analytics telemetry, and no external servers. Your clipboard never leaves your Mac.</p>
-          </div>
-
-          <div class="proof-tile fade-up">
-            <div class="proof-number">&lt; 18MB</div>
-            <h3 class="proof-title">Minimal memory footprint</h3>
-            <p class="proof-desc">Pure AppKit and SwiftUI memory management without heavy Electron or webview wrappers.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 7. CTA Section: Sentence with a blank -->
-    <section class="cta-section" id="download">
-      <div class="container">
-        <div class="cta-box fade-up">
-          <h2 class="cta-title">Download Zenith 2.0</h2>
-          <p class="cta-desc">
-            Get the standalone universal DMG installer for Apple Silicon and Intel Macs, or build directly from source using the Swift 6 toolchain.
-          </p>
-
-          <div class="hero-actions" style="justify-content: center; margin-bottom: 0;">
-            <a href="https://github.com/mynameisbat/zenith/releases/download/v2.0.0/Zenith-2.0.0.dmg" class="btn-primary">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              Download Zenith-2.0.0.dmg
-            </a>
-          </div>
-
-          <div>
-            <button class="terminal-pill" id="terminal-pill" data-copy="git clone https://github.com/mynameisbat/zenith-macos.git && cd zenith-macos && swift build -c release" title="Click to copy build command">
-              <code>git clone https://github.com/mynameisbat/zenith-macos.git</code>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-            </button>
-          </div>
+        <div class="download-specs-bar">
+          <span>Requires macOS 14.0+ Sonoma or macOS 15.0+ Sequoia</span>
+          <span>•</span>
+          <span>Apple Silicon &amp; Intel 64-bit</span>
+          <span>•</span>
+          <span>Open Source MIT License</span>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- 8. Footer Section: A single quiet line -->
+  <!-- Footer -->
   <footer class="site-footer">
     <div class="container footer-inner">
-      <div class="footer-top">
-        <div class="footer-brand">Zenith 2.0</div>
-        <ul class="footer-links">
-          <li><a href="https://github.com/mynameisbat/zenith-macos" target="_blank" rel="noopener">GitHub</a></li>
-          <li><a href="https://github.com/mynameisbat/zenith-macos/releases" target="_blank" rel="noopener">Releases</a></li>
-          <li><a href="https://github.com/mynameisbat/zenith-macos/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
-        </ul>
+      <div class="footer-brand">
+        <img src="assets/app-icon.png" width="24" height="24" alt="Zenith Icon">
+        <span>Zenith macOS Workspace</span>
       </div>
-
-      <div class="footer-credits">
-        Imagery credits: "Laser Towards Milky Ways Centre" by ESO/Yuri Beletsky, CC BY 4.0, via Wikimedia Commons; "Messier27" by George Jacoby, WIYN/NSF, CC BY 4.0, via Wikimedia Commons. Built natively for macOS Sonoma & Sequoia.
+      <div class="footer-copy">
+        Crafted natively with Swift 6 and AppKit. Open source on GitHub.
       </div>
     </div>
   </footer>
+
+  <div id="toast-hud" class="toast-hud" aria-live="polite"></div>
 
   <script src="main.js"></script>
 </body>

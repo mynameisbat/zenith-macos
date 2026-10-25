@@ -1,170 +1,210 @@
-// Zenith 2.0 - Interactive Motion & Live Product Fragments
-// Conforms to taste-skill v2.1 House Rules
+// Zenith 2.0 - Interactive Motion & Native Product Simulations
+// Designed strictly for taste-skill v2.1 House Rules
 
 document.addEventListener('DOMContentLoaded', () => {
-  initStaggeredMotion();
-  initLiveCommandHub();
-  initDynamicIsland();
-  initLoupeMagnifier();
-  initTerminalCopy();
+  initBrewCopy();
+  initCommandHubInteractive();
+  initLoupeSimulation();
+  initNotchInteractive();
+  initCleanerSimulation();
 });
 
-// 1. Staggered Motion Entrances
-function initStaggeredMotion() {
-  const elements = document.querySelectorAll('.fade-up');
-  if (!('IntersectionObserver' in window)) {
-    elements.forEach(el => el.classList.add('visible'));
-    return;
+// 1. Homebrew Command Copy Box
+function initBrewCopy() {
+  const brewBox = document.getElementById('brew-box');
+  const brewCopyBtn = document.getElementById('brew-copy');
+
+  const copyAction = () => {
+    const text = 'brew install --cask zenith';
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
+    showToast('Copied: brew install --cask zenith');
+  };
+
+  if (brewBox) brewBox.addEventListener('click', copyAction);
+  if (brewCopyBtn) brewCopyBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    copyAction();
+  });
+}
+
+// 2. Interactive macOS Command Hub (Search + Category Filter + Copy)
+function initCommandHubInteractive() {
+  const searchInput = document.getElementById('hub-search-input');
+  const clipCards = document.querySelectorAll('.clip-card');
+  const filterChips = document.querySelectorAll('.action-chip');
+
+  let activeCategory = 'all';
+
+  const filterClips = () => {
+    const query = (searchInput?.value || '').toLowerCase().trim();
+
+    clipCards.forEach(card => {
+      const category = card.getAttribute('data-category');
+      const text = (card.getAttribute('data-clip') || '') + ' ' + (card.textContent || '');
+      const matchesCategory = activeCategory === 'all' || category === activeCategory;
+      const matchesQuery = !query || text.toLowerCase().includes(query);
+
+      if (matchesCategory && matchesQuery) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  };
+
+  if (searchInput) {
+    searchInput.addEventListener('input', filterClips);
   }
 
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-        observer.unobserve(entry.target);
-      }
-    });
-  }, {
-    threshold: 0.15,
-    rootMargin: '0px 0px -40px 0px'
-  });
-
-  elements.forEach((el, index) => {
-    el.style.transitionDelay = `${(index % 4) * 75}ms`;
-    observer.observe(el);
-  });
-}
-
-// 2. Interactive Live Command Hub Demo
-function initLiveCommandHub() {
-  const searchInput = document.getElementById('hub-search-input');
-  const clipsContainer = document.getElementById('hub-clips-list');
-  const clipRows = document.querySelectorAll('.clip-row');
-
-  if (!searchInput || !clipsContainer) return;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase().trim();
-    clipRows.forEach(row => {
-      const text = row.getAttribute('data-search') || '';
-      if (!query || text.toLowerCase().includes(query)) {
-        row.style.display = 'flex';
-      } else {
-        row.style.display = 'none';
-      }
+  filterChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      filterChips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      activeCategory = chip.getAttribute('data-filter') || 'all';
+      filterClips();
     });
   });
 
-  clipRows.forEach(row => {
-    row.addEventListener('click', () => {
-      const textToCopy = row.getAttribute('data-clip') || '';
+  clipCards.forEach(card => {
+    card.addEventListener('click', () => {
+      const text = card.getAttribute('data-clip') || '';
       if (navigator.clipboard) {
-        navigator.clipboard.writeText(textToCopy);
+        navigator.clipboard.writeText(text);
       }
-      showToast(`Copied: "${textToCopy.substring(0, 24)}..."`);
+      showToast(`Pasted to clipboard: "${text.substring(0, 32)}..."`);
     });
   });
 }
 
-// 3. Interactive Dynamic Island Notch
-function initDynamicIsland() {
-  const notch = document.getElementById('notch-hud');
-  const notchText = document.getElementById('notch-text');
-  if (!notch || !notchText) return;
-
-  let isAlerting = false;
-  const messages = [
-    'Screenshot Saved (1920 × 1080)',
-    'DoH Shield Active · Cloudflare',
-    'Freed 1.2 GB System Cache',
-    'Clipboard Synced · 32 items'
-  ];
-  let msgIndex = 0;
-
-  notch.addEventListener('click', () => {
-    if (isAlerting) return;
-    isAlerting = true;
-    notch.classList.add('expanded');
-    notchText.textContent = messages[msgIndex % messages.length];
-    msgIndex++;
-
-    setTimeout(() => {
-      notch.classList.remove('expanded');
-      setTimeout(() => {
-        notchText.textContent = 'Zenith 2.0';
-        isAlerting = false;
-      }, 250);
-    }, 2400);
-  });
-}
-
-// 4. Interactive Loupe Magnifier Canvas
-function initLoupeMagnifier() {
-  const canvasArea = document.getElementById('loupe-canvas');
+// 3. Interactive Shottr-Style Loupe Magnifier Tracking
+function initLoupeSimulation() {
+  const stage = document.getElementById('loupe-stage');
   const lens = document.getElementById('loupe-lens');
-  const hexTag = document.getElementById('loupe-hex');
 
-  if (!canvasArea || !lens || !hexTag) return;
+  if (!stage || !lens) return;
 
-  const colors = ['#090A0F', '#147BFA', '#1FC16B', '#F59E0B', '#EF4444', '#F4F5F9', '#8B92A5'];
-
-  canvasArea.addEventListener('mousemove', (e) => {
-    const rect = canvasArea.getBoundingClientRect();
+  stage.addEventListener('mousemove', (e) => {
+    const rect = stage.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    lens.style.left = `${x - 65}px`;
-    lens.style.top = `${y - 65}px`;
+    // Clamp inside stage bounds
+    const clampedX = Math.max(70, Math.min(rect.width - 70, x));
+    const clampedY = Math.max(70, Math.min(rect.height - 70, y));
 
-    // Calculate sample hex
-    const colorIdx = Math.floor((x / rect.width) * colors.length) % colors.length;
-    hexTag.textContent = colors[colorIdx];
+    lens.style.left = `${clampedX - 70}px`;
+    lens.style.top = `${clampedY - 70}px`;
+  });
+
+  stage.addEventListener('mouseleave', () => {
+    // Reset to center
+    lens.style.left = '240px';
+    lens.style.top = '120px';
   });
 }
 
-// 5. Terminal One-Click Copy
-function initTerminalCopy() {
-  const terminalPill = document.getElementById('terminal-pill');
-  if (!terminalPill) return;
+// 4. Interactive MacBook Dynamic Island Notch Shelf
+function initNotchInteractive() {
+  const notch = document.getElementById('interactive-notch');
+  const notchLabel = document.getElementById('interactive-notch-label');
+  const drawer = document.getElementById('shelf-drawer');
+  const btnAlert = document.getElementById('btn-trigger-alert');
+  const btnToggle = document.getElementById('btn-toggle-shelf');
 
-  terminalPill.addEventListener('click', () => {
-    const cmd = terminalPill.getAttribute('data-copy') || 'git clone https://github.com/mynameisbat/zenith-macos.git';
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(cmd);
-      showToast('Copied command to clipboard!');
-    }
-  });
+  let isAlerting = false;
+  let isDrawerOpen = true;
+
+  const alerts = [
+    'Copied · #0F62FE Sapphire Blue',
+    'Retina Screenshot Saved (2880 × 1800)',
+    'DoH Shield Active · Cloudflare 1.1.1.1',
+    'Freed 42.0 GB Developer Caches'
+  ];
+  let alertIdx = 0;
+
+  const triggerAlert = () => {
+    if (isAlerting || !notch || !notchLabel) return;
+    isAlerting = true;
+    notch.style.transform = 'scale(1.08)';
+    notchLabel.textContent = alerts[alertIdx % alerts.length];
+    alertIdx++;
+
+    setTimeout(() => {
+      notch.style.transform = 'scale(1)';
+      setTimeout(() => {
+        notchLabel.textContent = 'Zenith Shelf · 2 items parked';
+        isAlerting = false;
+      }, 200);
+    }, 2000);
+  };
+
+  const toggleDrawer = () => {
+    if (!drawer) return;
+    isDrawerOpen = !isDrawerOpen;
+    drawer.style.display = isDrawerOpen ? 'flex' : 'none';
+  };
+
+  if (notch) notch.addEventListener('click', triggerAlert);
+  if (btnAlert) btnAlert.addEventListener('click', triggerAlert);
+  if (btnToggle) btnToggle.addEventListener('click', toggleDrawer);
 }
 
-// Lightweight Toast notification
-function showToast(message) {
-  let toast = document.getElementById('site-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'site-toast';
-    toast.style.position = 'fixed';
-    toast.style.bottom = '24px';
-    toast.style.right = '24px';
-    toast.style.backgroundColor = '#13151f';
-    toast.style.color = '#f4f5f9';
-    toast.style.padding = '10px 18px';
-    toast.style.borderRadius = '8px';
-    toast.style.fontSize = '13px';
-    toast.style.fontWeight = '500';
-    toast.style.border = '1px solid rgba(255, 255, 255, 0.12)';
-    toast.style.boxShadow = '0 8px 24px rgba(0,0,0,0.5)';
-    toast.style.zIndex = '9999';
-    toast.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-    document.body.appendChild(toast);
+// 5. Developer System Purge Simulation
+function initCleanerSimulation() {
+  const checkboxes = document.querySelectorAll('.cleaner-checkbox');
+  const badge = document.getElementById('cleaner-badge');
+  const btnClean = document.getElementById('btn-clean-action');
+
+  const sizes = [18.4, 12.6, 7.8, 3.2];
+
+  const updateCleanTotal = () => {
+    let total = 0;
+    checkboxes.forEach((cb, idx) => {
+      if (cb.checked) {
+        total += sizes[idx] || 0;
+      }
+    });
+
+    const formatted = total.toFixed(1);
+    if (badge) badge.textContent = `${formatted} GB Cleanable`;
+    if (btnClean) btnClean.textContent = `Purge Selected (${formatted} GB)`;
+  };
+
+  checkboxes.forEach(cb => {
+    cb.addEventListener('change', updateCleanTotal);
+  });
+
+  if (btnClean) {
+    btnClean.addEventListener('click', () => {
+      btnClean.textContent = 'Purging safely...';
+      btnClean.style.opacity = '0.7';
+
+      setTimeout(() => {
+        if (badge) {
+          badge.textContent = '0.0 GB · Clean';
+          badge.style.backgroundColor = 'rgba(31, 193, 107, 0.15)';
+          badge.style.color = '#1fc16b';
+        }
+        btnClean.textContent = '42.0 GB Reclaimed';
+        btnClean.style.backgroundColor = '#1fc16b';
+        btnClean.style.opacity = '1';
+        showToast('Successfully purged 42.0 GB developer caches into Trash!');
+      }, 900);
+    });
   }
+}
+
+// Toast HUD Utility
+function showToast(message) {
+  const toast = document.getElementById('toast-hud');
+  if (!toast) return;
 
   toast.textContent = message;
-  toast.style.opacity = '1';
-  toast.style.transform = 'translateY(0)';
+  toast.classList.add('show');
 
-  clearTimeout(window.__toastTimer);
-  window.__toastTimer = setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(8px)';
-  }, 2200);
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 2400);
 }
