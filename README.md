@@ -25,7 +25,7 @@ Zenith lives quietly in your Menu Bar as an ultra-lightweight accessory (idle RA
 ### Option 1: Download Pre-built DMG Installer (Recommended)
 Download the latest disk image from [GitHub Releases](https://github.com/mynameisbat/zenith-macos/releases):
 
-1. Download **`Zenith-2.0.0.dmg`**.
+1. Download **`Zenith-2.1.0.dmg`** (or latest release).
 2. Double-click the DMG file to mount it.
 3. Drag **Zenith.app** into your **Applications** folder.
 4. Launch Zenith from Spotlight or Applications.
@@ -33,7 +33,7 @@ Download the latest disk image from [GitHub Releases](https://github.com/mynamei
 #### Terminal / CLI Installation
 ```bash
 # Mount DMG and copy to /Applications
-hdiutil attach Zenith-2.0.0.dmg
+hdiutil attach Zenith-2.1.0.dmg
 cp -R "/Volumes/Zenith/Zenith.app" /Applications/
 hdiutil detach "/Volumes/Zenith"
 

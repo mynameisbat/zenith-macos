@@ -1,11 +1,12 @@
 #!/bin/bash
 set -e
 
-# Zenith 2.0 DMG Packaging Script
+# Zenith macOS DMG Packaging Script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 APP_PATH="$PROJECT_ROOT/Zenith.app"
-DMG_NAME="Zenith-2.0.0.dmg"
+VERSION="${1:-2.1.0}"
+DMG_NAME="Zenith-${VERSION}.dmg"
 DMG_OUTPUT="$PROJECT_ROOT/$DMG_NAME"
 TEMP_DMG_DIR="$PROJECT_ROOT/.build/dmg_staging"
 
