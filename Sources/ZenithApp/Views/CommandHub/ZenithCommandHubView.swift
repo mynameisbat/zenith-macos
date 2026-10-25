@@ -387,10 +387,10 @@ public struct ZenithCommandHubView: View {
 
     private var footerRow: some View {
         VStack(spacing: 6) {
-            // Top telemetry sub-row: CPU, RAM, Battery, SSD Free Space, and Peripherals
-            HStack(spacing: 8) {
+            // Top telemetry sub-row: CPU, RAM, Battery (with Maximum Capacity), Storage, and Peripherals
+            HStack(spacing: 7) {
                 // CPU status
-                HStack(spacing: 3.5) {
+                HStack(spacing: 3) {
                     Image(systemName: "cpu")
                         .font(.system(size: 10.5))
                         .foregroundColor(hubState.hardwareSnapshot.cpu.totalUsagePercent > 75 ? .red : (hubState.hardwareSnapshot.cpu.totalUsagePercent > 40 ? .orange : .secondary))
@@ -402,7 +402,7 @@ public struct ZenithCommandHubView: View {
                 .help("CPU Usage: \(String(format: "%.1f", hubState.hardwareSnapshot.cpu.totalUsagePercent))% across \(hubState.hardwareSnapshot.cpu.coreCount) cores")
 
                 // RAM status with pressure indicator
-                HStack(spacing: 3.5) {
+                HStack(spacing: 3) {
                     Image(systemName: "memorychip")
                         .font(.system(size: 10.5))
                         .foregroundColor(hubState.hardwareSnapshot.memory.pressureLevel == .critical ? .red : (hubState.hardwareSnapshot.memory.pressureLevel == .warning ? .orange : .secondary))
@@ -413,9 +413,9 @@ public struct ZenithCommandHubView: View {
                 }
                 .help("Memory: \(HardwareTelemetryService.formatBytes(hubState.hardwareSnapshot.memory.usedBytes)) used of \(HardwareTelemetryService.formatBytes(hubState.hardwareSnapshot.memory.totalBytes)) (\(hubState.hardwareSnapshot.memory.pressureLevel.rawValue.capitalized) pressure)")
 
-                // Battery status
+                // Battery status with charge level & Maximum Capacity
                 if hubState.hardwareSnapshot.battery.hasBattery {
-                    HStack(spacing: 3.5) {
+                    HStack(spacing: 3) {
                         Image(systemName: hubState.hardwareSnapshot.battery.isCharging ? "battery.100.bolt" : "battery.75")
                             .font(.system(size: 10.5))
                             .foregroundColor(hubState.hardwareSnapshot.battery.isCharging ? .green : (hubState.hardwareSnapshot.battery.percentage <= 20 ? .red : .secondary))
@@ -423,12 +423,18 @@ public struct ZenithCommandHubView: View {
                             .font(.system(size: 10.5, weight: .medium))
                             .monospacedDigit()
                             .foregroundColor(.secondary)
+
+                        if let maxCap = hubState.hardwareSnapshot.battery.healthPercent {
+                            Text("(\(maxCap)% max)")
+                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .foregroundColor(maxCap < 80 ? .orange : Color.secondary.opacity(0.75))
+                        }
                     }
-                    .help("Battery: \(hubState.hardwareSnapshot.battery.percentage)%, Condition: \(hubState.hardwareSnapshot.battery.condition), Cycles: \(hubState.hardwareSnapshot.battery.cycleCount ?? 0)")
+                    .help("Battery: \(hubState.hardwareSnapshot.battery.percentage)%, Maximum Capacity: \(hubState.hardwareSnapshot.battery.healthPercent ?? 100)%, Condition: \(hubState.hardwareSnapshot.battery.condition), Cycles: \(hubState.hardwareSnapshot.battery.cycleCount ?? 0)")
                 }
 
                 // Storage status
-                HStack(spacing: 3.5) {
+                HStack(spacing: 3) {
                     Image(systemName: "internaldrive")
                         .font(.system(size: 10.5))
                         .foregroundColor(.secondary)
@@ -441,7 +447,7 @@ public struct ZenithCommandHubView: View {
 
                 // Connected Bluetooth accessories
                 ForEach(hubState.hardwareSnapshot.bluetoothDevices) { dev in
-                    HStack(spacing: 3.5) {
+                    HStack(spacing: 3) {
                         Image(systemName: dev.icon)
                             .font(.system(size: 10.5))
                             .foregroundColor(.secondary)
@@ -454,84 +460,20 @@ public struct ZenithCommandHubView: View {
                 }
 
                 Spacer()
-
-                // Settings & Quit
-                HStack(spacing: 4) {
-                    Button {
-                        onClose()
-                        onOpenPreferences()
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 11))
-                            Text("⌘,")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(Color.secondary.opacity(0.6))
-                        }
-                        .foregroundColor(hubState.hoveredFooterId == "settings" ? .primary : .secondary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 3.5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(Color.primary.opacity(hubState.hoveredFooterId == "settings" ? 0.08 : 0.0))
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(",", modifiers: .command)
-                    .help("Settings (⌘,)")
-                    .onHover { isHovered in
-                        if isHovered {
-                            hubState.setHoveredFooter("settings")
-                        } else {
-                            hubState.clearHoveredFooter(ifCurrent: "settings")
-                        }
-                    }
-
-                    Button {
-                        onQuit()
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "power")
-                                .font(.system(size: 11))
-                            Text("⌘Q")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(Color.secondary.opacity(0.6))
-                        }
-                        .foregroundColor(hubState.hoveredFooterId == "quit" ? .red : .secondary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 3.5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(Color.red.opacity(hubState.hoveredFooterId == "quit" ? 0.12 : 0.0))
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut("q", modifiers: .command)
-                    .help("Quit Zenith (⌘Q)")
-                    .onHover { isHovered in
-                        if isHovered {
-                            hubState.setHoveredFooter("quit")
-                        } else {
-                            hubState.clearHoveredFooter(ifCurrent: "quit")
-                        }
-                    }
-                }
             }
 
-            // Bottom action tools row: DoH Shield, System Cleaner & Optimizer
-            HStack(spacing: 6) {
+            // Bottom action tools & application control row (Settings & Quit at bottom right)
+            HStack(spacing: 5) {
                 // DoH Shield Toggle
                 Button {
                     privacyController.toggle()
                 } label: {
-                    HStack(spacing: 4.5) {
+                    HStack(spacing: 4) {
                         Circle()
                             .fill(privacyController.isRunning ? Color(red: 0.18, green: 0.8, blue: 0.44) : Color.secondary.opacity(0.4))
-                            .frame(width: 6, height: 6)
+                            .frame(width: 5.5, height: 5.5)
 
-                        Text("DoH Shield")
+                        Text("DoH")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(privacyController.isRunning ? .primary : .secondary)
                     }
@@ -566,13 +508,13 @@ public struct ZenithCommandHubView: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 3.5) {
                         Image(systemName: "broom.fill")
-                            .font(.system(size: 10))
+                            .font(.system(size: 9.5))
                             .foregroundColor(cleaner.selectedJunkSize > 0 ? Color.orange : Color.secondary)
 
                         Text(cleaner.isCleaning ? "Cleaning..." : (cleaner.isScanning ? "Scanning..." : (cleaner.selectedJunkSize > 0 ? cleaner.formattedSelectedJunkSize : "Clean")))
-                            .font(.system(size: 10.5, weight: .medium))
+                            .font(.system(size: 10, weight: .medium))
                             .monospacedDigit()
                             .foregroundColor(cleaner.selectedJunkSize > 0 ? .primary : .secondary)
                     }
@@ -600,9 +542,9 @@ public struct ZenithCommandHubView: View {
                     hubState.boostSystem()
                     ToastHUDController.shared.show(message: "Zenith Boost: Memory Purged & DNS Flushed", icon: "sparkles")
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 3.5) {
                         Image(systemName: "bolt.fill")
-                            .font(.system(size: 9.5))
+                            .font(.system(size: 9))
                             .foregroundColor(Color.cyan)
                         Text("Boost")
                             .font(.system(size: 10, weight: .medium))
@@ -626,7 +568,71 @@ public struct ZenithCommandHubView: View {
                     }
                 }
 
-                Spacer()
+                Spacer(minLength: 4)
+
+                // Settings & Quit Buttons (Moved Down to bottom right)
+                HStack(spacing: 3) {
+                    Button {
+                        onClose()
+                        onOpenPreferences()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 10.5))
+                            Text("⌘,")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(Color.secondary.opacity(0.6))
+                        }
+                        .foregroundColor(hubState.hoveredFooterId == "settings" ? .primary : .secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 3.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Color.primary.opacity(hubState.hoveredFooterId == "settings" ? 0.08 : 0.0))
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(",", modifiers: .command)
+                    .help("Settings (⌘,)")
+                    .onHover { isHovered in
+                        if isHovered {
+                            hubState.setHoveredFooter("settings")
+                        } else {
+                            hubState.clearHoveredFooter(ifCurrent: "settings")
+                        }
+                    }
+
+                    Button {
+                        onQuit()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "power")
+                                .font(.system(size: 10.5))
+                            Text("⌘Q")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(Color.secondary.opacity(0.6))
+                        }
+                        .foregroundColor(hubState.hoveredFooterId == "quit" ? .red : .secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 3.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Color.red.opacity(hubState.hoveredFooterId == "quit" ? 0.12 : 0.0))
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut("q", modifiers: .command)
+                    .help("Quit Zenith (⌘Q)")
+                    .onHover { isHovered in
+                        if isHovered {
+                            hubState.setHoveredFooter("quit")
+                        } else {
+                            hubState.clearHoveredFooter(ifCurrent: "quit")
+                        }
+                    }
+                }
             }
         }
         .padding(.horizontal, 2)

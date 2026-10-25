@@ -120,6 +120,11 @@ public struct BatteryTelemetry: Sendable, Equatable {
     public let healthPercent: Int?
     public let timeRemainingMinutes: Int?
 
+    /// Maximum battery capacity percentage (Health), matching macOS System Settings.
+    public var maximumCapacityPercent: Int? {
+        healthPercent
+    }
+
     public init(
         hasBattery: Bool = false,
         percentage: Int = 100,
@@ -582,11 +587,32 @@ public final class HardwareTelemetryService: @unchecked Sendable {
             }
         }
 
-        // Query IOKit AppleSmartBattery for CycleCount, Voltage, Amperage, and Health
+        // Query IOKit AppleSmartBatteryPack & AppleSmartBattery for CycleCount, Voltage, Amperage, and Maximum Capacity / Health
         var cycleCount: Int? = nil
         var wattage: Double? = nil
         var healthPct: Int? = nil
 
+        // 1. Query AppleSmartBatteryPack first (Apple Silicon M1/M2/M3/M4 on macOS 12+) for precise Maximum Capacity
+        var packIter = io_iterator_t()
+        if IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("AppleSmartBatteryPack"), &packIter) == KERN_SUCCESS {
+            let packService = IOIteratorNext(packIter)
+            if packService != 0 {
+                var props: Unmanaged<CFMutableDictionary>?
+                if IORegistryEntryCreateCFProperties(packService, &props, kCFAllocatorDefault, 0) == KERN_SUCCESS,
+                   let dict = props?.takeRetainedValue() as? [String: Any],
+                   let bData = dict["BatteryData"] as? [String: Any] {
+                    let fcc = (bData["FccComp1"] as? Int) ?? (bData["NominalChargeCapacity"] as? Int) ?? (bData["FullChargeCapacity"] as? Int)
+                    let design = bData["DesignCapacity"] as? Int
+                    if let fcc = fcc, let design = design, design > 0 {
+                        healthPct = min(100, max(0, Int((Double(fcc) / Double(design)) * 100.0)))
+                    }
+                }
+                IOObjectRelease(packService)
+            }
+            IOObjectRelease(packIter)
+        }
+
+        // 2. Query AppleSmartBattery for CycleCount, Voltage, Amperage, and fallback Maximum Capacity
         var iterator = io_iterator_t()
         let matching = IOServiceMatching("AppleSmartBattery")
         if IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS {
@@ -607,10 +633,13 @@ public final class HardwareTelemetryService: @unchecked Sendable {
                             wattage = (watts * 10).rounded() / 10
                         }
                     }
-                    if let bData = dict["BatteryData"] as? [String: Any],
-                       let nominal = bData["NominalChargeCapacity"] as? Int,
-                       let design = bData["DesignCapacity"] as? Int, design > 0 {
-                        healthPct = min(100, max(0, Int((Double(nominal) / Double(design)) * 100.0)))
+                    if healthPct == nil,
+                       let bData = dict["BatteryData"] as? [String: Any] {
+                        let fcc = (bData["NominalChargeCapacity"] as? Int) ?? (bData["FullChargeCapacity"] as? Int)
+                        let design = bData["DesignCapacity"] as? Int
+                        if let fcc = fcc, let design = design, design > 0 {
+                            healthPct = min(100, max(0, Int((Double(fcc) / Double(design)) * 100.0)))
+                        }
                     }
                 }
                 IOObjectRelease(service)

@@ -22,9 +22,31 @@ struct HardwareTelemetryServiceTests {
             if let cycles = snapshot.battery.cycleCount {
                 #expect(cycles >= 0)
             }
+            if let health = snapshot.battery.maximumCapacityPercent {
+                #expect(health >= 0 && health <= 100)
+                #expect(snapshot.battery.healthPercent == health)
+            }
         } else {
             #expect(snapshot.battery.percentage == 100)
         }
+    }
+
+    @Test("HW-01B: BatteryTelemetry maximum capacity computation")
+    func testBatteryMaximumCapacitySemanticAccessor() {
+        let laptopBattery = BatteryTelemetry(
+            hasBattery: true,
+            percentage: 90,
+            isCharging: false,
+            isPluggedIn: true,
+            cycleCount: 326,
+            condition: "Normal",
+            healthPercent: 81
+        )
+        #expect(laptopBattery.maximumCapacityPercent == 81)
+        #expect(laptopBattery.healthPercent == 81)
+
+        let desktopBattery = BatteryTelemetry(hasBattery: false, percentage: 100)
+        #expect(desktopBattery.maximumCapacityPercent == nil)
     }
 
     @Test("HW-02: Bluetooth device model assigns correct system SF Symbols")
