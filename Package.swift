@@ -2,43 +2,43 @@
 import PackageDescription
 
 let package = Package(
-    name: "GoldenGate",
+    name: "Zenith",
     platforms: [
         .macOS(.v14)
     ],
     products: [
         .library(
-            name: "GoldenGateCore",
-            targets: ["GoldenGateCore"]
+            name: "ZenithCore",
+            targets: ["ZenithCore"]
         ),
         .executable(
-            name: "GoldenGateApp",
-            targets: ["GoldenGateApp"]
+            name: "Zenith",
+            targets: ["ZenithApp"]
         )
     ],
     dependencies: [],
     targets: [
         // Core business logic, protocols, domain models, and test mocks
         .target(
-            name: "GoldenGateCore",
+            name: "ZenithCore",
             dependencies: [],
-            path: "Sources/GoldenGateCore"
+            path: "Sources/ZenithCore"
         ),
         // macOS application layer: NSApplication, Menu Bar, Windows & SwiftUI Views
         .executableTarget(
-            name: "GoldenGateApp",
+            name: "ZenithApp",
             dependencies: [
-                "GoldenGateCore"
+                "ZenithCore"
             ],
-            path: "Sources/GoldenGateApp"
+            path: "Sources/ZenithApp"
         ),
         // Modern Swift Testing test suites (Tiers 1-4)
         .testTarget(
-            name: "GoldenGateCoreTests",
+            name: "ZenithCoreTests",
             dependencies: [
-                "GoldenGateCore"
+                "ZenithCore"
             ],
-            path: "Tests/GoldenGateCoreTests",
+            path: "Tests/ZenithCoreTests",
             swiftSettings: [
                 .unsafeFlags([
                     "-Xfrontend",

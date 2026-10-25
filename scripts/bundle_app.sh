@@ -20,7 +20,13 @@ mkdir -p "$MACOS_DIR"
 mkdir -p "$RESOURCES_DIR"
 
 echo "==> Copying binary..."
-cp "$BUILD_DIR/GoldenGateApp" "$MACOS_DIR/Zenith"
+if [ -f "$BUILD_DIR/Zenith" ]; then
+    cp "$BUILD_DIR/Zenith" "$MACOS_DIR/Zenith"
+elif [ -f "$BUILD_DIR/ZenithApp" ]; then
+    cp "$BUILD_DIR/ZenithApp" "$MACOS_DIR/Zenith"
+else
+    cp "$BUILD_DIR/GoldenGateApp" "$MACOS_DIR/Zenith"
+fi
 chmod +x "$MACOS_DIR/Zenith"
 
 echo "==> Copying Zenith AppIcon.icns..."

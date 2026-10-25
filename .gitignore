@@ -36,3 +36,4 @@ test_output.txt
 
 # Agent / Tooling Workspaces
 .agents/
+.taste-skill/

@@ -1,0 +1,6 @@
+import Foundation
+import AppKit
+import ZenithCore
+
+public typealias KeyboardNavigationEngine = ZenithCore.KeyboardNavigationEngine
+public typealias ClipboardHistoryViewModel = ZenithCore.ClipboardHistoryViewModel
