@@ -459,6 +459,104 @@ struct ZenithDynamicIslandTests {
         #expect(!geometry.idleFrame.contains(windowBelowIsland))
         #expect(!geometry.expandedFrame.contains(windowBelowIsland))
     }
+
+    @Test("ISL-20: IslandDropItem metadata extraction, file types, and size formatting")
+    func testDropItemMetadataExtraction() throws {
+        // Image files
+        let pngItem = IslandDropItem(name: "screenshot.PNG", fileURL: URL(fileURLWithPath: "/tmp/screenshot.PNG"))
+        #expect(pngItem.fileExtension == "png")
+        #expect(pngItem.isImageFile)
+        #expect(!pngItem.isTextOrCodeFile)
+        #expect(!pngItem.isPDF)
+
+        let jpgItem = IslandDropItem(name: "photo.jpg", fileURL: URL(fileURLWithPath: "/tmp/photo.jpg"))
+        #expect(jpgItem.isImageFile)
+
+        // Text & Code files
+        let swiftItem = IslandDropItem(name: "main.swift", fileURL: URL(fileURLWithPath: "/tmp/main.swift"))
+        #expect(swiftItem.isTextOrCodeFile)
+        #expect(!swiftItem.isImageFile)
+
+        let jsonItem = IslandDropItem(name: "data.json", fileURL: URL(fileURLWithPath: "/tmp/data.json"))
+        #expect(jsonItem.isTextOrCodeFile)
+
+        // PDF document
+        let pdfItem = IslandDropItem(name: "invoice.pdf", fileURL: URL(fileURLWithPath: "/tmp/invoice.pdf"))
+        #expect(pdfItem.isPDF)
+        #expect(!pdfItem.isImageFile)
+
+        // Audio & Video
+        let videoItem = IslandDropItem(name: "screen.mov", fileURL: URL(fileURLWithPath: "/tmp/screen.mov"))
+        #expect(videoItem.isAudioOrVideoFile)
+
+        // Pure text snippet
+        let textItem = IslandDropItem(name: "Note", textContent: "Zenith macOS Drop Shelf")
+        #expect(textItem.textSnippet == "Zenith macOS Drop Shelf")
+        #expect(!textItem.isImageFile)
+
+        // Formatted file size & disk text snippet
+        let tempDir = FileManager.default.temporaryDirectory
+        let sampleFile = tempDir.appendingPathComponent("zenith_test_\(UUID().uuidString).txt")
+        let sampleContent = "Hello Zenith Dynamic Island Preview!"
+        try sampleContent.write(to: sampleFile, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: sampleFile) }
+
+        let diskItem = IslandDropItem(name: sampleFile.lastPathComponent, fileURL: sampleFile)
+        #expect(diskItem.formattedFileSize != nil)
+        #expect(diskItem.textSnippet == sampleContent)
+    }
+
+    @Test("ISL-21: Dynamic Island Drop Shelf Preview State Management & Auto-Dismiss Lifecycle")
+    @MainActor
+    func testIslandPreviewStateLifecycle() {
+        let state = ZenithIslandState()
+        state.clearAll()
+        #expect(state.previewItem == nil)
+
+        let item1 = IslandDropItem(name: "photo1.png", fileURL: URL(fileURLWithPath: "/tmp/photo1.png"))
+        let item2 = IslandDropItem(name: "photo2.png", fileURL: URL(fileURLWithPath: "/tmp/photo2.png"))
+        state.addItem(name: item1.name, fileURL: item1.fileURL)
+        state.addItem(name: item2.name, fileURL: item2.fileURL)
+
+        guard let first = state.droppedItems.first else {
+            Issue.record("Expected dropped item")
+            return
+        }
+
+        // Show preview
+        state.showPreview(for: first)
+        #expect(state.previewItem?.id == first.id)
+        #expect(state.isExpanded)
+        #expect(state.isHovered)
+        #expect(state.isActivelyEngaged)
+        #expect(!state.isEligibleForHoverExpansion)
+
+        // onMouseLeave must NOT trigger collapse when preview is active
+        state.onMouseLeave()
+        #expect(state.isExpanded)
+        #expect(state.previewItem != nil)
+
+        // Toggle preview closes preview if called with same item
+        state.togglePreview(for: first)
+        #expect(state.previewItem == nil)
+
+        // Toggle preview opens preview if called with different/new item
+        state.togglePreview(for: first)
+        #expect(state.previewItem?.id == first.id)
+
+        // Removing active previewed item auto-dismisses preview
+        state.removeItem(id: first.id)
+        #expect(state.previewItem == nil)
+
+        // Show preview for remaining item and verify clearAll dismisses
+        if let remaining = state.droppedItems.first {
+            state.showPreview(for: remaining)
+            #expect(state.previewItem != nil)
+            state.clearAll()
+            #expect(state.previewItem == nil)
+            #expect(state.droppedItems.isEmpty)
+        }
+    }
 }
 
 

@@ -51,6 +51,23 @@ public final class ImageThumbnailService: @unchecked Sendable {
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
+    /// Generates a downsampled thumbnail directly from a file URL via ImageIO without loading full file into RAM.
+    public func generateThumbnail(from url: URL, maxPixelDimension: Int? = nil) -> CGImage? {
+        let dimension = maxPixelDimension ?? defaultMaxPixelDimension
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+            return nil
+        }
+
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: dimension,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true
+        ]
+
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+    }
+
     /// Retrieves cached thumbnail or generates one asynchronously on a background thread.
     public func thumbnail(for id: UUID, data: Data, maxPixelDimension: Int? = nil) async -> CGImage? {
         if let cached = cachedThumbnail(for: id) {
@@ -66,6 +83,35 @@ public final class ImageThumbnailService: @unchecked Sendable {
             self.storeThumbnail(thumb, for: id)
             return thumb
         }.value
+    }
+
+    /// Retrieves cached thumbnail or generates one asynchronously from a file URL on a background thread.
+    public func thumbnail(for id: UUID, url: URL, maxPixelDimension: Int? = nil) async -> CGImage? {
+        if let cached = cachedThumbnail(for: id) {
+            return cached
+        }
+
+        let dimension = maxPixelDimension ?? defaultMaxPixelDimension
+        return await Task.detached(priority: .userInitiated) { [weak self] () -> CGImage? in
+            guard let self = self else { return nil }
+            guard let thumb = self.generateThumbnail(from: url, maxPixelDimension: dimension) else {
+                return nil
+            }
+            self.storeThumbnail(thumb, for: id)
+            return thumb
+        }.value
+    }
+
+    /// Asynchronously pre-warms thumbnail cache from a file URL in the background at utility priority.
+    public func preloadThumbnail(for id: UUID, url: URL, maxPixelDimension: Int? = nil) {
+        if cachedThumbnail(for: id) != nil { return }
+        let dimension = maxPixelDimension ?? defaultMaxPixelDimension
+        Task.detached(priority: .utility) { [weak self] in
+            guard let self = self else { return }
+            if let thumb = self.generateThumbnail(from: url, maxPixelDimension: dimension) {
+                self.storeThumbnail(thumb, for: id)
+            }
+        }
     }
 
     /// Asynchronously pre-warms thumbnail cache in the background at utility priority.

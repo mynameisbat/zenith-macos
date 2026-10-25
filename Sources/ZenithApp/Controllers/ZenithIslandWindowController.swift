@@ -317,6 +317,19 @@ public final class ZenithIslandWindowController: NSObject {
         }
         .store(in: &cancellables)
 
+        // Observe drop shelf preview item state changes
+        ZenithIslandState.shared.$previewItem
+            .removeDuplicates()
+            .sink { [weak self] item in
+                guard let self = self else { return }
+                if let item = item {
+                    IslandPreviewWindowController.shared.show(for: item, relativeTo: self.geometry)
+                } else {
+                    IslandPreviewWindowController.shared.dismiss()
+                }
+            }
+            .store(in: &cancellables)
+
         // Observe screen configuration changes (e.g., monitor plug/unplug, resolution change)
         NotificationCenter.default.addObserver(
             self,
@@ -372,6 +385,12 @@ public final class ZenithIslandWindowController: NSObject {
     public func handleMouseMoved(screenPoint: NSPoint) {
         guard let panel = panel else { return }
         let state = ZenithIslandState.shared
+
+        // If the user is currently hovering or interacting with the floating preview card,
+        // keep the island engaged and don't trigger mouse leave.
+        if let previewFrame = IslandPreviewWindowController.shared.currentFrame, previewFrame.contains(screenPoint) {
+            return
+        }
 
         // Determine current interactive bounds in screen coordinates
         let activeScreenRect: CGRect
@@ -448,6 +467,7 @@ public final class ZenithIslandWindowController: NSObject {
             panel.setFrame(targetFrame, display: false)
         }
         if newMode == .idle {
+            IslandPreviewWindowController.shared.dismiss()
             let mouseLoc = NSEvent.mouseLocation
             if !geometry.idleFrame.contains(mouseLoc) {
                 panel.ignoresMouseEvents = true
@@ -484,6 +504,7 @@ public final class ZenithIslandWindowController: NSObject {
         collapseTask?.cancel()
         collapseTask = nil
         cancellables.removeAll()
+        IslandPreviewWindowController.shared.dismiss()
         panel?.close()
         panel = nil
     }

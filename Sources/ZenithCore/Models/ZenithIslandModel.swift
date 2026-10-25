@@ -120,6 +120,72 @@ public struct IslandDropItem: Identifiable, Sendable, Equatable {
     public static func == (lhs: IslandDropItem, rhs: IslandDropItem) -> Bool {
         lhs.id == rhs.id
     }
+
+    /// Lowercased file extension, or empty string if not a file URL.
+    public var fileExtension: String {
+        fileURL?.pathExtension.lowercased() ?? ""
+    }
+
+    /// Whether this item represents a previewable visual image format.
+    public var isImageFile: Bool {
+        let ext = fileExtension
+        return ["png", "jpg", "jpeg", "heic", "heif", "webp", "gif", "tiff", "tif", "bmp", "svg", "ico", "icns"].contains(ext)
+    }
+
+    /// Whether this item represents readable text, markdown, or code source.
+    public var isTextOrCodeFile: Bool {
+        let ext = fileExtension
+        return ["txt", "md", "markdown", "swift", "json", "js", "ts", "py", "sh", "zsh", "bash", "html", "css", "c", "cpp", "h", "hpp", "xml", "yaml", "yml", "csv", "log"].contains(ext)
+    }
+
+    /// Whether this item represents audio or video media.
+    public var isAudioOrVideoFile: Bool {
+        let ext = fileExtension
+        return ["mp4", "mov", "m4v", "avi", "mkv", "mp3", "wav", "m4a", "flac", "aac", "ogg"].contains(ext)
+    }
+
+    /// Whether this item represents a PDF document.
+    public var isPDF: Bool {
+        fileExtension == "pdf"
+    }
+
+    /// Formatted file size string (e.g. "2.4 MB") if this item points to a valid file on disk.
+    public var formattedFileSize: String? {
+        guard let fileURL = fileURL else { return nil }
+        if let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey]), let size = values.fileSize {
+            return SystemCleanerService.formatBytes(Int64(size))
+        }
+        return nil
+    }
+
+    /// Pixel dimensions (width, height) extracted via ImageIO without loading full bitmap into memory.
+    public var imageDimensions: CGSize? {
+        guard isImageFile, let fileURL = fileURL, let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil) else {
+            return nil
+        }
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? CGFloat,
+              let height = properties[kCGImagePropertyPixelHeight] as? CGFloat else {
+            return nil
+        }
+        return CGSize(width: width, height: height)
+    }
+
+    /// Safe text snippet extracted from payload or disk without exceeding memory bounds.
+    public var textSnippet: String? {
+        if let text = textContent, !text.isEmpty {
+            return text
+        }
+        guard isTextOrCodeFile, let fileURL = fileURL else { return nil }
+        if let handle = try? FileHandle(forReadingFrom: fileURL) {
+            defer { try? handle.close() }
+            let data = handle.readData(ofLength: 4096)
+            if let str = String(data: data, encoding: .utf8) {
+                return str
+            }
+        }
+        return nil
+    }
 }
 
 /// Represents a transient alert HUD shown inside the notch capsule.
@@ -152,6 +218,7 @@ public final class ZenithIslandState: ObservableObject {
     @Published public var isRimLightVisible: Bool = false
     @Published public var droppedItems: [IslandDropItem] = []
     @Published public var activeAlert: IslandAlert? = nil
+    @Published public var previewItem: IslandDropItem? = nil
 
     private var collapseTimer: Task<Void, Never>?
     private var dragOutTimer: Task<Void, Never>?
@@ -163,19 +230,44 @@ public final class ZenithIslandState: ObservableObject {
 
     // MARK: - Encapsulated State Predicates (Clean Code G28, G29)
 
-    /// True when the user is actively interacting with the island via hover, drag, or drop.
+    /// True when the user is actively interacting with the island via hover, drag, drop, or active preview.
     public var isActivelyEngaged: Bool {
-        isHovered || isDropTargeted || isDraggingOut
+        isHovered || isDropTargeted || isDraggingOut || (previewItem != nil)
     }
 
-    /// True when the island has no active hover, drag, or drop gestures.
+    /// True when the island has no active hover, drag, drop gestures, or active preview.
     public var isCompletelyIdle: Bool {
         !isActivelyEngaged
     }
 
     /// True when the island is eligible to expand purely by hovering.
     public var isEligibleForHoverExpansion: Bool {
-        isHovered && !isDropTargeted && !isDraggingOut
+        isHovered && !isDropTargeted && !isDraggingOut && (previewItem == nil)
+    }
+
+    // MARK: - Drop Item Quick Preview Controls
+
+    /// Opens the floating preview panel for the specified item.
+    public func showPreview(for item: IslandDropItem) {
+        self.previewItem = item
+        self.isExpanded = true
+        self.isHovered = true
+        self.collapseTimer?.cancel()
+        self.collapseTimer = nil
+    }
+
+    /// Dismisses any active item preview card.
+    public func dismissPreview() {
+        self.previewItem = nil
+    }
+
+    /// Toggles the preview state for the specified item.
+    public func togglePreview(for item: IslandDropItem) {
+        if previewItem?.id == item.id {
+            dismissPreview()
+        } else {
+            showPreview(for: item)
+        }
     }
 
     /// Displays a transient alert HUD directly in the notch capsule for 1.8 seconds, then smoothly collapses back.
@@ -265,6 +357,9 @@ public final class ZenithIslandState: ObservableObject {
 
     public func onMouseLeave() {
         isHovered = false
+        // Never collapse or hide rim light if user is currently interacting with an item preview
+        guard previewItem == nil else { return }
+
         // Instantly hide rim light when leaving so border never leaks or flashes on rapid re-hover
         rimLightFadeTask?.cancel()
         rimLightFadeTask = nil
@@ -344,10 +439,14 @@ public final class ZenithIslandState: ObservableObject {
     }
 
     public func removeItem(id: UUID) {
+        if previewItem?.id == id {
+            dismissPreview()
+        }
         droppedItems.removeAll { $0.id == id }
     }
 
     public func clearAll() {
+        dismissPreview()
         droppedItems.removeAll()
     }
 }

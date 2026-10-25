@@ -195,9 +195,18 @@ public struct ZenithDynamicIslandView: View {
     private var populatedShelfDock: some View {
         HStack(spacing: 6) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     ForEach(islandState.droppedItems) { item in
-                        shelfItemCard(item: item)
+                        IslandDropItemCardView(
+                            item: item,
+                            islandState: islandState,
+                            onCopy: {
+                                copyItemToClipboard(item: item)
+                            },
+                            makeItemProvider: {
+                                makeItemProvider(for: item)
+                            }
+                        )
                     }
                 }
                 .padding(.horizontal, 8)
@@ -220,109 +229,6 @@ public struct ZenithDynamicIslandView: View {
             }
             .buttonStyle(.plain)
             .help("Clear Shelf")
-        }
-    }
-
-    private func shelfItemCard(item: IslandDropItem) -> some View {
-        VStack(spacing: 3) {
-            ZStack(alignment: .topTrailing) {
-                // Native macOS file icon
-                if let url = item.fileURL {
-                    Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 30, height: 30)
-                } else {
-                    Image(systemName: "doc.text.fill")
-                        .font(.system(size: 26))
-                        .foregroundColor(.white.opacity(0.85))
-                        .frame(width: 30, height: 30)
-                }
-
-                // Delete individual item button
-                Button {
-                    islandState.removeItem(id: item.id)
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.5))
-                }
-                .buttonStyle(.plain)
-                .offset(x: 6, y: -4)
-            }
-
-            Text(item.name)
-                .font(.system(size: 9.5, weight: .regular))
-                .foregroundColor(.white.opacity(0.85))
-                .lineLimit(1)
-                .frame(width: 60)
-        }
-        .padding(.vertical, 2)
-        .contentShape(Rectangle())
-        // Click to copy immediately to clipboard
-        .onTapGesture {
-            copyItemToClipboard(item: item)
-        }
-        // Direct drag out to other applications
-        .onDrag {
-            islandState.beginDragOut()
-            return makeItemProvider(for: item)
-        }
-        .contextMenu {
-            if let url = item.fileURL, url.pathExtension.lowercased() == "app" {
-                Button {
-                    Task {
-                        if let plan = AppUninstallerService.shared.analyzeApp(atPath: url.path) {
-                            do {
-                                let freed = try AppUninstallerService.shared.uninstall(plan: plan, moveToTrash: true)
-                                ToastHUDController.shared.show(
-                                    message: "Uninstalled \(plan.app.displayName) (Freed \(SystemCleanerService.formatBytes(freed)))",
-                                    icon: "trash.fill"
-                                )
-                                islandState.removeItem(id: item.id)
-                            } catch {
-                                ToastHUDController.shared.show(message: "Uninstall error: \(error.localizedDescription)", icon: "exclamationmark.triangle")
-                            }
-                        }
-                    }
-                } label: {
-                    Label("Deep Uninstall App & Leftovers", systemImage: "trash.fill")
-                }
-
-                Button {
-                    Task {
-                        if let plan = BinarySlimmerService.shared.scanApp(atPath: url.path) {
-                            do {
-                                let saved = try BinarySlimmerService.shared.slimApp(plan: plan)
-                                ToastHUDController.shared.show(
-                                    message: "Slimmed \(plan.appName) (Saved \(SystemCleanerService.formatBytes(saved)))",
-                                    icon: "scissors"
-                                )
-                            } catch {
-                                ToastHUDController.shared.show(message: "Slimming error: \(error.localizedDescription)", icon: "exclamationmark.triangle")
-                            }
-                        } else {
-                            ToastHUDController.shared.show(message: "Already native Apple Silicon binary", icon: "checkmark.seal")
-                        }
-                    }
-                } label: {
-                    Label("Slim Universal App (Strip Intel code)", systemImage: "scissors")
-                }
-
-                Divider()
-            }
-
-            Button {
-                copyItemToClipboard(item: item)
-            } label: {
-                Label("Copy to Clipboard", systemImage: "doc.on.clipboard")
-            }
-
-            Button(role: .destructive) {
-                islandState.removeItem(id: item.id)
-            } label: {
-                Label("Remove from Shelf", systemImage: "xmark")
-            }
         }
     }
 
@@ -359,6 +265,248 @@ public struct ZenithDynamicIslandView: View {
             return NSItemProvider(object: text as NSString)
         } else {
             return NSItemProvider(object: item.name as NSString)
+        }
+    }
+}
+
+// MARK: - Shelf Item Card View with Rich Thumbnail & Preview Triggers
+
+@MainActor
+final class IslandCardHoverState: ObservableObject {
+    @Published var isHovered: Bool = false
+}
+
+@MainActor
+final class IslandCardThumbnailLoader: ObservableObject {
+    @Published var image: CGImage?
+
+    func load(for item: IslandDropItem) async {
+        guard item.isImageFile, let url = item.fileURL else { return }
+        if let cached = ImageThumbnailService.shared.cachedThumbnail(for: item.id) {
+            self.image = cached
+            return
+        }
+        let thumb = await ImageThumbnailService.shared.thumbnail(for: item.id, url: url, maxPixelDimension: 64)
+        self.image = thumb
+    }
+}
+
+public struct IslandDropItemCardView: View {
+    public let item: IslandDropItem
+    @ObservedObject public var islandState: ZenithIslandState
+    public var onCopy: () -> Void
+    public var makeItemProvider: () -> NSItemProvider
+
+    @StateObject private var hoverState = IslandCardHoverState()
+    @StateObject private var loader = IslandCardThumbnailLoader()
+
+    public init(
+        item: IslandDropItem,
+        islandState: ZenithIslandState,
+        onCopy: @escaping () -> Void,
+        makeItemProvider: @escaping () -> NSItemProvider
+    ) {
+        self.item = item
+        self.islandState = islandState
+        self.onCopy = onCopy
+        self.makeItemProvider = makeItemProvider
+    }
+
+    private var isCurrentlyPreviewed: Bool {
+        islandState.previewItem?.id == item.id
+    }
+
+    public var body: some View {
+        VStack(spacing: 3) {
+            ZStack(alignment: .topTrailing) {
+                thumbnailBox
+
+                // Delete individual item button
+                Button {
+                    islandState.removeItem(id: item.id)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.55))
+                }
+                .buttonStyle(.plain)
+                .offset(x: 5, y: -4)
+
+                // Quick preview eye button on hover or active preview
+                if hoverState.isHovered || isCurrentlyPreviewed {
+                    Button {
+                        islandState.togglePreview(for: item)
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color.black.opacity(0.8))
+                                .frame(width: 17, height: 17)
+                            Image(systemName: "eye.fill")
+                                .font(.system(size: 8.5, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .offset(x: -16, y: 16)
+                    .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                }
+            }
+
+            Text(item.name)
+                .font(.system(size: 9.5, weight: .regular))
+                .foregroundColor(.white.opacity(0.85))
+                .lineLimit(1)
+                .frame(width: 60)
+        }
+        .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isCurrentlyPreviewed ? ZenithTheme.accent.opacity(0.2) : (hoverState.isHovered ? Color.white.opacity(0.08) : Color.clear))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(isCurrentlyPreviewed ? ZenithTheme.accent : Color.clear, lineWidth: 1.2)
+        )
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                hoverState.isHovered = hovering
+            }
+        }
+        .onTapGesture(count: 2) {
+            islandState.togglePreview(for: item)
+        }
+        .onTapGesture(count: 1) {
+            onCopy()
+        }
+        .onDrag {
+            islandState.beginDragOut()
+            return makeItemProvider()
+        }
+        .contextMenu {
+            Button {
+                islandState.togglePreview(for: item)
+            } label: {
+                Label("Quick Preview", systemImage: "eye.fill")
+            }
+
+            if let url = item.fileURL {
+                Button {
+                    IslandQuickLookCoordinator.shared.openQuickLook(for: url)
+                } label: {
+                    Label("Quick Look in macOS (Space)", systemImage: "macwindow")
+                }
+
+                Button {
+                    NSWorkspace.shared.open(url)
+                } label: {
+                    Label("Open with Default App", systemImage: "arrow.up.forward.app")
+                }
+
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                } label: {
+                    Label("Reveal in Finder", systemImage: "folder")
+                }
+
+                Divider()
+
+                if url.pathExtension.lowercased() == "app" {
+                    Button {
+                        Task {
+                            if let plan = AppUninstallerService.shared.analyzeApp(atPath: url.path) {
+                                do {
+                                    let freed = try AppUninstallerService.shared.uninstall(plan: plan, moveToTrash: true)
+                                    ToastHUDController.shared.show(
+                                        message: "Uninstalled \(plan.app.displayName) (Freed \(SystemCleanerService.formatBytes(freed)))",
+                                        icon: "trash.fill"
+                                    )
+                                    islandState.removeItem(id: item.id)
+                                } catch {
+                                    ToastHUDController.shared.show(message: "Uninstall error: \(error.localizedDescription)", icon: "exclamationmark.triangle")
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Deep Uninstall App & Leftovers", systemImage: "trash.fill")
+                    }
+
+                    Button {
+                        Task {
+                            if let plan = BinarySlimmerService.shared.scanApp(atPath: url.path) {
+                                do {
+                                    let saved = try BinarySlimmerService.shared.slimApp(plan: plan)
+                                    ToastHUDController.shared.show(
+                                        message: "Slimmed \(plan.appName) (Saved \(SystemCleanerService.formatBytes(saved)))",
+                                        icon: "scissors"
+                                    )
+                                } catch {
+                                    ToastHUDController.shared.show(message: "Slimming error: \(error.localizedDescription)", icon: "exclamationmark.triangle")
+                                }
+                            } else {
+                                ToastHUDController.shared.show(message: "Already native Apple Silicon binary", icon: "checkmark.seal")
+                            }
+                        }
+                    } label: {
+                        Label("Slim Universal App (Strip Intel code)", systemImage: "scissors")
+                    }
+
+                    Divider()
+                }
+            }
+
+            Button {
+                onCopy()
+            } label: {
+                Label("Copy to Clipboard", systemImage: "doc.on.clipboard")
+            }
+
+            Button(role: .destructive) {
+                islandState.removeItem(id: item.id)
+            } label: {
+                Label("Remove from Shelf", systemImage: "xmark")
+            }
+        }
+        .task(id: item.id) {
+            await loader.load(for: item)
+        }
+    }
+
+    private var thumbnailBox: some View {
+        Group {
+            if item.isImageFile {
+                if let thumb = loader.image {
+                    Image(decorative: thumb, scale: 2.0)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 32, height: 32)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+                        )
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "photo")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                }
+            } else if let url = item.fileURL {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 30, height: 30)
+            } else {
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 26))
+                    .foregroundColor(.white.opacity(0.85))
+                    .frame(width: 30, height: 30)
+            }
         }
     }
 }
