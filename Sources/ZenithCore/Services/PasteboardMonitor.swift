@@ -20,7 +20,7 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
     private var lastObservedChangeCount: Int = 0
     private var lastSuppressedChangeCount: Int = -1
 
-    public init(pasteboard: NSPasteboard = .general, pollingInterval: TimeInterval = 0.3) {
+    public init(pasteboard: NSPasteboard = .general, pollingInterval: TimeInterval = 0.5) {
         self.pasteboard = pasteboard
         self.pollingInterval = pollingInterval
         self.lastObservedChangeCount = pasteboard.changeCount
@@ -47,10 +47,11 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
 
         // Main thread polling per AppKit NSPasteboard thread-safety rules (MED-05)
         let timerSource = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
+        let leewayMs = max(50, Int(pollingInterval * 300))
         timerSource.schedule(
             deadline: .now() + pollingInterval,
             repeating: pollingInterval,
-            leeway: .milliseconds(50)
+            leeway: .milliseconds(leewayMs)
         )
         timerSource.setEventHandler { [weak self] in
             self?.pollPasteboard()

@@ -259,6 +259,8 @@ public final class ZenithIslandWindowController: NSObject {
     private var collapseTask: Task<Void, Never>?
     private var globalMouseMonitor: Any?
     private var localMouseMonitor: Any?
+    private let mouseStateLock = NSLock()
+    private var isIgnoringMouseEvents: Bool = true
 
     override private init() {
         self.geometry = ZenithIslandGeometry()
@@ -293,6 +295,9 @@ public final class ZenithIslandWindowController: NSObject {
 
         self.panel = islandPanel
         self.currentMode = .idle
+        mouseStateLock.lock()
+        self.isIgnoringMouseEvents = true
+        mouseStateLock.unlock()
 
         // Observe island state expansion, alerts, and drop shelf interactions
         Publishers.CombineLatest3(
@@ -325,13 +330,38 @@ public final class ZenithIslandWindowController: NSObject {
         // whenever the cursor is outside the visible island. This completely eliminates any dead zones,
         // allowing 100% of mouse clicks to pass directly through to nearby menu bar icons and windows underneath.
         self.globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] _ in
+            guard let self = self else { return }
+            let mouseLoc = NSEvent.mouseLocation
+            // Fast-path guard: if cursor is outside the dynamic island interactive region
+            // and the panel is already ignoring mouse events while idle, skip scheduling
+            // an asynchronous Task on @MainActor.
+            let idleInteractionRect = self.geometry.idleFrame.insetBy(dx: -30, dy: -30)
+            if !idleInteractionRect.contains(mouseLoc) {
+                self.mouseStateLock.lock()
+                let ignoring = self.isIgnoringMouseEvents
+                self.mouseStateLock.unlock()
+                if ignoring {
+                    return
+                }
+            }
             Task { @MainActor [weak self] in
-                self?.handleMouseMoved(screenPoint: NSEvent.mouseLocation)
+                self?.handleMouseMoved(screenPoint: mouseLoc)
             }
         }
 
         self.localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] event in
-            self?.handleMouseMoved(screenPoint: NSEvent.mouseLocation)
+            guard let self = self else { return event }
+            let mouseLoc = NSEvent.mouseLocation
+            let idleInteractionRect = self.geometry.idleFrame.insetBy(dx: -30, dy: -30)
+            if !idleInteractionRect.contains(mouseLoc) {
+                self.mouseStateLock.lock()
+                let ignoring = self.isIgnoringMouseEvents
+                self.mouseStateLock.unlock()
+                if ignoring {
+                    return event
+                }
+            }
+            self.handleMouseMoved(screenPoint: mouseLoc)
             return event
         }
 
@@ -360,6 +390,9 @@ public final class ZenithIslandWindowController: NSObject {
             if panel.ignoresMouseEvents {
                 panel.ignoresMouseEvents = false
             }
+            mouseStateLock.lock()
+            isIgnoringMouseEvents = false
+            mouseStateLock.unlock()
             if !state.isHovered && !state.isDraggingOut {
                 state.onMouseEnter()
             }
@@ -368,6 +401,9 @@ public final class ZenithIslandWindowController: NSObject {
             if !panel.ignoresMouseEvents {
                 panel.ignoresMouseEvents = true
             }
+            mouseStateLock.lock()
+            isIgnoringMouseEvents = true
+            mouseStateLock.unlock()
             if state.isEligibleForHoverExpansion {
                 state.onMouseLeave()
             }
@@ -415,6 +451,9 @@ public final class ZenithIslandWindowController: NSObject {
             let mouseLoc = NSEvent.mouseLocation
             if !geometry.idleFrame.contains(mouseLoc) {
                 panel.ignoresMouseEvents = true
+                mouseStateLock.lock()
+                isIgnoringMouseEvents = true
+                mouseStateLock.unlock()
             }
         }
         panel.orderFrontRegardless()

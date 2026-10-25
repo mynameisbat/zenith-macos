@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import Darwin
 
 /// Supported quick action item IDs in the Zenith Command Hub action list.
 public enum ZenithHubAction: String, CaseIterable, Sendable {
@@ -68,26 +69,69 @@ public final class ZenithCommandHubState: ObservableObject {
     @Published public var searchText: String = ""
     @Published public var hoveredActionId: String? = nil
     @Published public var hoveredClipId: UUID? = nil
+    @Published public var hoveredProcessId: Int? = nil
     @Published public var hoveredFooterId: String? = nil
     @Published public var quickLookItem: ClipboardItem? = nil
     @Published public var presentationID: UUID = UUID()
-    @Published public var hardwareSnapshot: HardwareSnapshot = HardwareTelemetryService.shared.fetchSnapshot()
-    @Published public var showTopHogs: Bool = false
+    @Published public var hardwareSnapshot: HardwareSnapshot = HardwareSnapshot()
+    @Published public var showTopHogs: Bool = true
 
     public init() {}
 
-    public func refreshHardwareSnapshot() {
-        hardwareSnapshot = HardwareTelemetryService.shared.fetchSnapshot()
+    public var filteredTopHogs: [ProcessTelemetry] {
+        let allHogs = hardwareSnapshot.cpu.topHogs
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if query.isEmpty || query == "/boost" || query == "boost" {
+            return Array(allHogs.prefix(5))
+        }
+        let matched = allHogs.filter { hog in
+            hog.name.lowercased().contains(query) ||
+            hog.command.lowercased().contains(query) ||
+            String(hog.pid).contains(query)
+        }
+        return Array(matched.prefix(5))
+    }
+
+    public func refreshHardwareSnapshot(sync: Bool = false) {
+        if sync {
+            hardwareSnapshot = HardwareTelemetryService.shared.fetchSnapshot()
+            return
+        }
+        Task.detached(priority: .utility) { [weak self] in
+            let snapshot = HardwareTelemetryService.shared.fetchSnapshot()
+            await MainActor.run { [weak self] in
+                self?.hardwareSnapshot = snapshot
+            }
+        }
     }
 
     public func toggleTopHogs() {
         showTopHogs.toggle()
-        refreshHardwareSnapshot()
+        refreshHardwareSnapshot(sync: true)
     }
 
     public func killProcess(pid: Int) {
         HardwareTelemetryService.shared.killProcess(pid: pid, force: false)
-        refreshHardwareSnapshot()
+        refreshHardwareSnapshot(sync: true)
+    }
+
+    /// Performs a full system and memory boost: flushes DNS, purges zombie processes,
+    /// releases thumbnail cache, and triggers Darwin VM malloc pressure relief.
+    public func boostSystem() {
+        ImageThumbnailService.shared.clearCache()
+        malloc_zone_pressure_relief(nil, 0)
+        HardwareTelemetryService.shared.invalidateProcessCache()
+        refreshHardwareSnapshot(sync: true)
+
+        Task.detached(priority: .utility) { [weak self] in
+            _ = try? SystemOptimizerService.shared.execute(taskId: .preventNetworkDsStore)
+            _ = try? SystemOptimizerService.shared.execute(taskId: .quickLookCacheRefresh)
+            _ = try? SystemOptimizerService.shared.execute(taskId: .dnsCacheFlush)
+            _ = try? SystemOptimizerService.shared.execute(taskId: .zombieProcessCleanup)
+            await MainActor.run { [weak self] in
+                self?.refreshHardwareSnapshot(sync: true)
+            }
+        }
     }
 
     public func setSearchText(_ text: String) {
@@ -114,6 +158,16 @@ public final class ZenithCommandHubState: ObservableObject {
         }
     }
 
+    public func setHoveredProcess(_ id: Int?) {
+        hoveredProcessId = id
+    }
+
+    public func clearHoveredProcess(ifCurrent id: Int) {
+        if hoveredProcessId == id {
+            hoveredProcessId = nil
+        }
+    }
+
     public func setHoveredFooter(_ id: String?) {
         hoveredFooterId = id
     }
@@ -128,6 +182,7 @@ public final class ZenithCommandHubState: ObservableObject {
         searchText = ""
         hoveredActionId = nil
         hoveredClipId = nil
+        hoveredProcessId = nil
         hoveredFooterId = nil
         quickLookItem = nil
         presentationID = UUID()

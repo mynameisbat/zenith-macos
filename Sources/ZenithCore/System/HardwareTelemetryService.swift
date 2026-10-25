@@ -229,10 +229,10 @@ public struct HardwareSnapshot: Sendable, Equatable {
     }
 
     public init(
-        battery: BatteryTelemetry,
-        disk: DiskTelemetry,
-        cpu: CPUTelemetry,
-        memory: MemoryTelemetry,
+        battery: BatteryTelemetry = BatteryTelemetry(),
+        disk: DiskTelemetry = DiskTelemetry(),
+        cpu: CPUTelemetry = CPUTelemetry(),
+        memory: MemoryTelemetry = MemoryTelemetry(),
         bluetoothDevices: [BluetoothDeviceTelemetry] = [],
         thermalState: String = "Nominal",
         timestamp: Date = Date()
@@ -257,6 +257,9 @@ public final class HardwareTelemetryService: @unchecked Sendable {
     }
 
     private var previousCPUTicks: host_cpu_load_info?
+    private let processCacheLock = NSLock()
+    private var cachedProcesses: (topHogs: [ProcessTelemetry], zombies: [ProcessTelemetry])?
+    private var lastProcessSampleTime: Date?
 
     public init() {}
 
@@ -264,7 +267,7 @@ public final class HardwareTelemetryService: @unchecked Sendable {
     public func fetchSnapshot() -> HardwareSnapshot {
         let battery = readBatteryTelemetry()
         let disk = readDiskTelemetry()
-        let cpu = readCPUTelemetry()
+        let cpu = readCPUTelemetry(topLimit: 15)
         let memory = readMemoryTelemetry()
         let btDevices = readBluetoothPeripherals()
         let thermal = readThermalState()
@@ -342,6 +345,17 @@ public final class HardwareTelemetryService: @unchecked Sendable {
     }
 
     public func sampleProcesses(topLimit: Int = 5) -> (topHogs: [ProcessTelemetry], zombies: [ProcessTelemetry]) {
+        processCacheLock.lock()
+        if let cached = cachedProcesses,
+           let lastTime = lastProcessSampleTime,
+           Date().timeIntervalSince(lastTime) < 1.5 {
+            let hogs = Array(cached.topHogs.prefix(topLimit))
+            let zombies = cached.zombies
+            processCacheLock.unlock()
+            return (hogs, zombies)
+        }
+        processCacheLock.unlock()
+
         let pipe = Pipe()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/ps")
@@ -356,14 +370,27 @@ public final class HardwareTelemetryService: @unchecked Sendable {
             guard let output = String(data: data, encoding: .utf8) else {
                 return ([], [])
             }
-            return parseProcessOutput(output, topLimit: topLimit)
+            let (hogs, zombies) = parseProcessOutput(output, topLimit: max(25, topLimit))
+            processCacheLock.lock()
+            self.cachedProcesses = (hogs, zombies)
+            self.lastProcessSampleTime = Date()
+            processCacheLock.unlock()
+            return (Array(hogs.prefix(topLimit)), zombies)
         } catch {
             return ([], [])
         }
     }
 
+    /// Invalidates cached process telemetry so subsequent queries fetch fresh data.
+    public func invalidateProcessCache() {
+        processCacheLock.lock()
+        cachedProcesses = nil
+        lastProcessSampleTime = nil
+        processCacheLock.unlock()
+    }
+
     public func parseProcessOutput(_ output: String, topLimit: Int = 5) -> (topHogs: [ProcessTelemetry], zombies: [ProcessTelemetry]) {
-        var hogs: [ProcessTelemetry] = []
+        var activeProcs: [ProcessTelemetry] = []
         var zombies: [ProcessTelemetry] = []
 
         let lines = output.components(separatedBy: .newlines)
@@ -400,10 +427,28 @@ public final class HardwareTelemetryService: @unchecked Sendable {
 
             if isZombie {
                 zombies.append(proc)
+            } else {
+                activeProcs.append(proc)
             }
+        }
 
-            if hogs.count < topLimit && !isZombie {
+        // Maintain top CPU hogs followed by heavy RAM consumers not already included
+        var hogs: [ProcessTelemetry] = []
+        var addedPIDs = Set<Int>()
+
+        let topByCPU = activeProcs.sorted(by: { $0.cpuPercent > $1.cpuPercent })
+        for proc in topByCPU {
+            if hogs.count >= topLimit { break }
+            hogs.append(proc)
+            addedPIDs.insert(proc.pid)
+        }
+
+        let topByMem = activeProcs.sorted(by: { $0.memoryBytes > $1.memoryBytes })
+        for proc in topByMem {
+            if hogs.count >= topLimit { break }
+            if !addedPIDs.contains(proc.pid) {
                 hogs.append(proc)
+                addedPIDs.insert(proc.pid)
             }
         }
 
@@ -413,13 +458,15 @@ public final class HardwareTelemetryService: @unchecked Sendable {
     /// Gracefully requests a process to terminate (SIGTERM).
     @discardableResult
     public func terminateProcess(pid: Int) -> Bool {
-        sendSignal(SIGTERM, toProcess: pid)
+        invalidateProcessCache()
+        return sendSignal(SIGTERM, toProcess: pid)
     }
 
     /// Forcefully terminates a process immediately (SIGKILL).
     @discardableResult
     public func forceKillProcess(pid: Int) -> Bool {
-        sendSignal(SIGKILL, toProcess: pid)
+        invalidateProcessCache()
+        return sendSignal(SIGKILL, toProcess: pid)
     }
 
     /// Terminates a process by PID with optional force flag (Clean Code F3 backwards-compatible facade).

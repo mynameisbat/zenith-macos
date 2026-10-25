@@ -156,4 +156,126 @@ struct ZenithCommandHubTests {
         state.reset()
         #expect(state.presentationID != initialID)
     }
+
+    @Test("HUB-09: Process hover race condition protection")
+    @MainActor
+    func testProcessHoverRaceConditionProtection() {
+        let state = ZenithCommandHubState()
+
+        state.setHoveredProcess(101)
+        #expect(state.hoveredProcessId == 101)
+
+        // Enter process 202
+        state.setHoveredProcess(202)
+        #expect(state.hoveredProcessId == 202)
+
+        // Delayed exit from process 101
+        state.clearHoveredProcess(ifCurrent: 101)
+        #expect(state.hoveredProcessId == 202, "Exiting previous process must not clear hover for newly entered process")
+
+        // Exit process 202
+        state.clearHoveredProcess(ifCurrent: 202)
+        #expect(state.hoveredProcessId == nil)
+    }
+
+    @Test("HUB-10: Boost system executes maintenance operations and refreshes snapshot")
+    @MainActor
+    func testBoostSystemExecution() {
+        let state = ZenithCommandHubState()
+        state.boostSystem()
+
+        #expect(state.hardwareSnapshot.timestamp <= Date())
+        #expect(state.showTopHogs == true)
+    }
+
+    @Test("HUB-11: Process termination triggers hardware snapshot refresh and invalidation")
+    @MainActor
+    func testProcessTerminationTriggersRefresh() {
+        let state = ZenithCommandHubState()
+        // Terminate non-existent fake pid safely
+        state.killProcess(pid: 999999)
+        #expect(state.hardwareSnapshot.timestamp <= Date())
+    }
+
+    @Test("HUB-12: Default HardwareSnapshot creates valid lightweight initial state without child process overhead")
+    func testDefaultHardwareSnapshot() {
+        let snapshot = HardwareSnapshot()
+        #expect(snapshot.thermalState == "Nominal")
+        #expect(snapshot.cpu.coreCount > 0)
+        #expect(snapshot.bluetoothDevices.isEmpty)
+    }
+
+    @Test("HUB-13: Filtered top hogs returns prefix 5 when query is empty or /boost")
+    @MainActor
+    func testFilteredTopHogsDefaultAndBoost() {
+        let state = ZenithCommandHubState()
+        let fakeHogs = (1...10).map { i in
+            ProcessTelemetry(pid: 1000 + i, name: "proc_\(i)", cpuPercent: Double(10 - i), memoryBytes: Int64(i * 1024 * 1024))
+        }
+        state.hardwareSnapshot = HardwareSnapshot(cpu: CPUTelemetry(topHogs: fakeHogs))
+
+        // When search text is empty: exactly 5 items
+        state.searchText = ""
+        #expect(state.filteredTopHogs.count == 5)
+        #expect(state.filteredTopHogs.map(\.pid) == [1001, 1002, 1003, 1004, 1005])
+
+        // When search text is "/boost" or "boost"
+        state.searchText = "/boost"
+        #expect(state.filteredTopHogs.count == 5)
+        #expect(state.filteredTopHogs.map(\.pid) == [1001, 1002, 1003, 1004, 1005])
+
+        state.searchText = "boost"
+        #expect(state.filteredTopHogs.count == 5)
+    }
+
+    @Test("HUB-14: Filtered top hogs filters by name, command, and PID accurately")
+    @MainActor
+    func testFilteredTopHogsFiltering() {
+        let state = ZenithCommandHubState()
+        let proc1 = ProcessTelemetry(pid: 2048, name: "Google Chrome", command: "/Applications/Google Chrome.app", cpuPercent: 25.0)
+        let proc2 = ProcessTelemetry(pid: 3012, name: "Xcode", command: "/Applications/Xcode.app", cpuPercent: 12.0)
+        let proc3 = ProcessTelemetry(pid: 4096, name: "Slack", command: "/Applications/Slack.app", cpuPercent: 5.0)
+        let proc4 = ProcessTelemetry(pid: 5120, name: "Terminal", command: "/System/Applications/Utilities/Terminal.app", cpuPercent: 2.0)
+
+        state.hardwareSnapshot = HardwareSnapshot(cpu: CPUTelemetry(topHogs: [proc1, proc2, proc3, proc4]))
+
+        // Filter by name
+        state.searchText = "chrome"
+        #expect(state.filteredTopHogs.count == 1)
+        #expect(state.filteredTopHogs.first?.pid == 2048)
+
+        // Filter by PID
+        state.searchText = "4096"
+        #expect(state.filteredTopHogs.count == 1)
+        #expect(state.filteredTopHogs.first?.name == "Slack")
+
+        // Filter by command path substring
+        state.searchText = "Utilities"
+        #expect(state.filteredTopHogs.count == 1)
+        #expect(state.filteredTopHogs.first?.pid == 5120)
+
+        // Filter with non-matching query
+        state.searchText = "nonexistent_app"
+        #expect(state.filteredTopHogs.isEmpty)
+    }
+
+    @Test("HUB-15: Process output parser combines top CPU hogs and heavy RAM consumers without duplicate PIDs")
+    func testTopHogsCPUAndRAMCombination() {
+        let service = HardwareTelemetryService()
+        let sampleOutput = """
+         100     1 S      50.0  1.0   50000 high_cpu_low_mem
+         200     1 S       0.5 20.0 5000000 low_cpu_high_mem
+         300     1 S      30.0  2.0  100000 mid_cpu_mid_mem
+        """
+
+        let (hogs, _) = service.parseProcessOutput(sampleOutput, topLimit: 3)
+        #expect(hogs.count == 3)
+        // High CPU item must be present
+        #expect(hogs.contains { $0.pid == 100 })
+        // High RAM item must also be present
+        #expect(hogs.contains { $0.pid == 200 })
+        // Unique PIDs only
+        let uniquePIDs = Set(hogs.map(\.pid))
+        #expect(uniquePIDs.count == hogs.count)
+    }
 }

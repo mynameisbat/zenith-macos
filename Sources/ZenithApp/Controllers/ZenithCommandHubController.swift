@@ -9,6 +9,7 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
 
     private var popover: NSPopover?
     private var eventMonitor: Any?
+    private var telemetryTimer: Timer?
 
     public var isVisible: Bool {
         popover?.isShown ?? false
@@ -75,6 +76,7 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
         }
 
         installEventMonitor()
+        startTelemetryPolling()
         popover?.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
         popover?.contentViewController?.view.window?.makeKey()
         NSApp.activate(ignoringOtherApps: true)
@@ -82,6 +84,7 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
 
     /// Closes the popover with optional immediate suppression of window animations.
     public func close(immediately: Bool = false) {
+        stopTelemetryPolling()
         removeEventMonitor()
         if immediately {
             popover?.animates = false
@@ -90,6 +93,27 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
         } else {
             popover?.performClose(nil)
         }
+    }
+
+    // MARK: - Telemetry Polling Lifecycle (Zero Idle CPU)
+
+    private func startTelemetryPolling() {
+        stopTelemetryPolling()
+        ZenithCommandHubState.shared.refreshHardwareSnapshot()
+        telemetryTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self, self.isVisible else {
+                    self?.stopTelemetryPolling()
+                    return
+                }
+                ZenithCommandHubState.shared.refreshHardwareSnapshot()
+            }
+        }
+    }
+
+    private func stopTelemetryPolling() {
+        telemetryTimer?.invalidate()
+        telemetryTimer = nil
     }
 
     // MARK: - Key Event Handling
@@ -173,43 +197,37 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
                 return true
             }
 
-            // ⌘1..⌘4: Quick select clip
+            // ⌘1..⌘4: Terminate top hog at index
             let numberKeyCodes: [UInt16] = [18, 19, 20, 21] // 1, 2, 3, 4
             if let index = numberKeyCodes.firstIndex(of: event.keyCode) {
-                return selectClipAtIndex(index)
+                return handleQuickActionAtIndex(index)
             }
             if let chars = event.charactersIgnoringModifiers,
                let first = chars.first,
                let digit = Int(String(first)),
                digit >= 1 && digit <= 4 {
-                return selectClipAtIndex(digit - 1)
+                return handleQuickActionAtIndex(digit - 1)
             }
         }
 
         return false
     }
 
-    private func selectClipAtIndex(_ index: Int) -> Bool {
-        let query = ZenithCommandHubState.shared.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let items: [ClipboardItem]
-        if query.isEmpty {
-            items = Array(ClipboardStore.shared.items.prefix(4))
-        } else {
-            let matched = FuzzySearchEngine().search(query: query, in: ClipboardStore.shared.items)
-            items = Array(matched.prefix(5))
+    private func handleQuickActionAtIndex(_ index: Int) -> Bool {
+        let hogs = ZenithCommandHubState.shared.filteredTopHogs
+        guard index >= 0 && index < hogs.count else {
+            return false
         }
-
-        guard index >= 0 && index < items.count else { return true }
-        let item = items[index]
-        ClipboardStore.shared.selectAndRestoreItem(item)
-        ToastHUDController.shared.show(message: "Copied to Clipboard", icon: "doc.on.clipboard")
-        close()
+        let hog = hogs[index]
+        ZenithCommandHubState.shared.killProcess(pid: hog.pid)
+        ToastHUDController.shared.show(message: "Terminated \(hog.name)", icon: "xmark.circle.fill")
         return true
     }
 
     // MARK: - NSPopoverDelegate
 
     public func popoverDidClose(_ notification: Notification) {
+        stopTelemetryPolling()
         removeEventMonitor()
     }
 }

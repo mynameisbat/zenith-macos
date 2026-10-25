@@ -93,4 +93,21 @@ struct HardwareTelemetryServiceTests {
         #expect(zombies[0].pid == 5678)
         #expect(zombies[0].isZombie == true)
     }
+
+    @Test("HW-06: Process sampling caching avoids redundant process execution and invalidates cleanly")
+    func testProcessSamplingCache() {
+        let service = HardwareTelemetryService()
+        service.invalidateProcessCache()
+
+        let (hogs1, _) = service.sampleProcesses(topLimit: 3)
+        let (hogs2, _) = service.sampleProcesses(topLimit: 3)
+
+        // Within 1.5s TTL, cached sample is returned immediately
+        #expect(hogs1.map(\.pid) == hogs2.map(\.pid))
+
+        // Invalidate cache
+        service.invalidateProcessCache()
+        let (hogs3, _) = service.sampleProcesses(topLimit: 3)
+        #expect(!hogs3.isEmpty)
+    }
 }
