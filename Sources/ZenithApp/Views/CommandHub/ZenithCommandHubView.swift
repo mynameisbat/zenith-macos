@@ -78,7 +78,7 @@ public struct ZenithCommandHubView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.secondary)
 
-            TextField("Search actions, processes (or /boost)...", text: $hubState.searchText)
+            TextField("Search actions, apps to terminate (or /boost)...", text: $hubState.searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12.5))
                 .focused($isSearchFocused)
@@ -224,7 +224,7 @@ public struct ZenithCommandHubView: View {
                         .font(.system(size: 10.5))
                         .foregroundColor(hubState.hardwareSnapshot.cpu.totalUsagePercent > 60 ? .red : .orange)
 
-                    Text(hubState.searchText.isEmpty ? "TOP RESOURCE HOGS" : "MATCHING PROCESSES (\(hogs.count))")
+                    Text(hubState.searchText.isEmpty ? "RUNNING APPS (SAFE TO KILL)" : "MATCHING APPS (\(hogs.count))")
                         .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
                         .foregroundColor(Color.secondary.opacity(0.75))
                 }
@@ -241,7 +241,7 @@ public struct ZenithCommandHubView: View {
             if hogs.isEmpty {
                 HStack {
                     Spacer()
-                    Text(hubState.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Zero heavy CPU/RAM consumers" : "No matching processes found")
+                    Text(hubState.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Zero heavy user applications running" : "No matching applications found")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                         .padding(.vertical, 12)

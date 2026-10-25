@@ -349,7 +349,7 @@ public final class HardwareTelemetryService: @unchecked Sendable {
         )
     }
 
-    public func sampleProcesses(topLimit: Int = 5) -> (topHogs: [ProcessTelemetry], zombies: [ProcessTelemetry]) {
+    public func sampleProcesses(topLimit: Int = 5, filterSafeOnly: Bool = true) -> (topHogs: [ProcessTelemetry], zombies: [ProcessTelemetry]) {
         processCacheLock.lock()
         if let cached = cachedProcesses,
            let lastTime = lastProcessSampleTime,
@@ -375,7 +375,7 @@ public final class HardwareTelemetryService: @unchecked Sendable {
             guard let output = String(data: data, encoding: .utf8) else {
                 return ([], [])
             }
-            let (hogs, zombies) = parseProcessOutput(output, topLimit: max(25, topLimit))
+            let (hogs, zombies) = parseProcessOutput(output, topLimit: max(25, topLimit), filterSafeOnly: filterSafeOnly)
             processCacheLock.lock()
             self.cachedProcesses = (hogs, zombies)
             self.lastProcessSampleTime = Date()
@@ -394,7 +394,90 @@ public final class HardwareTelemetryService: @unchecked Sendable {
         processCacheLock.unlock()
     }
 
-    public func parseProcessOutput(_ output: String, topLimit: Int = 5) -> (topHogs: [ProcessTelemetry], zombies: [ProcessTelemetry]) {
+    /// Determines whether a process is a user-facing application or user-space tool
+    /// that can be safely terminated without destabilizing the macOS operating system.
+    public static func isSafeToKillProcess(pid: Int, command: String = "") -> Bool {
+        if pid <= 1 || pid == ProcessInfo.processInfo.processIdentifier {
+            return false
+        }
+
+        var pathBuffer = [UInt8](repeating: 0, count: 4096)
+        let length = pathBuffer.withUnsafeMutableBufferPointer { ptr in
+            proc_pidpath(pid_t(pid), ptr.baseAddress, UInt32(ptr.count))
+        }
+        let path: String
+        if length > 0 {
+            let slice = pathBuffer.prefix(Int(length))
+            path = String(decoding: slice, as: UTF8.self).trimmingCharacters(in: .whitespaces)
+        } else {
+            path = command.trimmingCharacters(in: .whitespaces)
+        }
+
+        // 1. Critical system directories that must never be terminated
+        let systemPrefixes = [
+            "/System/",
+            "/usr/libexec/",
+            "/usr/sbin/",
+            "/sbin/",
+            "/Library/Apple/",
+            "/Library/SystemExtensions/"
+        ]
+        if systemPrefixes.contains(where: { path.hasPrefix($0) }) {
+            return false
+        }
+
+        // 2. Blacklisted core Apple system services & UI daemons
+        let coreSystemNames: Set<String> = [
+            "windowserver", "loginwindow", "dock", "finder", "systemuiserver",
+            "controlcenter", "spotlight", "notificationcenter", "windowmanager",
+            "coreaudiod", "bluetoothd", "wifid", "logd", "fseventsd", "powerd",
+            "tccd", "trustd", "opendirectoryd", "securityd", "diskarbitrationd",
+            "amfid", "syslogd", "notifyd", "kernelmanagerd", "hidd", "locationd",
+            "sharingd", "airportd", "clocksyncd", "biomesyncd", "chronod",
+            "distnoted", "cfprefsd", "nsurlsessiond", "containermanagerd",
+            "runningboardd", "diagnosticd", "symptomd", "symptomsd", "contextstored",
+            "rapportd", "identityservicesd", "secd", "accountsd", "callservicesd",
+            "imagent", "suggestd", "coreduetd", "vtdecoderxpcservice",
+            "vtencoderxpcservice", "mtlcompilerservice", "xprotectd", "bird",
+            "cloudd", "fileproviderd", "geod", "passd", "pkd", "revisiond",
+            "quicklookd", "spindump", "sysdiagnose", "secinitd", "neagent",
+            "appleeventsd", "corespotlightd", "keychainsharingd", "usernoted",
+            "viewbridgeauxiliary", "zenith", "goldengate"
+        ]
+        let nameLower = (path as NSString).lastPathComponent.lowercased()
+        if coreSystemNames.contains(nameLower) || nameLower.hasPrefix("com.apple.") {
+            return false
+        }
+
+        // 3. Positive verification: User applications, developer tools, or Homebrew binaries
+        let userAllowedPrefixes = [
+            "/Applications/",
+            "/Users/",
+            "/opt/homebrew/",
+            "/usr/local/"
+        ]
+        if userAllowedPrefixes.contains(where: { path.hasPrefix($0) }) {
+            return true
+        }
+
+        let safeDeveloperTools: Set<String> = [
+            "node", "python", "python3", "ruby", "java", "cargo", "rustc", "go",
+            "docker", "containerd", "language_server", "esbuild", "git", "ffmpeg",
+            "dotnet", "ugrep", "rg", "npm", "yarn", "pnpm", "vite"
+        ]
+        if safeDeveloperTools.contains(nameLower) {
+            return true
+        }
+
+        // Generic non-system executable not matching system keywords
+        if !path.hasPrefix("/") && !nameLower.hasSuffix("d") && !nameLower.contains("system") && !nameLower.contains("apple") {
+            return true
+        }
+
+        return false
+    }
+
+    public func parseProcessOutput(_ output: String, topLimit: Int = 5, filterSafeOnly: Bool = false) -> (topHogs: [ProcessTelemetry], zombies: [ProcessTelemetry]) {
         var activeProcs: [ProcessTelemetry] = []
         var zombies: [ProcessTelemetry] = []
 
@@ -433,6 +516,9 @@ public final class HardwareTelemetryService: @unchecked Sendable {
             if isZombie {
                 zombies.append(proc)
             } else {
+                if filterSafeOnly && !Self.isSafeToKillProcess(pid: pid, command: rawCommand) {
+                    continue
+                }
                 activeProcs.append(proc)
             }
         }
