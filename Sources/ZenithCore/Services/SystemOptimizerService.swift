@@ -372,11 +372,17 @@ public final class SystemOptimizerService: @unchecked Sendable {
         }
         guard let bin = binaryPath, !bin.isEmpty else { return false }
         // If binary is a system utility (/bin/sh, /usr/bin/python, etc.) it's not orphan
-        if bin.hasPrefix("/bin") || bin.hasPrefix("/usr/bin") || bin.hasPrefix("/System") {
+        if isSystemBinary(bin) {
             return false
         }
         // If target binary does not exist, it is an orphan
         return !fileManager.fileExists(atPath: bin)
+    }
+
+    private static let systemBinaryPrefixes = ["/bin", "/usr/bin", "/System"]
+
+    private func isSystemBinary(_ path: String) -> Bool {
+        Self.systemBinaryPrefixes.contains { path.hasPrefix($0) }
     }
 
     private func calculateSize(of path: String) -> Int64 {

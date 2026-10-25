@@ -744,11 +744,26 @@ public final class SystemCleanerService: ObservableObject {
         categories[catIdx].isSelected = categories[catIdx].items.contains(where: \.isSelected)
     }
 
+    /// Selects all cleaning categories and items.
+    public func selectAll() {
+        setAllSelected(true)
+    }
+
+    /// Deselects all cleaning categories and items (Clean Code N7, F3).
+    public func deselectAll() {
+        setAllSelected(false)
+    }
+
+    /// Selects or deselects all items (backwards-compatible facade).
     public func selectAll(_ select: Bool) {
+        setAllSelected(select)
+    }
+
+    private func setAllSelected(_ isSelected: Bool) {
         for i in 0..<categories.count {
-            categories[i].isSelected = select
+            categories[i].isSelected = isSelected
             for j in 0..<categories[i].items.count {
-                categories[i].items[j].isSelected = select
+                categories[i].items[j].isSelected = isSelected
             }
         }
     }

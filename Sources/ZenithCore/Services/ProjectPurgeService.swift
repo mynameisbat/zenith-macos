@@ -159,6 +159,12 @@ public final class ProjectPurgeService: @unchecked Sendable {
         )
     }
 
+    private static let ignoredSystemDirectories: Set<String> = [
+        "Library",
+        "Applications",
+        ".git"
+    ]
+
     private func scanDirectory(
         currentPath: String,
         depth: Int,
@@ -171,7 +177,7 @@ public final class ProjectPurgeService: @unchecked Sendable {
 
         // Skip system directories and applications
         let baseName = (currentPath as NSString).lastPathComponent
-        if baseName == "Library" || baseName == "Applications" || baseName == ".git" {
+        if Self.ignoredSystemDirectories.contains(baseName) {
             return
         }
 

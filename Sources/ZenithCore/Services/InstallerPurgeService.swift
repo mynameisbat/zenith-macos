@@ -35,6 +35,12 @@ public final class InstallerPurgeService: @unchecked Sendable {
     public static let shared = InstallerPurgeService()
 
     public static let supportedExtensions: Set<String> = ["dmg", "pkg", "iso", "xip"]
+    private static let installerNameKeywords = ["installer", "setup", "mac", "darwin", "app"]
+
+    private func isZipInstallerCandidate(url: URL) -> Bool {
+        let baseName = url.deletingPathExtension().lastPathComponent.lowercased()
+        return Self.installerNameKeywords.contains { baseName.contains($0) }
+    }
 
     public init() {}
 
@@ -66,10 +72,7 @@ public final class InstallerPurgeService: @unchecked Sendable {
 
                 // For ZIP archives, candidate if size > 50MB and name indicates an app installer
                 if ext == "zip" {
-                    let baseName = fileURL.deletingPathExtension().lastPathComponent.lowercased()
-                    if baseName.contains("installer") || baseName.contains("setup") || baseName.contains("mac") || baseName.contains("darwin") || baseName.contains("app") {
-                        isCandidate = true
-                    }
+                    isCandidate = isZipInstallerCandidate(url: fileURL)
                 }
 
                 guard isCandidate else { continue }

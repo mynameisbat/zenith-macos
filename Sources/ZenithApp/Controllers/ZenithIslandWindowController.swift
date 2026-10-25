@@ -154,7 +154,7 @@ public final class ZenithIslandHostingView: NSHostingView<ZenithDynamicIslandVie
                 ZenithIslandState.shared.onMouseEnter()
             }
         } else {
-            if ZenithIslandState.shared.isHovered && !ZenithIslandState.shared.isDropTargeted && !ZenithIslandState.shared.isDraggingOut {
+            if ZenithIslandState.shared.isEligibleForHoverExpansion {
                 ZenithIslandState.shared.onMouseLeave()
             }
         }
@@ -368,7 +368,7 @@ public final class ZenithIslandWindowController: NSObject {
             if !panel.ignoresMouseEvents {
                 panel.ignoresMouseEvents = true
             }
-            if state.isHovered && !state.isDropTargeted && !state.isDraggingOut {
+            if state.isEligibleForHoverExpansion {
                 state.onMouseLeave()
             }
         }

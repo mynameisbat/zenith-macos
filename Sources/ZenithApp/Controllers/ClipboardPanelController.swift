@@ -50,21 +50,25 @@ final class ClipboardPanel: NSPanel {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let relevantModifiers = modifiers.subtracting([.capsLock, .numericPad, .function])
-        if relevantModifiers == [.command] && (event.keyCode == 12 || event.charactersIgnoringModifiers?.lowercased() == "q") { // ⌘Q
+        guard relevantModifiers == [.command] else {
+            return super.performKeyEquivalent(with: event)
+        }
+
+        switch event.keyCode {
+        case KeyboardNavigationEngine.KeyCodes.keyQ:
             NSApp.terminate(nil)
             return true
-        }
-        if relevantModifiers == [.command] && (event.keyCode == 13 || event.charactersIgnoringModifiers?.lowercased() == "w") { // ⌘W
+        case KeyboardNavigationEngine.KeyCodes.keyW:
             ClipboardPanelController.shared.hide()
             return true
-        }
-        if relevantModifiers == [.command] && (event.keyCode == 43 || event.charactersIgnoringModifiers == ",") { // ⌘,
+        case KeyboardNavigationEngine.KeyCodes.comma:
             ClipboardPanelController.shared.hide()
             SettingsWindowController.shared.configureDefaultContent()
             SettingsWindowController.shared.show()
             return true
+        default:
+            return super.performKeyEquivalent(with: event)
         }
-        return super.performKeyEquivalent(with: event)
     }
 }
 

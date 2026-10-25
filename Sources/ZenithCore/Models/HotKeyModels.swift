@@ -220,18 +220,13 @@ public enum HotKeyParser {
 
             var textFlags: CarbonModifierFlags = []
             for modToken in rawTokens.dropLast() {
-                let lower = modToken.lowercased()
-                if lower == "cmd" || lower == "command" || lower == "⌘" {
-                    textFlags.insert(.command)
-                } else if lower == "shift" || lower == "⇧" {
-                    textFlags.insert(.shift)
-                } else if lower == "opt" || lower == "option" || lower == "alt" || lower == "⌥" {
-                    textFlags.insert(.option)
-                } else if lower == "ctrl" || lower == "control" || lower == "⌃" {
-                    textFlags.insert(.control)
-                } else if !modToken.isEmpty {
-                    throw HotKeyParseError.unknownKey(modToken)
+                guard let flag = parseModifierToken(modToken) else {
+                    if !modToken.isEmpty {
+                        throw HotKeyParseError.unknownKey(modToken)
+                    }
+                    continue
                 }
+                textFlags.insert(flag)
             }
 
             guard !textFlags.isEmpty else {
@@ -250,12 +245,23 @@ public enum HotKeyParser {
             throw HotKeyParseError.missingModifier
         }
 
-        let lower = trimmed.lowercased()
-        if lower == "cmd" || lower == "command" || lower == "shift" || lower == "option" || lower == "control" || lower == "ctrl" || lower == "opt" {
+        if parseModifierToken(trimmed) != nil {
             throw HotKeyParseError.missingKey
         }
 
         throw HotKeyParseError.unknownKey(trimmed)
+    }
+
+    // MARK: - Token Parsing Helpers (Clean Code G28, G5)
+
+    private static func parseModifierToken(_ token: String) -> CarbonModifierFlags? {
+        switch token.lowercased() {
+        case "cmd", "command", "⌘": return .command
+        case "shift", "⇧": return .shift
+        case "opt", "option", "alt", "⌥": return .option
+        case "ctrl", "control", "⌃": return .control
+        default: return nil
+        }
     }
 }
 

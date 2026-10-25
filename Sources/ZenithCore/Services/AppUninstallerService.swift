@@ -341,14 +341,14 @@ public final class AppUninstallerService: @unchecked Sendable {
         for item in itemsToDelete {
             if isSafeLeftoverPath(item.path) {
                 totalFreed += item.sizeBytes
-                try deleteOrTrash(path: item.path, moveToTrash: moveToTrash)
+                try removeFile(atPath: item.path, moveToTrash: moveToTrash)
             }
         }
 
         // 4. Remove/Trash the main .app bundle
         if fileManager.fileExists(atPath: plan.app.bundlePath) {
             totalFreed += plan.app.appSizeBytes
-            try deleteOrTrash(path: plan.app.bundlePath, moveToTrash: moveToTrash)
+            try removeFile(atPath: plan.app.bundlePath, moveToTrash: moveToTrash)
         }
 
         if totalFreed > 0 {
@@ -362,13 +362,24 @@ public final class AppUninstallerService: @unchecked Sendable {
         return totalFreed
     }
 
-    private func deleteOrTrash(path: String, moveToTrash: Bool) throws {
-        let url = URL(fileURLWithPath: path)
+    // MARK: - File Removal (Clean Code F3, G30)
+
+    private func removeFile(atPath path: String, moveToTrash: Bool) throws {
         if moveToTrash {
-            try fileManager.trashItem(at: url, resultingItemURL: nil)
+            try sendToTrash(atPath: path)
         } else {
-            try fileManager.removeItem(at: url)
+            try deletePermanently(atPath: path)
         }
+    }
+
+    private func sendToTrash(atPath path: String) throws {
+        let url = URL(fileURLWithPath: path)
+        try fileManager.trashItem(at: url, resultingItemURL: nil)
+    }
+
+    private func deletePermanently(atPath path: String) throws {
+        let url = URL(fileURLWithPath: path)
+        try fileManager.removeItem(at: url)
     }
 
     private func terminateRunningApp(bundleIdentifier: String) {

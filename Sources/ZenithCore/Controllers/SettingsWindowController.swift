@@ -46,7 +46,8 @@ public final class SettingsWindow: NSWindow {
             }
 
             // 2. Generous fallback bounding box covering the top-left traffic light zone
-            if !isCloseHit && loc.x >= 0 && loc.x <= 60 && loc.y >= (frame.height - 44) && loc.y <= frame.height {
+            let trafficLightZone = CGRect(x: 0, y: frame.height - 44, width: 60, height: 44)
+            if !isCloseHit && trafficLightZone.contains(loc) {
                 isCloseHit = true
             }
 
@@ -59,7 +60,9 @@ public final class SettingsWindow: NSWindow {
     }
 
     public override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 || (event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "w") {
+        let isEscapeKey = event.keyCode == KeyboardNavigationEngine.KeyCodes.escapeKey
+        let isCommandW = event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "w"
+        if isEscapeKey || isCommandW {
             dismissWindow()
             return
         }

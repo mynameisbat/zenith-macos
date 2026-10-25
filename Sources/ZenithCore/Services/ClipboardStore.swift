@@ -154,7 +154,8 @@ public struct FuzzySearchEngine: Sendable {
         }
 
         // 4. Fuzzy subsequence match (short queries 2...4 chars when no other match)
-        if score == 0 && queryLen >= 2 && queryLen <= 4 && typeScore == 0 && queryLen <= previewLen {
+        let isEligibleForFuzzySubsequence = score == 0 && typeScore == 0 && (2...4).contains(queryLen) && queryLen <= previewLen
+        if isEligibleForFuzzySubsequence {
             if isPureASCII {
                 if let subseq = fuzzySubsequenceScoreASCII(queryBytes: queryBytes, target: normPreview) {
                     score = subseq

@@ -161,6 +161,23 @@ public final class ZenithIslandState: ObservableObject {
 
     public init() {}
 
+    // MARK: - Encapsulated State Predicates (Clean Code G28, G29)
+
+    /// True when the user is actively interacting with the island via hover, drag, or drop.
+    public var isActivelyEngaged: Bool {
+        isHovered || isDropTargeted || isDraggingOut
+    }
+
+    /// True when the island has no active hover, drag, or drop gestures.
+    public var isCompletelyIdle: Bool {
+        !isActivelyEngaged
+    }
+
+    /// True when the island is eligible to expand purely by hovering.
+    public var isEligibleForHoverExpansion: Bool {
+        isHovered && !isDropTargeted && !isDraggingOut
+    }
+
     /// Displays a transient alert HUD directly in the notch capsule for 1.8 seconds, then smoothly collapses back.
     public func triggerAlert(icon: String, title: String, subtitle: String? = nil, duration: TimeInterval = 1.8) {
         guard isEnabled else { return }
@@ -260,11 +277,9 @@ public final class ZenithIslandState: ObservableObject {
         collapseTimer = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 300_000_000) // 300ms grace period
             guard let self = self, !Task.isCancelled else { return }
-            if !self.isHovered && !self.isDropTargeted && !self.isDraggingOut {
-                if self.isExpanded {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        self.isExpanded = false
-                    }
+            if self.isCompletelyIdle && self.isExpanded {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    self.isExpanded = false
                 }
             }
         }

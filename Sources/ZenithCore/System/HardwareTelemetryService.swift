@@ -410,12 +410,27 @@ public final class HardwareTelemetryService: @unchecked Sendable {
         return (hogs, zombies)
     }
 
-    /// Terminates a process by PID.
+    /// Gracefully requests a process to terminate (SIGTERM).
+    @discardableResult
+    public func terminateProcess(pid: Int) -> Bool {
+        sendSignal(SIGTERM, toProcess: pid)
+    }
+
+    /// Forcefully terminates a process immediately (SIGKILL).
+    @discardableResult
+    public func forceKillProcess(pid: Int) -> Bool {
+        sendSignal(SIGKILL, toProcess: pid)
+    }
+
+    /// Terminates a process by PID with optional force flag (Clean Code F3 backwards-compatible facade).
     @discardableResult
     public func killProcess(pid: Int, force: Bool = false) -> Bool {
+        force ? forceKillProcess(pid: pid) : terminateProcess(pid: pid)
+    }
+
+    private func sendSignal(_ signal: Int32, toProcess pid: Int) -> Bool {
         guard pid > 1 else { return false } // Guard against init / kernel
-        let sig = force ? SIGKILL : SIGTERM
-        return kill(pid_t(pid), sig) == 0
+        return kill(pid_t(pid), signal) == 0
     }
 
     // MARK: - Memory Telemetry
