@@ -122,7 +122,7 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
             return true
         }
 
-        // Command + Shift shortcuts (⌘⇧2, ⌘⇧1, ⌘⇧V)
+        // Command + Shift shortcuts (⌘⇧2, ⌘⇧1, ⌘⇧3, ⌘⇧V)
         if relevantModifiers == [.command, .shift] {
             if event.keyCode == 19 || event.charactersIgnoringModifiers == "2" {
                 // ⌘⇧2: Area capture
@@ -140,6 +140,12 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
                     guard let image = image else { return }
                     AnnotationWindowController.shared.present(image: image)
                 }
+                return true
+            }
+            if event.keyCode == 20 || event.charactersIgnoringModifiers == "3" {
+                // ⌘⇧3: Screen OCR & Barcode recognition
+                close(immediately: true)
+                ScreenOCRCoordinator.shared.startAreaOCR()
                 return true
             }
             if event.keyCode == 9 || event.charactersIgnoringModifiers?.lowercased() == "v" {

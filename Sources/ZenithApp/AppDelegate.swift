@@ -137,5 +137,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+
+        // ⌘⇧3 - Screen OCR & Barcode Recognition
+        let ocrDefinition = HotKeyDefinition(
+            id: "capture.ocr",
+            name: "Screen OCR",
+            keyCode: 20, // kVK_ANSI_3
+            carbonModifiers: CarbonModifierFlags.command.rawValue | CarbonModifierFlags.shift.rawValue,
+            keyEquivalent: "⌘⇧3"
+        )
+        hotKeyManager.registerHotKey(ocrDefinition) {
+            Task { @MainActor in
+                ScreenOCRCoordinator.shared.startAreaOCR()
+            }
+        }
     }
 }
