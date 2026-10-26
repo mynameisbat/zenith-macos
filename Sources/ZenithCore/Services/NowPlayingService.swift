@@ -2,7 +2,108 @@ import Foundation
 import AppKit
 import Combine
 
-/// Concurrency-safe service coordinating Apple Music and Spotify playback telemetry
+/// Dynamic bridge to macOS private MediaRemote framework for universal browser (Chrome, Safari, Arc, Firefox, etc.)
+/// and system media player tracking with zero background CPU polling.
+final class MediaRemoteBridge: @unchecked Sendable {
+    static let shared = MediaRemoteBridge()
+
+    typealias MRRegisterFunction = @convention(c) (DispatchQueue) -> Void
+    typealias MRGetInfoFunction = @convention(c) (DispatchQueue, @escaping (CFDictionary?) -> Void) -> Void
+    typealias MRGetPIDFunction = @convention(c) (DispatchQueue, @escaping (pid_t) -> Void) -> Void
+    typealias MRSendCommandFunction = @convention(c) (UInt32, AnyObject?) -> Bool
+
+    private var registerFn: MRRegisterFunction?
+    private var getInfoFn: MRGetInfoFunction?
+    private var getPIDFn: MRGetPIDFunction?
+    private var sendCommandFn: MRSendCommandFunction?
+    private var isRegistered = false
+
+    init() {
+        if let handle = dlopen("/System/Library/PrivateFrameworks/MediaRemote.framework/MediaRemote", RTLD_NOW) {
+            if let symReg = dlsym(handle, "MRMediaRemoteRegisterForNowPlayingNotifications") {
+                registerFn = unsafeBitCast(symReg, to: MRRegisterFunction.self)
+            }
+            if let symInfo = dlsym(handle, "MRMediaRemoteGetNowPlayingInfo") {
+                getInfoFn = unsafeBitCast(symInfo, to: MRGetInfoFunction.self)
+            }
+            if let symPID = dlsym(handle, "MRMediaRemoteGetNowPlayingApplicationPID") {
+                getPIDFn = unsafeBitCast(symPID, to: MRGetPIDFunction.self)
+            }
+            if let symSend = dlsym(handle, "MRMediaRemoteSendCommand") {
+                sendCommandFn = unsafeBitCast(symSend, to: MRSendCommandFunction.self)
+            }
+        }
+    }
+
+    func registerForNotifications() {
+        guard !isRegistered, let register = registerFn else { return }
+        register(DispatchQueue.main)
+        isRegistered = true
+    }
+
+    func queryNowPlaying(completion: @escaping @MainActor (NowPlayingTrack?) -> Void) {
+        guard let getPID = getPIDFn, let getInfo = getInfoFn else {
+            Task { @MainActor in completion(nil) }
+            return
+        }
+
+        getPID(DispatchQueue.main) { pid in
+            let app = NSRunningApplication(processIdentifier: pid)
+            let bundleId = app?.bundleIdentifier
+            let appName = app?.localizedName
+
+            getInfo(DispatchQueue.main) { dict in
+                guard let info = dict as? [String: Any] else {
+                    Task { @MainActor in completion(nil) }
+                    return
+                }
+
+                let title = info["kMRMediaRemoteNowPlayingInfoTitle"] as? String ?? ""
+                guard !title.isEmpty else {
+                    Task { @MainActor in completion(nil) }
+                    return
+                }
+
+                let artist = info["kMRMediaRemoteNowPlayingInfoArtist"] as? String ?? appName ?? ""
+                let album = info["kMRMediaRemoteNowPlayingInfoAlbum"] as? String
+                let duration = info["kMRMediaRemoteNowPlayingInfoDuration"] as? Double ?? 0
+                let elapsed = info["kMRMediaRemoteNowPlayingInfoElapsedTime"] as? Double ?? 0
+                let rate = info["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? Double ?? 0
+                let isPlaying = rate > 0
+                let artworkData = info["kMRMediaRemoteNowPlayingInfoArtworkData"] as? Data
+
+                let resolvedApp = NowPlayingApp.resolve(
+                    bundleId: bundleId,
+                    title: title,
+                    artist: artist
+                )
+
+                let track = NowPlayingTrack(
+                    app: resolvedApp,
+                    title: title,
+                    artist: artist.isEmpty ? resolvedApp.displayName : artist,
+                    album: (album?.isEmpty ?? true) ? nil : album,
+                    duration: duration,
+                    position: elapsed,
+                    isPlaying: isPlaying,
+                    artworkData: artworkData
+                )
+
+                Task { @MainActor in
+                    completion(track)
+                }
+            }
+        }
+    }
+
+    @discardableResult
+    func sendCommand(_ command: UInt32) -> Bool {
+        guard let send = sendCommandFn else { return false }
+        return send(command, nil)
+    }
+}
+
+/// Concurrency-safe service coordinating Apple Music, Spotify, YouTube, and browser playback telemetry
 /// and remote playback controls for Zenith Dynamic Island.
 @MainActor
 public final class NowPlayingService: ObservableObject {
@@ -75,7 +176,33 @@ public final class NowPlayingService: ObservableObject {
         }
         observers.append(spotifyObserver)
 
-        // Initial check for currently running media players
+        // 3. Observe universal browser & media player state changes via MediaRemote
+        MediaRemoteBridge.shared.registerForNotifications()
+
+        let mrInfoObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("kMRMediaRemoteNowPlayingInfoDidChangeNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.refreshMediaRemoteTrack()
+            }
+        }
+        observers.append(mrInfoObserver)
+
+        let mrPlayingObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("kMRMediaRemoteNowPlayingApplicationIsPlayingDidChangeNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.refreshMediaRemoteTrack()
+            }
+        }
+        observers.append(mrPlayingObserver)
+
+        // Initial check for currently running media players & browser media
+        refreshMediaRemoteTrack()
         checkRunningPlayers()
     }
 
@@ -84,6 +211,7 @@ public final class NowPlayingService: ObservableObject {
         let center = DistributedNotificationCenter.default()
         for obs in observers {
             center.removeObserver(obs)
+            NotificationCenter.default.removeObserver(obs)
         }
         observers.removeAll()
         progressTimer?.cancel()
@@ -91,6 +219,21 @@ public final class NowPlayingService: ObservableObject {
         self.isMonitoring = false
         self.currentTrack = nil
         ZenithIslandState.shared.nowPlayingTrack = nil
+    }
+
+    /// Refreshes track state from system MediaRemote framework.
+    public func refreshMediaRemoteTrack() {
+        MediaRemoteBridge.shared.queryNowPlaying { [weak self] track in
+            guard let self = self else { return }
+            if let track = track {
+                if track.isPlaying || self.currentTrack?.id == track.id {
+                    self.updateTrack(track)
+                }
+            } else if self.currentTrack?.app != .appleMusic && self.currentTrack?.app != .spotify {
+                self.currentTrack = nil
+                ZenithIslandState.shared.nowPlayingTrack = nil
+            }
+        }
     }
 
     // MARK: - Notification Processors
@@ -211,20 +354,29 @@ public final class NowPlayingService: ObservableObject {
 
     // MARK: - Remote Media Controls
 
-    /// Toggles play/pause state for the active media application.
+    /// Toggles play/pause state for the active media application or browser video.
     public func togglePlayPause() {
+        if MediaRemoteBridge.shared.sendCommand(2) {
+            return
+        }
         guard let app = currentTrack?.app ?? preferredActiveApp else { return }
         runAppleScript("tell application \"\(app.rawValue)\" to playpause")
     }
 
     /// Skips to the next track.
     public func nextTrack() {
+        if MediaRemoteBridge.shared.sendCommand(4) {
+            return
+        }
         guard let app = currentTrack?.app ?? preferredActiveApp else { return }
         runAppleScript("tell application \"\(app.rawValue)\" to next track")
     }
 
     /// Rewinds or skips to the previous track.
     public func previousTrack() {
+        if MediaRemoteBridge.shared.sendCommand(5) {
+            return
+        }
         guard let app = currentTrack?.app ?? preferredActiveApp else { return }
         runAppleScript("tell application \"\(app.rawValue)\" to previous track")
     }

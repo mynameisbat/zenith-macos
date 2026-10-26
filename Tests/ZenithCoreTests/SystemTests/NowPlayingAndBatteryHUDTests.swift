@@ -9,7 +9,7 @@ struct NowPlayingAndBatteryHUDTests {
 
     // MARK: - NowPlayingApp Enum Tests
 
-    @Test("NP-01: NowPlayingApp properties for Apple Music and Spotify")
+    @Test("NP-01: NowPlayingApp properties for Apple Music, Spotify, YouTube, and Browsers")
     func testNowPlayingAppProperties() {
         let music = NowPlayingApp.appleMusic
         #expect(music.rawValue == "Music")
@@ -23,10 +23,35 @@ struct NowPlayingAndBatteryHUDTests {
         #expect(spotify.bundleIdentifier == "com.spotify.client")
         #expect(spotify.iconName == "waveform")
 
+        let youtube = NowPlayingApp.youtube
+        #expect(youtube.rawValue == "YouTube")
+        #expect(youtube.displayName == "YouTube")
+        #expect(youtube.iconName == "play.rectangle.fill")
+
+        let chrome = NowPlayingApp.chrome
+        #expect(chrome.displayName == "Google Chrome")
+        #expect(chrome.iconName == "globe")
+
+        let safari = NowPlayingApp.safari
+        #expect(safari.displayName == "Safari")
+        #expect(safari.iconName == "safari.fill")
+
         // CaseIterable completeness
-        #expect(NowPlayingApp.allCases.count == 2)
+        #expect(NowPlayingApp.allCases.count >= 8)
         #expect(NowPlayingApp.allCases.contains(.appleMusic))
         #expect(NowPlayingApp.allCases.contains(.spotify))
+        #expect(NowPlayingApp.allCases.contains(.youtube))
+        #expect(NowPlayingApp.allCases.contains(.chrome))
+        #expect(NowPlayingApp.allCases.contains(.safari))
+
+        // Resolver logic
+        #expect(NowPlayingApp.resolve(bundleId: "com.google.Chrome", title: "Video on YouTube", artist: "Creator") == .youtube)
+        #expect(NowPlayingApp.resolve(bundleId: "com.google.Chrome", title: "News", artist: "CNN") == .chrome)
+        #expect(NowPlayingApp.resolve(bundleId: "com.apple.Safari", title: "Blog Post", artist: "Author") == .safari)
+        #expect(NowPlayingApp.resolve(bundleId: "com.apple.Music", title: "Song", artist: "Singer") == .appleMusic)
+        #expect(NowPlayingApp.resolve(bundleId: "com.spotify.client", title: "Pod", artist: "Host") == .spotify)
+        #expect(NowPlayingApp.resolve(bundleId: "company.thebrowser.Browser", title: "Web", artist: nil) == .arc)
+        #expect(NowPlayingApp.resolve(bundleId: "org.mozilla.firefox", title: "Web", artist: nil) == .firefox)
     }
 
     // MARK: - NowPlayingTrack Domain Model Tests
