@@ -2,18 +2,18 @@
 
 [![macOS](https://img.shields.io/badge/macOS-14.0%2B%20%7C%20Sonoma%20%7C%20Sequoia-000000.svg?style=flat&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Swift 6](https://img.shields.io/badge/Swift-6.0%20Native-F05138.svg?style=flat&logo=swift&logoColor=white)](https://swift.org)
-[![Tests](https://img.shields.io/badge/Tests-736%20passing%20%7C%2070%20suites-1FC16B.svg?style=flat)](https://github.com/mynameisbat/zenith-macos/actions)
+[![Tests](https://img.shields.io/badge/Tests-754%20passing%20%7C%2071%20suites-1FC16B.svg?style=flat)](https://github.com/mynameisbat/zenith-macos/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/Website-mynameisbat.github.io%2Fzenith--macos-0F62FE.svg)](https://mynameisbat.github.io/zenith-macos/)
 
 **Zenith** is a premium, native macOS powerhouse utility and creative workspace built entirely with **Swift 6**, **SwiftUI**, and **AppKit**.
 
-Zenith lives quietly in your Menu Bar as an ultra-lightweight accessory (idle RAM ~28 MB), replacing scattered, battery-draining Electron apps with a single, unified high-performance binary:
+Zenith lives quietly in your Menu Bar as an ultra-lightweight accessory (idle RAM ~25 MB, idle CPU <0.3%), replacing scattered, battery-draining Electron apps with a single, unified high-performance binary:
 1. **Native Screen OCR & Barcode/QR Extractor (`⌘⇧3`)** with on-device Apple Vision neural engine and instant clipboard formatting.
-2. **Smart In-Memory Clipboard Manager (`⌘⇧V`)** with sub-millisecond fuzzy search and password protection.
-3. **Shottr-Grade Screen Capture & Annotation (`⌘⇧2`)** with a live 16x pixel Loupe magnifier.
-4. **MacBook Dynamic Island & Drop Shelf** for temporary file parking and status capsules.
-5. **Developer Deep Purge (Mole-Inspired)** to reclaim tens of gigabytes from `node_modules`, Xcode `DerivedData`, and stale `.dmg` installers.
+2. **MacBook Dynamic Island & Drop Shelf** with live audio visualizer, Now Playing controls, MagSafe charging HUD, and file previews.
+3. **Smart In-Memory Clipboard Manager (`⌘⇧V`)** with sub-millisecond fuzzy search and password protection.
+4. **Shottr-Grade Screen Capture & Annotation (`⌘⇧2`)** with a live 16x pixel Loupe magnifier.
+5. **Developer Deep Purge & Safe App Monitor (Mole-Inspired)** to reclaim tens of gigabytes and safely kill heavy user processes.
 6. **Privacy Shield (DNS-over-HTTPS + Anti-DPI)** with in-process TLS ClientHello SNI chunking without VPN ping overhead.
 
 🌐 **Visit the official website:** [https://mynameisbat.github.io/zenith-macos/](https://mynameisbat.github.io/zenith-macos/)
@@ -25,7 +25,7 @@ Zenith lives quietly in your Menu Bar as an ultra-lightweight accessory (idle RA
 ### Option 1: Download Pre-built DMG Installer (Recommended)
 Download the latest disk image from [GitHub Releases](https://github.com/mynameisbat/zenith-macos/releases):
 
-1. Download **`Zenith-2.1.0.dmg`** (or latest release).
+1. Download **`Zenith-2.2.0.dmg`** (or latest release).
 2. Double-click the DMG file to mount it.
 3. Drag **Zenith.app** into your **Applications** folder.
 4. Launch Zenith from Spotlight or Applications.
@@ -33,7 +33,7 @@ Download the latest disk image from [GitHub Releases](https://github.com/mynamei
 #### Terminal / CLI Installation
 ```bash
 # Mount DMG and copy to /Applications
-hdiutil attach Zenith-2.1.0.dmg
+hdiutil attach Zenith-2.2.0.dmg
 cp -R "/Volumes/Zenith/Zenith.app" /Applications/
 hdiutil detach "/Volumes/Zenith"
 
@@ -107,11 +107,22 @@ open Zenith.app
   - `⌘Z` / `⇧⌘Z`: Full undo/redo command stack.
   - `Esc`: Dismiss editor safely.
 
-### 5. 🏝 Dynamic Island & Drop Shelf
-- **Hardware-Aware Notch Integration**: Seamlessly integrates into MacBook display camera notches as well as external monitors.
-- **Interactive Drop Shelf**: Drag any file, image, or snippet to the top of your screen to park it in the notch shelf. Switch spaces, apps, or fullscreens and drag it out.
-- **Transient Status HUD Capsules**: Symmetrical 120Hz ProMotion spring expansion for transient feedback on copy, capture, and cache cleaning.
-- **Zero Mini-LED Light Bleed**: Engineered with pure obsidian black `#06070a` matching MacBook Liquid Retina XDR Mini-LED bezels without glowing halos.
+### 5. 🏝 Dynamic Island, Now Playing & Battery HUD
+- **Hardware-Aware Notch Integration**: Seamlessly integrates into MacBook display camera notches as well as external monitors with zero Mini-LED light bleed (`#06070a`).
+- **Now Playing & Live Equalizer Visualizer**:
+  - Event-driven tracking for **Apple Music** and **Spotify** with **0.0% background polling**.
+  - **Left Wing**: Mini spinning vinyl disc with app badge / album artwork.
+  - **Right Wing**: Animated jumping 4-bar equalizer visualizer with brand-matched dynamic color palettes.
+  - **Expanded Player**: Hover over the island to reveal full track metadata, interactive scrub bar, and media controls (Play/Pause, Skip, Previous).
+  - **Tab Switcher**: Seamlessly switch between `[🎵 Now Playing]` and `[📦 Shelf]` when parked items coexist.
+- **MagSafe & USB-C Charging HUD**:
+  - Native IOKit RunLoop listener (`IOPSNotificationCreateRunLoopSource`) with 0.0% polling overhead.
+  - Glowing neon green rim light capsule displaying battery charge and charger wattage (e.g. `Charging • 85% (67W Charger)`).
+  - Intelligent unplugged battery notice, low battery 20% alert with 5-minute throttling, and full charge notification with battery Maximum Capacity health readout.
+  - Instant Bluetooth accessory battery percentage HUD on connection.
+- **Interactive Drop Shelf & Quick Look Preview**:
+  - Drag any file, image, or text snippet to the top edge of your screen to park it on the notch shelf.
+  - High-resolution hover preview modal (`IslandPreviewWindowController`) with auto-dismiss lifecycle and drag-out staging.
 
 ### 6. 🧹 Developer Deep Purge (Mole-Inspired)
 - **Project Build Artifact Purge**: Recursively scans and purges heavy build directories:
