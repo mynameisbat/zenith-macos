@@ -18,11 +18,17 @@ public struct ZenithDynamicIslandView: View {
         islandState.activeAlert != nil
     }
 
+    private var isNowPlayingActive: Bool {
+        islandState.nowPlayingTrack?.isPlaying == true
+    }
+
     private var currentWidth: CGFloat {
         if isDisplayingAlert {
             return geometry.alertWidth
         } else if islandState.isExpanded {
             return geometry.expandedWidth
+        } else if isNowPlayingActive {
+            return geometry.nowPlayingIdleWidth
         } else {
             return geometry.idleWidth
         }
@@ -33,6 +39,8 @@ public struct ZenithDynamicIslandView: View {
             return geometry.effectiveAlertHeight
         } else if islandState.isExpanded {
             return geometry.expandedHeight
+        } else if isNowPlayingActive {
+            return geometry.nowPlayingIdleHeight
         } else {
             return geometry.idleHeight
         }
@@ -82,9 +90,16 @@ public struct ZenithDynamicIslandView: View {
 
     // MARK: - Unified Morphing Container
 
+    private var targetRimLightColor: Color {
+        if let alert = islandState.activeAlert {
+            return alert.resolvedColor
+        }
+        return Color.white
+    }
+
     private var rimLightOverlay: some View {
         currentShape
-            .strokeBorder(Color.white.opacity(targetRimLightOpacity), lineWidth: 0.5)
+            .strokeBorder(targetRimLightColor.opacity(targetRimLightOpacity), lineWidth: 0.5)
             .opacity(islandState.isRimLightVisible ? 1.0 : 0.0)
             .mask {
                 if geometry.hasNotch {
@@ -103,8 +118,11 @@ public struct ZenithDynamicIslandView: View {
                 alertCapsuleView(alert)
                     .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
             } else if islandState.isExpanded {
-                shelfContent
+                expandedIslandContent
                     .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            } else if isNowPlayingActive, let track = islandState.nowPlayingTrack {
+                nowPlayingIdleCapsule(track)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
             }
         }
         .frame(width: currentWidth, height: currentHeight, alignment: .top)
@@ -114,11 +132,32 @@ public struct ZenithDynamicIslandView: View {
         .scaleEffect(islandState.isDropTargeted ? 1.015 : 1.0, anchor: .top)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.isExpanded)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.activeAlert)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isNowPlayingActive)
         .animation(.spring(response: 0.32, dampingFraction: 0.8), value: islandState.isDropTargeted)
         .onChange(of: islandState.isDropTargeted) { _, targeted in
             if targeted {
                 NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
             }
+        }
+    }
+
+    // MARK: - Now Playing Idle Capsule (Wings on left & right of notch)
+
+    private func nowPlayingIdleCapsule(_ track: NowPlayingTrack) -> some View {
+        HStack {
+            NowPlayingCompactDiscView(track: track)
+                .padding(.leading, 6)
+
+            Spacer()
+
+            NowPlayingVisualizerView(brandColor: track.app.brandColor, isPlaying: track.isPlaying)
+                .padding(.trailing, 6)
+        }
+        .padding(.top, geometry.hasNotch ? (geometry.notchRect.height / 2 - 8) : 5)
+        .frame(width: geometry.nowPlayingIdleWidth, height: geometry.nowPlayingIdleHeight)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            islandState.onMouseEnter()
         }
     }
 
@@ -130,7 +169,7 @@ public struct ZenithDynamicIslandView: View {
 
             Image(systemName: alert.icon)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(ZenithTheme.accent)
+                .foregroundColor(alert.resolvedColor)
                 .frame(width: 18, height: 18)
 
             VStack(alignment: .leading, spacing: 1) {
@@ -153,6 +192,83 @@ public struct ZenithDynamicIslandView: View {
         .frame(width: geometry.alertWidth, height: geometry.alertHeight)
         .padding(.top, geometry.hasNotch ? geometry.notchRect.height : 0)
         .frame(width: geometry.alertWidth, height: geometry.effectiveAlertHeight, alignment: .top)
+    }
+
+    // MARK: - Expanded Dynamic Island (Tabbed Shelf or Now Playing)
+
+    private var expandedIslandContent: some View {
+        VStack(spacing: 0) {
+            // If both Now Playing and Shelf items exist, provide smooth tab switcher
+            if islandState.nowPlayingTrack != nil && !islandState.droppedItems.isEmpty {
+                tabSwitcherHeader
+            }
+
+            // Tab content
+            if islandState.nowPlayingTrack != nil && (islandState.activeTab == .nowPlaying || islandState.droppedItems.isEmpty) {
+                if let track = islandState.nowPlayingTrack {
+                    NowPlayingExpandedView(
+                        track: track,
+                        onPrevious: { NowPlayingService.shared.previousTrack() },
+                        onTogglePlayPause: { NowPlayingService.shared.togglePlayPause() },
+                        onNext: { NowPlayingService.shared.nextTrack() }
+                    )
+                    .padding(.top, geometry.hasNotch ? (geometry.notchRect.height + 2) : 6)
+                }
+            } else {
+                shelfContent
+            }
+        }
+        .frame(width: geometry.expandedWidth, height: geometry.expandedHeight)
+    }
+
+    private var tabSwitcherHeader: some View {
+        HStack(spacing: 4) {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    islandState.activeTab = .nowPlaying
+                }
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "music.note")
+                        .font(.system(size: 8.5))
+                    Text("Now Playing")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                .foregroundColor(islandState.activeTab == .nowPlaying ? .white : .white.opacity(0.45))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(islandState.activeTab == .nowPlaying ? Color.white.opacity(0.12) : Color.clear)
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    islandState.activeTab = .shelf
+                }
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "tray.and.arrow.down.fill")
+                        .font(.system(size: 8.5))
+                    Text("Shelf (\(islandState.droppedItems.count))")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                .foregroundColor(islandState.activeTab == .shelf ? .white : .white.opacity(0.45))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(islandState.activeTab == .shelf ? Color.white.opacity(0.12) : Color.clear)
+                )
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.top, geometry.hasNotch ? (geometry.notchRect.height + 2) : 4)
     }
 
     // MARK: - Shelf Content

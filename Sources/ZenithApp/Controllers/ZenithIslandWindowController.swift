@@ -116,10 +116,21 @@ public final class ZenithIslandHostingView: NSHostingView<ZenithDynamicIslandVie
         return NSRect(x: x, y: y, width: alertW, height: alertH)
     }
 
+    private var nowPlayingHitRect: NSRect {
+        let geom = ZenithIslandWindowController.shared.currentGeometry
+        let w = geom.nowPlayingIdleWidth
+        let h = geom.nowPlayingIdleHeight
+        let x = (bounds.width - w) / 2
+        let y = isFlipped ? 0 : (bounds.height - h)
+        return NSRect(x: x, y: y, width: w, height: h)
+    }
+
     /// Hit target for cursor hover detection. Transient alerts must never expand the drop shelf on hover.
     private var currentHoverHitRect: NSRect {
         if ZenithIslandState.shared.isExpanded || ZenithIslandState.shared.isDropTargeted {
             return bounds
+        } else if ZenithIslandState.shared.nowPlayingTrack?.isPlaying == true {
+            return nowPlayingHitRect
         } else {
             return idleHitRect
         }
@@ -379,6 +390,10 @@ public final class ZenithIslandWindowController: NSObject {
         }
 
         handleMouseMoved(screenPoint: NSEvent.mouseLocation)
+
+        // Start system media & battery monitoring for Dynamic Island
+        NowPlayingService.shared.startMonitoring()
+        PowerSourceMonitorService.shared.startMonitoring()
     }
 
     /// Evaluates cursor position to toggle mouse click passthrough.
@@ -398,6 +413,8 @@ public final class ZenithIslandWindowController: NSObject {
             activeScreenRect = geometry.expandedFrame
         } else if state.activeAlert != nil {
             activeScreenRect = geometry.alertFrame
+        } else if state.nowPlayingTrack?.isPlaying == true {
+            activeScreenRect = geometry.nowPlayingIdleFrame
         } else {
             activeScreenRect = geometry.idleFrame
         }
@@ -504,6 +521,8 @@ public final class ZenithIslandWindowController: NSObject {
         collapseTask?.cancel()
         collapseTask = nil
         cancellables.removeAll()
+        NowPlayingService.shared.stopMonitoring()
+        PowerSourceMonitorService.shared.stopMonitoring()
         IslandPreviewWindowController.shared.dismiss()
         panel?.close()
         panel = nil

@@ -93,6 +93,25 @@ public struct ZenithIslandGeometry: Sendable, Equatable {
     public var expandedFrame: CGRect {
         windowFrame(isExpanded: true)
     }
+
+    /// Effective width for Idle capsule when media (Now Playing) is active.
+    public var nowPlayingIdleWidth: CGFloat {
+        idleWidth + (hasNotch ? 56 : 50)
+    }
+
+    /// Effective height for Idle capsule when media (Now Playing) is active.
+    public var nowPlayingIdleHeight: CGFloat {
+        hasNotch ? (notchRect.height + 4) : 26
+    }
+
+    /// Computes the window frame for the Idle Now Playing capsule.
+    public var nowPlayingIdleFrame: CGRect {
+        let w = nowPlayingIdleWidth
+        let h = nowPlayingIdleHeight
+        let x = notchRect.midX - w / 2
+        let y = screenFrame.maxY - h
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
 }
 
 /// Represents an item stored in the Dynamic Island's Drop Shelf.
@@ -188,20 +207,47 @@ public struct IslandDropItem: Identifiable, Sendable, Equatable {
     }
 }
 
+/// Mode for the expanded Dynamic Island view.
+public enum IslandExpandedTab: String, Sendable, Equatable {
+    case shelf
+    case nowPlaying
+}
+
 /// Represents a transient alert HUD shown inside the notch capsule.
 public struct IslandAlert: Identifiable, Sendable, Equatable {
     public let id: UUID
     public let icon: String
     public let title: String
     public let subtitle: String?
+    public let tintColor: Color?
     public let timestamp: Date
 
-    public init(id: UUID = UUID(), icon: String, title: String, subtitle: String? = nil, timestamp: Date = Date()) {
+    public init(
+        id: UUID = UUID(),
+        icon: String,
+        title: String,
+        subtitle: String? = nil,
+        tintColor: Color? = nil,
+        timestamp: Date = Date()
+    ) {
         self.id = id
         self.icon = icon
         self.title = title
         self.subtitle = subtitle
+        self.tintColor = tintColor
         self.timestamp = timestamp
+    }
+
+    /// Dynamic theme color for this alert HUD (e.g. green for MagSafe charging, amber for low battery).
+    public var resolvedColor: Color {
+        if let tintColor = tintColor { return tintColor }
+        if icon.contains("bolt") {
+            return Color(red: 0.19, green: 0.82, blue: 0.35) // Apple charging green
+        } else if icon.contains("battery.25") {
+            return Color(red: 1.0, green: 0.62, blue: 0.04) // Warning amber
+        } else {
+            return Color(red: 0.98, green: 0.45, blue: 0.09) // Default Zenith flame accent
+        }
     }
 }
 
@@ -219,6 +265,8 @@ public final class ZenithIslandState: ObservableObject {
     @Published public var droppedItems: [IslandDropItem] = []
     @Published public var activeAlert: IslandAlert? = nil
     @Published public var previewItem: IslandDropItem? = nil
+    @Published public var nowPlayingTrack: NowPlayingTrack? = nil
+    @Published public var activeTab: IslandExpandedTab = .shelf
 
     private var collapseTimer: Task<Void, Never>?
     private var dragOutTimer: Task<Void, Never>?
@@ -271,11 +319,11 @@ public final class ZenithIslandState: ObservableObject {
     }
 
     /// Displays a transient alert HUD directly in the notch capsule for 1.8 seconds, then smoothly collapses back.
-    public func triggerAlert(icon: String, title: String, subtitle: String? = nil, duration: TimeInterval = 1.8) {
+    public func triggerAlert(icon: String, title: String, subtitle: String? = nil, duration: TimeInterval = 1.8, tintColor: Color? = nil) {
         guard isEnabled else { return }
         alertDismissWorkItem?.cancel()
         alertDismissTask?.cancel()
-        let alert = IslandAlert(icon: icon, title: title, subtitle: subtitle)
+        let alert = IslandAlert(icon: icon, title: title, subtitle: subtitle, tintColor: tintColor)
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             self.activeAlert = alert
             self.isRimLightVisible = true
