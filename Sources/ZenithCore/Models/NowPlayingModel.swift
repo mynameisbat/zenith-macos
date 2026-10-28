@@ -6,6 +6,7 @@ public enum NowPlayingApp: String, Sendable, CaseIterable, Equatable {
     case appleMusic = "Music"
     case spotify = "Spotify"
     case youtube = "YouTube"
+    case xTwitter = "X"
     case chrome = "Chrome"
     case safari = "Safari"
     case arc = "Arc"
@@ -18,6 +19,7 @@ public enum NowPlayingApp: String, Sendable, CaseIterable, Equatable {
         case .appleMusic: return "com.apple.Music"
         case .spotify: return "com.spotify.client"
         case .youtube: return "com.google.Chrome"
+        case .xTwitter: return "com.atebits.Tweetie2"
         case .chrome: return "com.google.Chrome"
         case .safari: return "com.apple.Safari"
         case .arc: return "company.thebrowser.Browser"
@@ -32,6 +34,7 @@ public enum NowPlayingApp: String, Sendable, CaseIterable, Equatable {
         case .appleMusic: return "Apple Music"
         case .spotify: return "Spotify"
         case .youtube: return "YouTube"
+        case .xTwitter: return "X"
         case .chrome: return "Google Chrome"
         case .safari: return "Safari"
         case .arc: return "Arc"
@@ -46,6 +49,7 @@ public enum NowPlayingApp: String, Sendable, CaseIterable, Equatable {
         case .appleMusic: return "music.note"
         case .spotify: return "waveform"
         case .youtube: return "play.rectangle.fill"
+        case .xTwitter: return "bubble.left.and.bubble.right.fill"
         case .chrome: return "globe"
         case .safari: return "safari.fill"
         case .arc: return "sparkles"
@@ -60,6 +64,7 @@ public enum NowPlayingApp: String, Sendable, CaseIterable, Equatable {
         case .appleMusic: return Color(red: 0.98, green: 0.22, blue: 0.36) // Apple Music vibrant pink-red
         case .spotify: return Color(red: 0.12, green: 0.84, blue: 0.38)    // Spotify neon green
         case .youtube: return Color(red: 1.0, green: 0.15, blue: 0.15)     // YouTube vibrant red
+        case .xTwitter: return Color.white                                  // X monochrome white
         case .chrome: return Color(red: 0.26, green: 0.52, blue: 0.96)     // Chrome Google blue
         case .safari: return Color(red: 0.0, green: 0.48, blue: 1.0)       // Safari electric blue
         case .arc: return Color(red: 0.95, green: 0.35, blue: 0.55)        // Arc browser magenta
@@ -69,13 +74,17 @@ public enum NowPlayingApp: String, Sendable, CaseIterable, Equatable {
         }
     }
 
-    /// Resolves best matching NowPlayingApp from bundle identifier, track title, and artist metadata.
-    public static func resolve(bundleId: String?, title: String?, artist: String?) -> NowPlayingApp {
+    /// Resolves best matching NowPlayingApp from bundle identifier, track title, artist metadata, and active browser URL.
+    public static func resolve(bundleId: String?, title: String?, artist: String?, activeUrl: String? = nil) -> NowPlayingApp {
         let b = bundleId?.lowercased() ?? ""
         let t = (title ?? "").lowercased()
         let a = (artist ?? "").lowercased()
+        let u = (activeUrl ?? "").lowercased()
 
-        if t.contains("youtube") || a.contains("youtube") {
+        if u.contains("x.com") || u.contains("twitter.com") || t.contains("x.com") || t.contains("twitter") || a.contains("twitter") || a.contains("x.com") {
+            return .xTwitter
+        }
+        if u.contains("youtube.com") || u.contains("youtu.be") || t.contains("youtube") || a.contains("youtube") {
             return .youtube
         }
         if b.contains("com.apple.music") {

@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Combine
+import CoreAudio
 
 /// Dynamic bridge to macOS private MediaRemote framework for universal browser (Chrome, Safari, Arc, Firefox, etc.)
 /// and system media player tracking with zero background CPU polling.
@@ -8,13 +9,17 @@ final class MediaRemoteBridge: @unchecked Sendable {
     static let shared = MediaRemoteBridge()
 
     typealias MRRegisterFunction = @convention(c) (DispatchQueue) -> Void
+    typealias MRSetWantsFunction = @convention(c) (Bool) -> Void
     typealias MRGetInfoFunction = @convention(c) (DispatchQueue, @escaping (CFDictionary?) -> Void) -> Void
     typealias MRGetPIDFunction = @convention(c) (DispatchQueue, @escaping (pid_t) -> Void) -> Void
+    typealias MRGetIsPlayingFunction = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
     typealias MRSendCommandFunction = @convention(c) (UInt32, AnyObject?) -> Bool
 
     private var registerFn: MRRegisterFunction?
+    private var setWantsFn: MRSetWantsFunction?
     private var getInfoFn: MRGetInfoFunction?
     private var getPIDFn: MRGetPIDFunction?
+    private var getIsPlayingFn: MRGetIsPlayingFunction?
     private var sendCommandFn: MRSendCommandFunction?
     private var isRegistered = false
 
@@ -23,11 +28,17 @@ final class MediaRemoteBridge: @unchecked Sendable {
             if let symReg = dlsym(handle, "MRMediaRemoteRegisterForNowPlayingNotifications") {
                 registerFn = unsafeBitCast(symReg, to: MRRegisterFunction.self)
             }
+            if let symWants = dlsym(handle, "MRMediaRemoteSetWantsNowPlayingNotifications") {
+                setWantsFn = unsafeBitCast(symWants, to: MRSetWantsFunction.self)
+            }
             if let symInfo = dlsym(handle, "MRMediaRemoteGetNowPlayingInfo") {
                 getInfoFn = unsafeBitCast(symInfo, to: MRGetInfoFunction.self)
             }
             if let symPID = dlsym(handle, "MRMediaRemoteGetNowPlayingApplicationPID") {
                 getPIDFn = unsafeBitCast(symPID, to: MRGetPIDFunction.self)
+            }
+            if let symPlaying = dlsym(handle, "MRMediaRemoteGetNowPlayingApplicationIsPlaying") {
+                getIsPlayingFn = unsafeBitCast(symPlaying, to: MRGetIsPlayingFunction.self)
             }
             if let symSend = dlsym(handle, "MRMediaRemoteSendCommand") {
                 sendCommandFn = unsafeBitCast(symSend, to: MRSendCommandFunction.self)
@@ -36,8 +47,9 @@ final class MediaRemoteBridge: @unchecked Sendable {
     }
 
     func registerForNotifications() {
-        guard !isRegistered, let register = registerFn else { return }
-        register(DispatchQueue.main)
+        guard !isRegistered else { return }
+        registerFn?(DispatchQueue.main)
+        setWantsFn?(true)
         isRegistered = true
     }
 
@@ -52,48 +64,94 @@ final class MediaRemoteBridge: @unchecked Sendable {
             let bundleId = app?.bundleIdentifier
             let appName = app?.localizedName
 
+            // Query active tab URL if it's a browser (Chrome, Safari, Arc)
+            let activeUrl = Self.fetchActiveBrowserUrl(bundleId: bundleId)
+
             getInfo(DispatchQueue.main) { dict in
                 guard let info = dict as? [String: Any] else {
                     Task { @MainActor in completion(nil) }
                     return
                 }
 
-                let title = info["kMRMediaRemoteNowPlayingInfoTitle"] as? String ?? ""
-                guard !title.isEmpty else {
-                    Task { @MainActor in completion(nil) }
-                    return
-                }
-
-                let artist = info["kMRMediaRemoteNowPlayingInfoArtist"] as? String ?? appName ?? ""
+                let rawTitle = (info["kMRMediaRemoteNowPlayingInfoTitle"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let rawArtist = (info["kMRMediaRemoteNowPlayingInfoArtist"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
                 let album = info["kMRMediaRemoteNowPlayingInfoAlbum"] as? String
-                let duration = info["kMRMediaRemoteNowPlayingInfoDuration"] as? Double ?? 0
-                let elapsed = info["kMRMediaRemoteNowPlayingInfoElapsedTime"] as? Double ?? 0
-                let rate = info["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? Double ?? 0
-                let isPlaying = rate > 0
+                let duration = (info["kMRMediaRemoteNowPlayingInfoDuration"] as? NSNumber)?.doubleValue ?? 0
+                let elapsed = (info["kMRMediaRemoteNowPlayingInfoElapsedTime"] as? NSNumber)?.doubleValue ?? 0
+                let rate = (info["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? NSNumber)?.doubleValue ?? 0
                 let artworkData = info["kMRMediaRemoteNowPlayingInfoArtworkData"] as? Data
 
                 let resolvedApp = NowPlayingApp.resolve(
                     bundleId: bundleId,
-                    title: title,
-                    artist: artist
+                    title: rawTitle,
+                    artist: rawArtist,
+                    activeUrl: activeUrl
                 )
 
-                let track = NowPlayingTrack(
-                    app: resolvedApp,
-                    title: title,
-                    artist: artist.isEmpty ? resolvedApp.displayName : artist,
-                    album: (album?.isEmpty ?? true) ? nil : album,
-                    duration: duration,
-                    position: elapsed,
-                    isPlaying: isPlaying,
-                    artworkData: artworkData
-                )
+                let title = (rawTitle?.isEmpty == false) ? rawTitle! : (appName ?? resolvedApp.displayName)
+                let artist = (rawArtist?.isEmpty == false) ? rawArtist! : resolvedApp.displayName
 
-                Task { @MainActor in
-                    completion(track)
+                // Verify playback status
+                let isRatePlaying = rate > 0
+                if isRatePlaying {
+                    let track = NowPlayingTrack(
+                        app: resolvedApp,
+                        title: title,
+                        artist: artist,
+                        album: (album?.isEmpty ?? true) ? nil : album,
+                        duration: duration,
+                        position: elapsed,
+                        isPlaying: true,
+                        artworkData: artworkData
+                    )
+                    Task { @MainActor in completion(track) }
+                } else if let getIsPlaying = self.getIsPlayingFn {
+                    getIsPlaying(DispatchQueue.main) { isSysPlaying in
+                        let track = NowPlayingTrack(
+                            app: resolvedApp,
+                            title: title,
+                            artist: artist,
+                            album: (album?.isEmpty ?? true) ? nil : album,
+                            duration: duration,
+                            position: elapsed,
+                            isPlaying: isSysPlaying,
+                            artworkData: artworkData
+                        )
+                        Task { @MainActor in completion(track) }
+                    }
+                } else {
+                    let track = NowPlayingTrack(
+                        app: resolvedApp,
+                        title: title,
+                        artist: artist,
+                        album: (album?.isEmpty ?? true) ? nil : album,
+                        duration: duration,
+                        position: elapsed,
+                        isPlaying: false,
+                        artworkData: artworkData
+                    )
+                    Task { @MainActor in completion(track) }
                 }
             }
         }
+    }
+
+    private static func fetchActiveBrowserUrl(bundleId: String?) -> String? {
+        guard let bundleId = bundleId else { return nil }
+        if bundleId.contains("com.google.Chrome") {
+            let script = NSAppleScript(source: "tell application \"Google Chrome\" to return URL of active tab of front window")
+            var err: NSDictionary?
+            return script?.executeAndReturnError(&err).stringValue
+        } else if bundleId.contains("com.apple.Safari") {
+            let script = NSAppleScript(source: "tell application \"Safari\" to return URL of current tab of front window")
+            var err: NSDictionary?
+            return script?.executeAndReturnError(&err).stringValue
+        } else if bundleId.contains("thebrowser") || bundleId.contains("arc") {
+            let script = NSAppleScript(source: "tell application \"Arc\" to return URL of active tab of front window")
+            var err: NSDictionary?
+            return script?.executeAndReturnError(&err).stringValue
+        }
+        return nil
     }
 
     @discardableResult
@@ -103,7 +161,7 @@ final class MediaRemoteBridge: @unchecked Sendable {
     }
 }
 
-/// Concurrency-safe service coordinating Apple Music, Spotify, YouTube, and browser playback telemetry
+/// Concurrency-safe service coordinating Apple Music, Spotify, YouTube, X, and browser playback telemetry
 /// and remote playback controls for Zenith Dynamic Island.
 @MainActor
 public final class NowPlayingService: ObservableObject {
@@ -112,8 +170,14 @@ public final class NowPlayingService: ObservableObject {
     @Published public var currentTrack: NowPlayingTrack?
     @Published public var isMonitoring: Bool = false
 
-    private var observers: [NSObjectProtocol] = []
-    private var progressTimer: Task<Void, Never>?
+    private var distributedObservers: [NSObjectProtocol] = []
+    private var workspaceObservers: [NSObjectProtocol] = []
+    private var adaptiveTicker: Task<Void, Never>?
+
+    // CoreAudio hardware listener
+    private var coreAudioDeviceID: AudioDeviceID = 0
+    private var coreAudioPropertyAddress: AudioObjectPropertyAddress?
+    private var coreAudioListenerBlock: AudioObjectPropertyListenerBlock?
 
     public init() {}
 
@@ -148,7 +212,7 @@ public final class NowPlayingService: ObservableObject {
                 )
             }
         }
-        observers.append(musicObserver)
+        distributedObservers.append(musicObserver)
 
         // 2. Observe Spotify playback state changes
         let spotifyObserver = center.addObserver(
@@ -174,32 +238,28 @@ public final class NowPlayingService: ObservableObject {
                 )
             }
         }
-        observers.append(spotifyObserver)
+        distributedObservers.append(spotifyObserver)
 
-        // 3. Observe universal browser & media player state changes via MediaRemote
+        // 3. Register CoreAudio hardware listener for instant audio start/stop detection
+        setupCoreAudioListener()
+
+        // 4. Register Workspace observer for frontmost app changes
+        let appObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.refreshMediaRemoteTrack()
+            }
+        }
+        workspaceObservers.append(appObserver)
+
+        // 5. Register MediaRemote notifications
         MediaRemoteBridge.shared.registerForNotifications()
 
-        let mrInfoObserver = NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("kMRMediaRemoteNowPlayingInfoDidChangeNotification"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.refreshMediaRemoteTrack()
-            }
-        }
-        observers.append(mrInfoObserver)
-
-        let mrPlayingObserver = NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("kMRMediaRemoteNowPlayingApplicationIsPlayingDidChangeNotification"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.refreshMediaRemoteTrack()
-            }
-        }
-        observers.append(mrPlayingObserver)
+        // 6. Start adaptive ticker (ticks every 1s when media playing, 2s when idle)
+        startAdaptiveTicker()
 
         // Initial check for currently running media players & browser media
         refreshMediaRemoteTrack()
@@ -209,13 +269,19 @@ public final class NowPlayingService: ObservableObject {
     /// Stops media observation and cleans up notification listeners.
     public func stopMonitoring() {
         let center = DistributedNotificationCenter.default()
-        for obs in observers {
+        for obs in distributedObservers {
             center.removeObserver(obs)
-            NotificationCenter.default.removeObserver(obs)
         }
-        observers.removeAll()
-        progressTimer?.cancel()
-        progressTimer = nil
+        distributedObservers.removeAll()
+
+        for obs in workspaceObservers {
+            NSWorkspace.shared.notificationCenter.removeObserver(obs)
+        }
+        workspaceObservers.removeAll()
+
+        teardownCoreAudioListener()
+        adaptiveTicker?.cancel()
+        adaptiveTicker = nil
         self.isMonitoring = false
         self.currentTrack = nil
         ZenithIslandState.shared.nowPlayingTrack = nil
@@ -226,12 +292,108 @@ public final class NowPlayingService: ObservableObject {
         MediaRemoteBridge.shared.queryNowPlaying { [weak self] track in
             guard let self = self else { return }
             if let track = track {
-                if track.isPlaying || self.currentTrack?.id == track.id {
+                if track.isPlaying {
                     self.updateTrack(track)
+                } else if self.currentTrack?.id == track.id {
+                    self.updateTrack(track)
+                } else if self.currentTrack?.app != .appleMusic && self.currentTrack?.app != .spotify {
+                    self.currentTrack = nil
+                    ZenithIslandState.shared.nowPlayingTrack = nil
                 }
             } else if self.currentTrack?.app != .appleMusic && self.currentTrack?.app != .spotify {
                 self.currentTrack = nil
                 ZenithIslandState.shared.nowPlayingTrack = nil
+            }
+        }
+    }
+
+    // MARK: - CoreAudio Hardware Output Listener
+
+    private func setupCoreAudioListener() {
+        var defaultOutputDeviceID = AudioDeviceID(0)
+        var propertySize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &propertySize,
+            &defaultOutputDeviceID
+        )
+
+        guard status == noErr, defaultOutputDeviceID != 0 else { return }
+        self.coreAudioDeviceID = defaultOutputDeviceID
+
+        var isRunningAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        self.coreAudioPropertyAddress = isRunningAddress
+
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.refreshMediaRemoteTrack()
+            }
+        }
+        self.coreAudioListenerBlock = block
+
+        AudioObjectAddPropertyListenerBlock(
+            defaultOutputDeviceID,
+            &isRunningAddress,
+            DispatchQueue.main,
+            block
+        )
+    }
+
+    private func teardownCoreAudioListener() {
+        if coreAudioDeviceID != 0, var address = coreAudioPropertyAddress, let block = coreAudioListenerBlock {
+            AudioObjectRemovePropertyListenerBlock(
+                coreAudioDeviceID,
+                &address,
+                DispatchQueue.main,
+                block
+            )
+        }
+        coreAudioListenerBlock = nil
+        coreAudioPropertyAddress = nil
+        coreAudioDeviceID = 0
+    }
+
+    // MARK: - Adaptive Media Ticker
+
+    private func startAdaptiveTicker() {
+        adaptiveTicker?.cancel()
+        adaptiveTicker = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                let isPlaying = self?.currentTrack?.isPlaying == true
+                let delayNanos: UInt64 = isPlaying ? 1_000_000_000 : 2_000_000_000
+                try? await Task.sleep(nanoseconds: delayNanos)
+                guard let self = self, !Task.isCancelled else { break }
+
+                if let track = self.currentTrack, track.isPlaying && (track.app == .appleMusic || track.app == .spotify) {
+                    let newPos = min(track.position + 1.0, track.duration)
+                    let updated = NowPlayingTrack(
+                        app: track.app,
+                        title: track.title,
+                        artist: track.artist,
+                        album: track.album,
+                        duration: track.duration,
+                        position: newPos,
+                        isPlaying: track.isPlaying,
+                        artworkData: track.artworkData
+                    )
+                    self.currentTrack = updated
+                    ZenithIslandState.shared.nowPlayingTrack = updated
+                } else {
+                    self.refreshMediaRemoteTrack()
+                }
             }
         }
     }
@@ -312,43 +474,12 @@ public final class NowPlayingService: ObservableObject {
     private func updateTrack(_ track: NowPlayingTrack) {
         self.currentTrack = track
         ZenithIslandState.shared.nowPlayingTrack = track
-
-        progressTimer?.cancel()
-        if track.isPlaying {
-            startProgressInterpolation()
-        }
     }
 
     private func clearCurrentTrackIfApp(_ app: NowPlayingApp) {
         if currentTrack?.app == app {
             self.currentTrack = nil
             ZenithIslandState.shared.nowPlayingTrack = nil
-            progressTimer?.cancel()
-            progressTimer = nil
-        }
-    }
-
-    // MARK: - Playback Progress Smooth Interpolation
-
-    private func startProgressInterpolation() {
-        progressTimer = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                guard let self = self, let track = self.currentTrack, track.isPlaying else { break }
-                let newPos = min(track.position + 1.0, track.duration)
-                let updated = NowPlayingTrack(
-                    app: track.app,
-                    title: track.title,
-                    artist: track.artist,
-                    album: track.album,
-                    duration: track.duration,
-                    position: newPos,
-                    isPlaying: track.isPlaying,
-                    artworkData: track.artworkData
-                )
-                self.currentTrack = updated
-                ZenithIslandState.shared.nowPlayingTrack = updated
-            }
         }
     }
 
@@ -429,8 +560,7 @@ public final class NowPlayingService: ObservableObject {
         let musicRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: NowPlayingApp.appleMusic.bundleIdentifier).isEmpty
         let spotifyRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: NowPlayingApp.spotify.bundleIdentifier).isEmpty
 
-        if !musicRunning && !spotifyRunning {
-            self.currentTrack = nil
+        if !musicRunning && !spotifyRunning && currentTrack == nil {
             ZenithIslandState.shared.nowPlayingTrack = nil
         }
     }

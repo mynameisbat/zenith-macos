@@ -36,16 +36,23 @@ struct NowPlayingAndBatteryHUDTests {
         #expect(safari.displayName == "Safari")
         #expect(safari.iconName == "safari.fill")
 
+        let xTwitter = NowPlayingApp.xTwitter
+        #expect(xTwitter.rawValue == "X")
+        #expect(xTwitter.displayName == "X")
+
         // CaseIterable completeness
-        #expect(NowPlayingApp.allCases.count >= 8)
+        #expect(NowPlayingApp.allCases.count >= 9)
         #expect(NowPlayingApp.allCases.contains(.appleMusic))
         #expect(NowPlayingApp.allCases.contains(.spotify))
         #expect(NowPlayingApp.allCases.contains(.youtube))
+        #expect(NowPlayingApp.allCases.contains(.xTwitter))
         #expect(NowPlayingApp.allCases.contains(.chrome))
         #expect(NowPlayingApp.allCases.contains(.safari))
 
         // Resolver logic
         #expect(NowPlayingApp.resolve(bundleId: "com.google.Chrome", title: "Video on YouTube", artist: "Creator") == .youtube)
+        #expect(NowPlayingApp.resolve(bundleId: "com.google.Chrome", title: "Post", artist: "Author", activeUrl: "https://x.com/home") == .xTwitter)
+        #expect(NowPlayingApp.resolve(bundleId: "com.google.Chrome", title: "Video on Twitter", artist: "Author") == .xTwitter)
         #expect(NowPlayingApp.resolve(bundleId: "com.google.Chrome", title: "News", artist: "CNN") == .chrome)
         #expect(NowPlayingApp.resolve(bundleId: "com.apple.Safari", title: "Blog Post", artist: "Author") == .safari)
         #expect(NowPlayingApp.resolve(bundleId: "com.apple.Music", title: "Song", artist: "Singer") == .appleMusic)
