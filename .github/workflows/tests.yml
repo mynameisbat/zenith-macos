@@ -1,0 +1,35 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch makes the older run pointless.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcode-select -p
+          swift --version
+
+      - name: Build the app (release)
+        run: swift build -c release
+
+      # Every suite runs in its own process: see the comment at the top of the script.
+      # VisionChallenger2EmpiricalTests asserts a memory ceiling for 8K OCR that this project does not meet on every
+      # machine; it is listed here so its failure is visible rather than silently skipped.
+      - name: Run every test suite
+        env:
+          EXPECTED_FAILING_SUITES: VisionChallenger2EmpiricalTests
+        run: ./scripts/test_each_suite.sh

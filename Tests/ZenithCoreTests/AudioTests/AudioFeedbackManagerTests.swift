@@ -5,10 +5,25 @@ import Foundation
 @Suite("AudioFeedbackManager Playback & Concurrency Test Suite")
 struct AudioFeedbackManagerTests {
 
+    /// A settings store of its own: the managers follow their store's changes, so sharing `SettingsStore.shared`
+    /// let one test's mute toggle reset another test's manager while they ran in parallel.
+    private func isolatedStore() -> SettingsStore {
+        SettingsStore(userDefaults: UserDefaults(suiteName: "zenith.tests.audio.\(UUID().uuidString)")!)
+    }
+
+    /// Playback is handed to a background queue, so a count read straight after a trigger can be one short.
+    /// Waits (briefly) for the expected value instead of asserting on a race.
+    private func waitUntil(_ condition: @autoclosure () -> Bool, timeout: TimeInterval = 2) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.005)
+        }
+    }
+
     @Test("Plays distinct cues for all sound types when unmuted")
     func testSoundTypePlayback() {
         let mockBackend = MockAudioPlayerBackend()
-        let audioManager = AudioFeedbackManager(backend: mockBackend, isMuted: false)
+        let audioManager = AudioFeedbackManager(backend: mockBackend, settingsStore: isolatedStore(), isMuted: false)
 
         audioManager.playNewCopySound()
         #expect(mockBackend.playedSounds.last == "Pop")
@@ -27,7 +42,7 @@ struct AudioFeedbackManagerTests {
     @Test("Mute suppresses all audio playback calls")
     func testMuteSuppression() {
         let mockBackend = MockAudioPlayerBackend()
-        let audioManager = AudioFeedbackManager(backend: mockBackend, isMuted: true)
+        let audioManager = AudioFeedbackManager(backend: mockBackend, settingsStore: isolatedStore(), isMuted: true)
 
         audioManager.playNewCopySound()
         audioManager.playPasteSound()
@@ -41,9 +56,10 @@ struct AudioFeedbackManagerTests {
     @Test("Dynamic mute toggling immediately suppresses and restores audio cues")
     func testDynamicMuteToggling() {
         let mockBackend = MockAudioPlayerBackend()
-        let audioManager = AudioFeedbackManager(backend: mockBackend, isMuted: false)
+        let audioManager = AudioFeedbackManager(backend: mockBackend, settingsStore: isolatedStore(), isMuted: false)
 
         audioManager.playNewCopySound()
+        waitUntil(mockBackend.playedSounds.count == 1)
         #expect(mockBackend.playedSounds.count == 1)
 
         audioManager.isMuted = true
@@ -52,13 +68,14 @@ struct AudioFeedbackManagerTests {
 
         audioManager.isMuted = false
         audioManager.playShutterSound()
+        waitUntil(mockBackend.playedSounds.count == 2)
         #expect(mockBackend.playedSounds.count == 2)
     }
 
     @Test("Volume clamps strictly between 0.0 and 1.0")
     func testVolumeClamping() {
         let mockBackend = MockAudioPlayerBackend()
-        let audioManager = AudioFeedbackManager(backend: mockBackend)
+        let audioManager = AudioFeedbackManager(backend: mockBackend, settingsStore: isolatedStore())
 
         audioManager.volume = -0.5
         #expect(audioManager.volume == 0.0)
@@ -124,7 +141,7 @@ struct AudioFeedbackManagerTests {
     @Test("Plays semantic sound effects cues accurately")
     func testSemanticSoundEffectsPlayback() {
         let mockBackend = MockAudioPlayerBackend()
-        let audioManager = AudioFeedbackManager(backend: mockBackend, isMuted: false)
+        let audioManager = AudioFeedbackManager(backend: mockBackend, settingsStore: isolatedStore(), isMuted: false)
 
         audioManager.play(SoundEffect.colorSample)
         #expect(mockBackend.playedSounds.last == "Ping")
@@ -142,7 +159,7 @@ struct AudioFeedbackManagerTests {
     @Test("Stop all forwards command to backend")
     func testStopAllForwarding() {
         let mockBackend = MockAudioPlayerBackend()
-        let audioManager = AudioFeedbackManager(backend: mockBackend)
+        let audioManager = AudioFeedbackManager(backend: mockBackend, settingsStore: isolatedStore())
 
         audioManager.stopAll()
         #expect(mockBackend.stopAllCount == 1)
@@ -173,7 +190,7 @@ struct AudioFeedbackManagerTests {
     @Test("Handles concurrent mute toggling during rapid playback without crash")
     func testConcurrentMuteTogglingStress() async {
         let mockBackend = MockAudioPlayerBackend()
-        let audioManager = AudioFeedbackManager(backend: mockBackend, isMuted: false)
+        let audioManager = AudioFeedbackManager(backend: mockBackend, settingsStore: isolatedStore(), isMuted: false)
 
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<50 {
@@ -194,7 +211,7 @@ struct AudioFeedbackManagerTests {
     @Test("Caller latency benchmark: 100 consecutive sound triggers execute in under 10ms")
     func testNonBlockingPerformanceSLA() {
         let mockBackend = MockAudioPlayerBackend()
-        let audioManager = AudioFeedbackManager(backend: mockBackend, isMuted: false)
+        let audioManager = AudioFeedbackManager(backend: mockBackend, settingsStore: isolatedStore(), isMuted: false)
 
         let start = DispatchTime.now()
         for _ in 0..<100 {
@@ -203,6 +220,7 @@ struct AudioFeedbackManagerTests {
         let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000.0 // in ms
 
         #expect(elapsed < 10.0)
+        waitUntil(mockBackend.playedSounds.count == 100)
         #expect(mockBackend.playedSounds.count == 100)
     }
 
