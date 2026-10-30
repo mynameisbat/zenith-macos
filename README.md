@@ -2,7 +2,7 @@
 
 [![macOS](https://img.shields.io/badge/macOS-14.0%2B%20%7C%20Sonoma%20%7C%20Sequoia-000000.svg?style=flat&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Swift 6](https://img.shields.io/badge/Swift-6.0%20Native-F05138.svg?style=flat&logo=swift&logoColor=white)](https://swift.org)
-[![Tests](https://img.shields.io/badge/Tests-754%20passing%20%7C%2071%20suites-1FC16B.svg?style=flat)](https://github.com/mynameisbat/zenith-macos/actions)
+[![Tests](https://img.shields.io/badge/Tests-Swift%20Testing-1FC16B.svg?style=flat)](https://github.com/mynameisbat/zenith-macos/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/Website-mynameisbat.github.io%2Fzenith--macos-0F62FE.svg)](https://mynameisbat.github.io/zenith-macos/)
 
@@ -11,7 +11,7 @@
 Zenith lives quietly in your Menu Bar as an ultra-lightweight accessory (idle RAM ~25 MB, idle CPU <0.3%), replacing scattered, battery-draining Electron apps with a single, unified high-performance binary:
 1. **Native Screen OCR & Barcode/QR Extractor (`⌘⇧3`)** with on-device Apple Vision neural engine and instant clipboard formatting.
 2. **MacBook Dynamic Island & Drop Shelf** with live audio visualizer, Now Playing controls, MagSafe charging HUD, and file previews.
-3. **Smart In-Memory Clipboard Manager (`⌘⇧V`)** with sub-millisecond fuzzy search and password protection.
+3. **Smart In-Memory Clipboard Manager (`⌘⇧V`)** with sub-millisecond fuzzy search and automatic exclusion of passwords copied from password managers.
 4. **Shottr-Grade Screen Capture & Annotation (`⌘⇧2`)** with a live 16x pixel Loupe magnifier.
 5. **Developer Deep Purge & Safe App Monitor (Mole-Inspired)** to reclaim tens of gigabytes and safely kill heavy user processes.
 6. **Privacy Shield (DNS-over-HTTPS + Anti-DPI)** with in-process TLS ClientHello SNI chunking without VPN ping overhead.
@@ -52,7 +52,7 @@ open /Applications/Zenith.app
 git clone https://github.com/mynameisbat/zenith-macos.git
 cd zenith-macos
 
-# Run automated test suites (736/736 tests in 70 suites)
+# Run the automated test suites (hermetic: they never change your system proxy, Finder preferences or clipboard)
 swift test
 
 # Build and assemble Zenith.app bundle
@@ -110,7 +110,7 @@ open Zenith.app
 ### 5. 🏝 Dynamic Island, Now Playing & Battery HUD
 - **Hardware-Aware Notch Integration**: Seamlessly integrates into MacBook display camera notches as well as external monitors with zero Mini-LED light bleed (`#06070a`).
 - **Now Playing & Live Equalizer Visualizer**:
-  - Event-driven tracking for **Apple Music** and **Spotify** with **0.0% background polling**.
+  - Track changes for **Apple Music** and **Spotify** arrive as system notifications (no polling); a light 1–2 s tick keeps the progress bar and other audio sources in sync.
   - **Left Wing**: Mini spinning vinyl disc with app badge / album artwork.
   - **Right Wing**: Animated jumping 4-bar equalizer visualizer with brand-matched dynamic color palettes.
   - **Expanded Player**: Hover over the island to reveal full track metadata, interactive scrub bar, and media controls (Play/Pause, Skip, Previous).
@@ -137,7 +137,7 @@ open Zenith.app
 
 ### 7. 🛡 Privacy Shield (DoH + Anti-DPI Local Proxy)
 - **DNS-over-HTTPS (DoH)**: Built-in local resolver routing system DNS requests over encrypted HTTPS to **Cloudflare** (`1.1.1.1`) or **Google** (`8.8.8.8`).
-- **TLS ClientHello SNI Chunker**: Splits the initial TLS handshake packet into dual micro-chunks directly on `127.0.0.1:8080`, evading Deep Packet Inspection (DPI) firewalls with **zero ping latency penalty** and without third-party VPN subscriptions.
+- **TLS ClientHello SNI Chunker**: Splits the initial TLS handshake packet into dual micro-chunks directly on `127.0.0.1:8080`, evading Deep Packet Inspection (DPI) firewalls with no VPN subscription needed and only a 5 ms pause between the two fragments of each HTTPS handshake.
 
 ### 8. 🔊 Native Audio Feedback
 - 14 customizable native macOS sound cues (Pop, Tink, Hero, Bottle, Funk, Ping, Purr, Submarine, etc.) with custom sound file import (`.wav`, `.aiff`, `.m4a`).
@@ -235,7 +235,7 @@ graph TD
         Perms[System Permissions & Deep Links]
     end
 
-    subgraph Test_Layer [ZenithCoreTests - 736 Tests in 70 Suites]
+    subgraph Test_Layer [ZenithCoreTests]
         T1[Tier 1: Feature Coverage]
         T2[Tier 2: Boundary & Corner Cases]
         T3[Tier 3: Cross-Feature Interactions]
@@ -265,7 +265,7 @@ graph TD
 └───────────────────────────▲────────────────────────────┘
                             │ verified by
 ┌───────────────────────────┴────────────────────────────┐
-│         ZenithCoreTests (736 tests / 70 suites)        │
+│         ZenithCoreTests                                 │
 │  - Tier 1-4: Core features, boundaries & torture       │
 │  - Tier 5: Vision OCR & 5 Critical Edge Cases (39 tests)│
 │  - Zero regressions, verified Swift 6 strict concurrency│

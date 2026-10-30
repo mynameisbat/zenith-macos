@@ -328,6 +328,18 @@ public final class ZenithIslandWindowController: NSObject {
         }
         .store(in: &cancellables)
 
+        // Observe Now Playing track changes to ensure island panel orders front and hit targets update
+        ZenithIslandState.shared.$nowPlayingTrack
+            .removeDuplicates()
+            .sink { [weak self] track in
+                guard let self = self else { return }
+                self.handleMouseMoved(screenPoint: NSEvent.mouseLocation)
+                if track?.isPlaying == true {
+                    self.panel?.orderFrontRegardless()
+                }
+            }
+            .store(in: &cancellables)
+
         // Observe drop shelf preview item state changes
         ZenithIslandState.shared.$previewItem
             .removeDuplicates()
@@ -528,13 +540,5 @@ public final class ZenithIslandWindowController: NSObject {
         panel = nil
     }
 
-    isolated deinit {
-        NotificationCenter.default.removeObserver(self)
-        if let monitor = globalMouseMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-        if let monitor = localMouseMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-    }
+    // There is no deinit: this is a singleton, `teardown()` removes the monitors, and `isolated deinit` needs Swift 6.2.
 }

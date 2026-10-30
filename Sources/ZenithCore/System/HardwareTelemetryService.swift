@@ -361,29 +361,18 @@ public final class HardwareTelemetryService: @unchecked Sendable {
         }
         processCacheLock.unlock()
 
-        let pipe = Pipe()
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/ps")
-        process.arguments = ["-Aceo", "pid=,ppid=,state=,pcpu=,pmem=,rss=,comm=", "-r"]
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let output = String(data: data, encoding: .utf8) else {
-                return ([], [])
-            }
-            let (hogs, zombies) = parseProcessOutput(output, topLimit: max(25, topLimit), filterSafeOnly: filterSafeOnly)
-            processCacheLock.lock()
-            self.cachedProcesses = (hogs, zombies)
-            self.lastProcessSampleTime = Date()
-            processCacheLock.unlock()
-            return (Array(hogs.prefix(topLimit)), zombies)
-        } catch {
+        // The runner reads the output while `ps` is still running: waiting for exit first would hang for good once
+        // the listing outgrows the 64 KiB pipe buffer (about 1,200 processes).
+        guard let result = SystemCommand.processRunner("/bin/ps", ["-Aceo", "pid=,ppid=,state=,pcpu=,pmem=,rss=,comm=", "-r"]),
+              result.status == 0 else {
             return ([], [])
         }
+        let (hogs, zombies) = parseProcessOutput(result.output, topLimit: max(25, topLimit), filterSafeOnly: filterSafeOnly)
+        processCacheLock.lock()
+        self.cachedProcesses = (hogs, zombies)
+        self.lastProcessSampleTime = Date()
+        processCacheLock.unlock()
+        return (Array(hogs.prefix(topLimit)), zombies)
     }
 
     /// Invalidates cached process telemetry so subsequent queries fetch fresh data.
@@ -547,17 +536,30 @@ public final class HardwareTelemetryService: @unchecked Sendable {
     }
 
     /// Gracefully requests a process to terminate (SIGTERM).
+    ///
+    /// The safety check runs again here, against whatever owns the PID right now: the process list on screen can be
+    /// seconds old, and by then the PID may belong to a system service.
     @discardableResult
     public func terminateProcess(pid: Int) -> Bool {
         invalidateProcessCache()
+        guard Self.isSafeToKillProcess(pid: pid) else { return false }
         return sendSignal(SIGTERM, toProcess: pid)
     }
 
-    /// Forcefully terminates a process immediately (SIGKILL).
+    /// Forcefully terminates a process immediately (SIGKILL), after the same fresh safety check.
     @discardableResult
     public func forceKillProcess(pid: Int) -> Bool {
         invalidateProcessCache()
+        guard Self.isSafeToKillProcess(pid: pid) else { return false }
         return sendSignal(SIGKILL, toProcess: pid)
+    }
+
+    /// Asks the parent of a zombie to collect it (SIGCHLD). A zombie is already dead and cannot be killed;
+    /// only its parent can reap it. Returns whether the signal was delivered.
+    @discardableResult
+    public func requestReap(of zombie: ProcessTelemetry) -> Bool {
+        guard zombie.isZombie, zombie.ppid > 1 else { return false }
+        return sendSignal(SIGCHLD, toProcess: zombie.ppid)
     }
 
     /// Terminates a process by PID with optional force flag (Clean Code F3 backwards-compatible facade).

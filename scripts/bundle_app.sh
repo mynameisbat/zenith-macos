@@ -1,13 +1,22 @@
 #!/bin/bash
 set -e
 
-# Zenith 2.0 macOS Application Bundler
+# Zenith macOS Application Bundler
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_ROOT/.build/release"
 APP_DIR="$PROJECT_ROOT/Zenith.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
+
+# The version is declared once, in ZenithVersion.swift.
+VERSION_FILE="$PROJECT_ROOT/Sources/ZenithCore/Models/ZenithVersion.swift"
+VERSION="$(sed -n 's/.*current = "\(.*\)".*/\1/p' "$VERSION_FILE")"
+BUILD="$(sed -n 's/.*build = "\(.*\)".*/\1/p' "$VERSION_FILE")"
+if [ -z "$VERSION" ] || [ -z "$BUILD" ]; then
+    echo "error: could not read the version from $VERSION_FILE" >&2
+    exit 1
+fi
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 
 echo "==> Building Zenith in Release configuration..."
@@ -67,10 +76,13 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Zenith requires Accessibility permissions to automatically paste clipboard history items into your active application.</string>
+    <string>Zenith uses Apple Events to see what Music, Spotify and your browser are playing and to control playback from the Dynamic Island.</string>
 </dict>
 </plist>
 EOF
+
+echo "==> Stamping version $VERSION (build $BUILD)..."
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $BUILD" "$CONTENTS_DIR/Info.plist"
 
 echo "==> Performing ad-hoc code signature..."
 codesign --force --deep --sign - "$APP_DIR"

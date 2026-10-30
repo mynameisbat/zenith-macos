@@ -13,14 +13,12 @@ final class MediaRemoteBridge: @unchecked Sendable {
     typealias MRGetInfoFunction = @convention(c) (DispatchQueue, @escaping (CFDictionary?) -> Void) -> Void
     typealias MRGetPIDFunction = @convention(c) (DispatchQueue, @escaping (pid_t) -> Void) -> Void
     typealias MRGetIsPlayingFunction = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
-    typealias MRSendCommandFunction = @convention(c) (UInt32, AnyObject?) -> Bool
 
     private var registerFn: MRRegisterFunction?
     private var setWantsFn: MRSetWantsFunction?
     private var getInfoFn: MRGetInfoFunction?
     private var getPIDFn: MRGetPIDFunction?
     private var getIsPlayingFn: MRGetIsPlayingFunction?
-    private var sendCommandFn: MRSendCommandFunction?
     private var isRegistered = false
 
     init() {
@@ -39,9 +37,6 @@ final class MediaRemoteBridge: @unchecked Sendable {
             }
             if let symPlaying = dlsym(handle, "MRMediaRemoteGetNowPlayingApplicationIsPlaying") {
                 getIsPlayingFn = unsafeBitCast(symPlaying, to: MRGetIsPlayingFunction.self)
-            }
-            if let symSend = dlsym(handle, "MRMediaRemoteSendCommand") {
-                sendCommandFn = unsafeBitCast(symSend, to: MRSendCommandFunction.self)
             }
         }
     }
@@ -64,7 +59,8 @@ final class MediaRemoteBridge: @unchecked Sendable {
             let bundleId = app?.bundleIdentifier
             let appName = app?.localizedName
 
-            // Query active tab URL if it's a browser (Chrome, Safari, Arc)
+            // The front tab's URL (what tells YouTube or X from a plain browser) comes from a cache that is
+            // refreshed in the background, so this callback never waits on an AppleScript round trip.
             let activeUrl = Self.fetchActiveBrowserUrl(bundleId: bundleId)
 
             getInfo(DispatchQueue.main) { dict in
@@ -136,28 +132,38 @@ final class MediaRemoteBridge: @unchecked Sendable {
         }
     }
 
+    private static let tabURLCache = TabURLCache()
+
     private static func fetchActiveBrowserUrl(bundleId: String?) -> String? {
-        guard let bundleId = bundleId else { return nil }
-        if bundleId.contains("com.google.Chrome") {
-            let script = NSAppleScript(source: "tell application \"Google Chrome\" to return URL of active tab of front window")
-            var err: NSDictionary?
-            return script?.executeAndReturnError(&err).stringValue
-        } else if bundleId.contains("com.apple.Safari") {
-            let script = NSAppleScript(source: "tell application \"Safari\" to return URL of current tab of front window")
-            var err: NSDictionary?
-            return script?.executeAndReturnError(&err).stringValue
-        } else if bundleId.contains("thebrowser") || bundleId.contains("arc") {
-            let script = NSAppleScript(source: "tell application \"Arc\" to return URL of active tab of front window")
-            var err: NSDictionary?
-            return script?.executeAndReturnError(&err).stringValue
-        }
-        return nil
+        guard let bundleId = bundleId, BrowserTabProbe.supportsTabLookup(bundleIdentifier: bundleId) else { return nil }
+        return tabURLCache.url(for: bundleId)
     }
 
-    @discardableResult
-    func sendCommand(_ command: UInt32) -> Bool {
-        guard let send = sendCommandFn else { return false }
-        return send(command, nil)
+    /// Last known front-tab URL per browser, refreshed at most every few seconds on a background queue.
+    private final class TabURLCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var entries: [String: (url: String?, fetchedAt: Date)] = [:]
+        private var inFlight: Set<String> = []
+
+        func url(for bundleId: String) -> String? {
+            lock.lock()
+            let entry = entries[bundleId]
+            let isStale = entry.map { Date().timeIntervalSince($0.fetchedAt) > 5 } ?? true
+            let shouldRefresh = isStale && !inFlight.contains(bundleId)
+            if shouldRefresh { inFlight.insert(bundleId) }
+            lock.unlock()
+
+            if shouldRefresh {
+                DispatchQueue.global(qos: .utility).async { [self] in
+                    let url = BrowserTabProbe.activeTab(bundleIdentifier: bundleId, runner: SystemCommand.processRunner)?.url
+                    lock.lock()
+                    entries[bundleId] = (url, Date())
+                    inFlight.remove(bundleId)
+                    lock.unlock()
+                }
+            }
+            return entry?.url
+        }
     }
 }
 
@@ -174,12 +180,55 @@ public final class NowPlayingService: ObservableObject {
     private var workspaceObservers: [NSObjectProtocol] = []
     private var adaptiveTicker: Task<Void, Never>?
 
+    private let islandState: ZenithIslandState
+    private let playingApplicationProvider: @Sendable () -> PlayingApplication?
+    private let commandRunner: SystemCommandRunner
+    private let mediaKeys: MediaKeyPosting
+    private let scriptRunner: @Sendable (String) -> Void
+
+    /// Front-tab lookups are slow (an AppleScript round trip), so the last result is reused for a few seconds and
+    /// at most one lookup is ever in flight.
+    private var tabCache: (bundleId: String, tab: BrowserTab?, fetchedAt: Date)?
+    private var pendingTabFetch: Task<Void, Never>?
+    private static let tabCacheLifetime: TimeInterval = 4
+
     // CoreAudio hardware listener
     private var coreAudioDeviceID: AudioDeviceID = 0
     private var coreAudioPropertyAddress: AudioObjectPropertyAddress?
     private var coreAudioListenerBlock: AudioObjectPropertyListenerBlock?
 
-    public init() {}
+    /// Watches which device is the default output, so the listener above follows it (AirPods, a dock, HDMI…).
+    private var defaultDeviceAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    private var defaultDeviceListenerBlock: AudioObjectPropertyListenerBlock?
+
+    /// - Parameters:
+    ///   - islandState: Where the current track is published.
+    ///   - playingApplicationProvider: Which app is playing audio; tests supply a stand-in for the system's answer.
+    ///   - commandRunner: Runs `osascript` for tab lookups.
+    ///   - mediaKeys: Posts play/next/previous key presses for apps that are not controlled by AppleScript.
+    ///   - scriptRunner: Runs AppleScript commands for Music and Spotify.
+    public init(
+        islandState: ZenithIslandState = .shared,
+        playingApplicationProvider: @escaping @Sendable () -> PlayingApplication? = {
+            PlaybackAssertionProbe.playingApplication(excluding: [
+                NowPlayingApp.appleMusic.bundleIdentifier,
+                NowPlayingApp.spotify.bundleIdentifier
+            ])
+        },
+        commandRunner: @escaping SystemCommandRunner = SystemCommand.processRunner,
+        mediaKeys: MediaKeyPosting = SystemMediaKeys(),
+        scriptRunner: @escaping @Sendable (String) -> Void = NowPlayingService.executeAppleScript
+    ) {
+        self.islandState = islandState
+        self.playingApplicationProvider = playingApplicationProvider
+        self.commandRunner = commandRunner
+        self.mediaKeys = mediaKeys
+        self.scriptRunner = scriptRunner
+    }
 
     /// Starts observing system-wide media playback notifications with zero background polling.
     public func startMonitoring() {
@@ -283,33 +332,129 @@ public final class NowPlayingService: ObservableObject {
         adaptiveTicker?.cancel()
         adaptiveTicker = nil
         self.isMonitoring = false
-        self.currentTrack = nil
-        ZenithIslandState.shared.nowPlayingTrack = nil
+        clearTrack()
     }
 
-    /// Refreshes track state from system MediaRemote framework.
+    /// Refreshes the current track: first from the system's Now Playing (MediaRemote, which only answers on macOS
+    /// before 15.4), then from which app is playing audio.
     public func refreshMediaRemoteTrack() {
         MediaRemoteBridge.shared.queryNowPlaying { [weak self] track in
             guard let self = self else { return }
-            if let track = track {
-                if track.isPlaying {
-                    self.updateTrack(track)
-                } else if self.currentTrack?.id == track.id {
-                    self.updateTrack(track)
-                } else if self.currentTrack?.app != .appleMusic && self.currentTrack?.app != .spotify {
-                    self.currentTrack = nil
-                    ZenithIslandState.shared.nowPlayingTrack = nil
-                }
-            } else if self.currentTrack?.app != .appleMusic && self.currentTrack?.app != .spotify {
-                self.currentTrack = nil
-                ZenithIslandState.shared.nowPlayingTrack = nil
+            if let track = track, track.isPlaying || self.currentTrack?.id == track.id {
+                self.updateTrack(track)
+                return
+            }
+            self.refreshFromPlaybackAssertions()
+        }
+    }
+
+    /// Detects audio from an app that publishes no track information of its own (browsers above all).
+    func refreshFromPlaybackAssertions() {
+        // Apple Music and Spotify report precisely through their own notifications; audio from another app must not
+        // replace a track they are playing.
+        if let current = currentTrack, current.isPlaying, current.app == .appleMusic || current.app == .spotify {
+            return
+        }
+
+        guard let playing = playingApplicationProvider() else {
+            // Audio stopped: drop a track that came from detection (never one of Music/Spotify's own).
+            if let current = currentTrack, current.app != .appleMusic, current.app != .spotify {
+                clearTrack()
+            }
+            return
+        }
+
+        let bundleId = playing.bundleIdentifier ?? ""
+        let cachedTab: BrowserTab?
+        if let cache = tabCache, cache.bundleId == bundleId {
+            cachedTab = cache.tab
+        } else {
+            cachedTab = nil
+        }
+        updateTrackIfChanged(Self.browserTrack(for: playing, tab: cachedTab))
+
+        refreshTabIfNeeded(for: playing)
+    }
+
+    private func refreshTabIfNeeded(for playing: PlayingApplication) {
+        guard let bundleId = playing.bundleIdentifier,
+              BrowserTabProbe.supportsTabLookup(bundleIdentifier: bundleId),
+              pendingTabFetch == nil else { return }
+        if let cache = tabCache, cache.bundleId == bundleId,
+           Date().timeIntervalSince(cache.fetchedAt) < Self.tabCacheLifetime {
+            return
+        }
+
+        let runner = commandRunner
+        pendingTabFetch = Task { [weak self] in
+            let tab = await Task.detached(priority: .utility) {
+                BrowserTabProbe.activeTab(bundleIdentifier: bundleId, runner: runner)
+            }.value
+            guard let self else { return }
+            self.pendingTabFetch = nil
+            self.tabCache = (bundleId, tab, Date())
+            // Show the title right away, but only if this browser is still the one playing.
+            if let current = self.currentTrack, current.isPlaying, current.app != .appleMusic, current.app != .spotify,
+               let playing = self.playingApplicationProvider(), playing.bundleIdentifier == bundleId {
+                self.updateTrackIfChanged(Self.browserTrack(for: playing, tab: tab))
             }
         }
+    }
+
+    /// Waits for the tab lookup in flight, if any. For tests.
+    func waitForTabLookup() async {
+        await pendingTabFetch?.value
+    }
+
+    /// The track shown for audio from an app that reports nothing itself. Without a readable tab on a media site it
+    /// says only which app is playing, rather than passing off an unrelated tab's title as the media.
+    nonisolated static func browserTrack(for playing: PlayingApplication, tab: BrowserTab?) -> NowPlayingTrack {
+        if let tab = tab, BrowserTabProbe.isMediaSite(url: tab.url) {
+            let resolved = NowPlayingApp.resolve(bundleId: playing.bundleIdentifier, title: nil, artist: nil, activeUrl: tab.url)
+            let cleaned = BrowserTabProbe.cleanTitle(tab.title)
+            let title: String
+            if cleaned.isEmpty || BrowserTabProbe.genericTitles.contains(cleaned.lowercased()) {
+                title = resolved == .xTwitter ? "Video on X" : "\(resolved.displayName) video"
+            } else {
+                title = cleaned
+            }
+            let artist = (resolved == .youtube || resolved == .xTwitter) ? resolved.displayName : playing.name
+            return NowPlayingTrack(app: resolved, title: title, artist: artist, duration: 0, position: 0, isPlaying: true)
+        }
+
+        let resolved = NowPlayingApp.resolve(bundleId: playing.bundleIdentifier, title: nil, artist: nil)
+        return NowPlayingTrack(app: resolved, title: playing.name, artist: "Playing audio", duration: 0, position: 0, isPlaying: true)
     }
 
     // MARK: - CoreAudio Hardware Output Listener
 
     private func setupCoreAudioListener() {
+        // First, follow changes of the default output device; then listen on the device that is current now.
+        let deviceChanged: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.defaultOutputDeviceChanged()
+            }
+        }
+        defaultDeviceListenerBlock = deviceChanged
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &defaultDeviceAddress,
+            DispatchQueue.main,
+            deviceChanged
+        )
+
+        registerOutputDeviceListener()
+    }
+
+    /// The listener was attached to whichever device was default at launch and stayed there after the output changed,
+    /// so audio start/stop on the new device went unnoticed until the next poll.
+    private func defaultOutputDeviceChanged() {
+        unregisterOutputDeviceListener()
+        registerOutputDeviceListener()
+        refreshMediaRemoteTrack()
+    }
+
+    private func registerOutputDeviceListener() {
         var defaultOutputDeviceID = AudioDeviceID(0)
         var propertySize = UInt32(MemoryLayout<AudioDeviceID>.size)
         var address = AudioObjectPropertyAddress(
@@ -353,6 +498,19 @@ public final class NowPlayingService: ObservableObject {
     }
 
     private func teardownCoreAudioListener() {
+        unregisterOutputDeviceListener()
+        if let block = defaultDeviceListenerBlock {
+            AudioObjectRemovePropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject),
+                &defaultDeviceAddress,
+                DispatchQueue.main,
+                block
+            )
+            defaultDeviceListenerBlock = nil
+        }
+    }
+
+    private func unregisterOutputDeviceListener() {
         if coreAudioDeviceID != 0, var address = coreAudioPropertyAddress, let block = coreAudioListenerBlock {
             AudioObjectRemovePropertyListenerBlock(
                 coreAudioDeviceID,
@@ -389,8 +547,7 @@ public final class NowPlayingService: ObservableObject {
                         isPlaying: track.isPlaying,
                         artworkData: track.artworkData
                     )
-                    self.currentTrack = updated
-                    ZenithIslandState.shared.nowPlayingTrack = updated
+                    self.updateTrack(updated)
                 } else {
                     self.refreshMediaRemoteTrack()
                 }
@@ -473,13 +630,24 @@ public final class NowPlayingService: ObservableObject {
 
     private func updateTrack(_ track: NowPlayingTrack) {
         self.currentTrack = track
-        ZenithIslandState.shared.nowPlayingTrack = track
+        islandState.nowPlayingTrack = track
+    }
+
+    /// Publishes a track only when it differs, so the island is not redrawn on every poll.
+    private func updateTrackIfChanged(_ track: NowPlayingTrack) {
+        if currentTrack != track {
+            updateTrack(track)
+        }
+    }
+
+    private func clearTrack() {
+        self.currentTrack = nil
+        islandState.nowPlayingTrack = nil
     }
 
     private func clearCurrentTrackIfApp(_ app: NowPlayingApp) {
         if currentTrack?.app == app {
-            self.currentTrack = nil
-            ZenithIslandState.shared.nowPlayingTrack = nil
+            clearTrack()
         }
     }
 
@@ -487,29 +655,31 @@ public final class NowPlayingService: ObservableObject {
 
     /// Toggles play/pause state for the active media application or browser video.
     public func togglePlayPause() {
-        if MediaRemoteBridge.shared.sendCommand(2) {
-            return
-        }
-        guard let app = currentTrack?.app ?? preferredActiveApp else { return }
-        runAppleScript("tell application \"\(app.rawValue)\" to playpause")
+        send(.playPause, musicCommand: "playpause")
     }
 
     /// Skips to the next track.
     public func nextTrack() {
-        if MediaRemoteBridge.shared.sendCommand(4) {
-            return
-        }
-        guard let app = currentTrack?.app ?? preferredActiveApp else { return }
-        runAppleScript("tell application \"\(app.rawValue)\" to next track")
+        send(.next, musicCommand: "next track")
     }
 
     /// Rewinds or skips to the previous track.
     public func previousTrack() {
-        if MediaRemoteBridge.shared.sendCommand(5) {
-            return
+        send(.previous, musicCommand: "previous track")
+    }
+
+    /// Music and Spotify are told directly over AppleScript. Anything else (a browser tab) gets the hardware media
+    /// key, which macOS delivers to the app that is playing without raising it or typing into a focused field.
+    private func send(_ key: MediaKey, musicCommand: String) {
+        switch currentTrack?.app ?? preferredActiveApp {
+        case .some(let app) where app == .appleMusic || app == .spotify:
+            scriptRunner("tell application \"\(app.rawValue)\" to \(musicCommand)")
+        case .some:
+            mediaKeys.post(key)
+        case .none:
+            // Nothing is playing: a media key now would only make macOS launch Music.
+            break
         }
-        guard let app = currentTrack?.app ?? preferredActiveApp else { return }
-        runAppleScript("tell application \"\(app.rawValue)\" to previous track")
     }
 
     private var preferredActiveApp: NowPlayingApp? {
@@ -522,7 +692,8 @@ public final class NowPlayingService: ObservableObject {
         return nil
     }
 
-    private func runAppleScript(_ source: String) {
+    /// Runs AppleScript off the calling thread.
+    public nonisolated static func executeAppleScript(_ source: String) {
         Task.detached(priority: .userInitiated) {
             let script = NSAppleScript(source: source)
             var errorInfo: NSDictionary?
@@ -531,29 +702,32 @@ public final class NowPlayingService: ObservableObject {
     }
 
     private func fetchAppleMusicArtwork() {
-        Task.detached(priority: .utility) { [weak self] in
-            let scriptSource = "tell application \"Music\" to get raw data of artwork 1 of current track"
-            let script = NSAppleScript(source: scriptSource)
-            var errorInfo: NSDictionary?
-            if let desc = script?.executeAndReturnError(&errorInfo), desc.descriptorType == typeType || desc.data.count > 100 {
-                let data = desc.data
-                await MainActor.run {
-                    guard let self = self, let current = self.currentTrack, current.app == .appleMusic else { return }
-                    let updated = NowPlayingTrack(
-                        app: current.app,
-                        title: current.title,
-                        artist: current.artist,
-                        album: current.album,
-                        duration: current.duration,
-                        position: current.position,
-                        isPlaying: current.isPlaying,
-                        artworkData: data
-                    )
-                    self.currentTrack = updated
-                    ZenithIslandState.shared.nowPlayingTrack = updated
-                }
-            }
+        // This task runs on the main actor; only the AppleScript call leaves it, and it hands back plain data.
+        // (Capturing `self` into a detached task and hopping back with `MainActor.run` is rejected by the Swift 6.1
+        // compiler as a possible data race.)
+        Task { [weak self] in
+            let data = await Task.detached(priority: .utility) { Self.readAppleMusicArtwork() }.value
+            guard let self, let data, let current = self.currentTrack, current.app == .appleMusic else { return }
+            self.updateTrack(NowPlayingTrack(
+                app: current.app,
+                title: current.title,
+                artist: current.artist,
+                album: current.album,
+                duration: current.duration,
+                position: current.position,
+                isPlaying: current.isPlaying,
+                artworkData: data
+            ))
         }
+    }
+
+    /// Asks Music for the current track's artwork. Blocks on an Apple Event, so call it off the main thread.
+    nonisolated private static func readAppleMusicArtwork() -> Data? {
+        let script = NSAppleScript(source: "tell application \"Music\" to get raw data of artwork 1 of current track")
+        var errorInfo: NSDictionary?
+        guard let desc = script?.executeAndReturnError(&errorInfo),
+              desc.descriptorType == typeType || desc.data.count > 100 else { return nil }
+        return desc.data
     }
 
     private func checkRunningPlayers() {
@@ -561,7 +735,7 @@ public final class NowPlayingService: ObservableObject {
         let spotifyRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: NowPlayingApp.spotify.bundleIdentifier).isEmpty
 
         if !musicRunning && !spotifyRunning && currentTrack == nil {
-            ZenithIslandState.shared.nowPlayingTrack = nil
+            islandState.nowPlayingTrack = nil
         }
     }
 }

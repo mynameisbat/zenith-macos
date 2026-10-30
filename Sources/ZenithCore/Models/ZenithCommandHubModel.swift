@@ -76,7 +76,11 @@ public final class ZenithCommandHubState: ObservableObject {
     @Published public var hardwareSnapshot: HardwareSnapshot = HardwareSnapshot()
     @Published public var showTopHogs: Bool = true
 
-    public init() {}
+    private let optimizer: SystemOptimizerService
+
+    public init(optimizer: SystemOptimizerService = .shared) {
+        self.optimizer = optimizer
+    }
 
     public var filteredTopHogs: [ProcessTelemetry] {
         let allHogs = hardwareSnapshot.cpu.topHogs
@@ -123,11 +127,11 @@ public final class ZenithCommandHubState: ObservableObject {
         HardwareTelemetryService.shared.invalidateProcessCache()
         refreshHardwareSnapshot(sync: true)
 
+        let optimizer = self.optimizer
         Task.detached(priority: .utility) { [weak self] in
-            _ = try? SystemOptimizerService.shared.execute(taskId: .preventNetworkDsStore)
-            _ = try? SystemOptimizerService.shared.execute(taskId: .quickLookCacheRefresh)
-            _ = try? SystemOptimizerService.shared.execute(taskId: .dnsCacheFlush)
-            _ = try? SystemOptimizerService.shared.execute(taskId: .zombieProcessCleanup)
+            _ = try? optimizer.execute(taskId: .quickLookCacheRefresh)
+            _ = try? optimizer.execute(taskId: .dnsCacheFlush)
+            _ = try? optimizer.execute(taskId: .zombieProcessCleanup)
             await MainActor.run { [weak self] in
                 self?.refreshHardwareSnapshot(sync: true)
             }

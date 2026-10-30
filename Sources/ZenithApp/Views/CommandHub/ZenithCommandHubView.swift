@@ -499,6 +499,17 @@ public struct ZenithCommandHubView: View {
                 // System Cleaner Badge
                 Button {
                     Task {
+                        // Nothing has been scanned yet: look first, so there is something to confirm.
+                        if cleaner.categories.isEmpty && !cleaner.isScanning {
+                            await cleaner.scan()
+                        }
+                        guard cleaner.selectedJunkSize > 0,
+                              DestructiveConfirmation.confirm(
+                                title: "Delete \(cleaner.formatSelectedSize) permanently?",
+                                message: "These cannot be restored:\n\(cleaner.selectionSummary)",
+                                destructiveTitle: "Delete Permanently"
+                              ) else { return }
+
                         let freed = await cleaner.cleanSelected()
                         if freed > 0 {
                             ToastHUDController.shared.show(

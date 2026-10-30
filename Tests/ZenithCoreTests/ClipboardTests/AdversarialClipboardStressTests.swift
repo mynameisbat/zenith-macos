@@ -475,7 +475,7 @@ struct AdversarialClipboardStressTests {
 
     @Test("PasteboardMonitor start and stop monitoring lifecycle is thread-safe under concurrent stress")
     func testPasteboardMonitorStartStopLifecycleConcurrency() async {
-        let monitor = PasteboardMonitor(pasteboard: .general)
+        let monitor = PasteboardMonitor(pasteboard: NSPasteboard.withUniqueName())
 
         await withTaskGroup(of: Void.self) { group in
             for i in 0..<30 {

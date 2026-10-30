@@ -32,13 +32,39 @@ public struct ExternalVolumeItem: Identifiable, Sendable, Equatable {
     }
 }
 
+public enum ExternalDriveError: Error, LocalizedError, Equatable {
+    case notAnExternalVolume(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .notAnExternalVolume(let path):
+            return "\(path) is not a mounted, writable external volume, so nothing was removed."
+        }
+    }
+}
+
 /// Service that scrubs macOS phantom files (.DS_Store, AppleDouble ._*, .TemporaryItems)
 /// from external drives, USB thumbsticks, and shared FAT/exFAT/NTFS storage.
 /// Modeled after Mole's `mo clean --external`.
+///
+/// It deletes permanently, so it is deliberately narrow: it only works on the root of a mounted external volume, and a
+/// file is only "phantom" when its content says so, not merely because of its name.
 public final class ExternalDriveSanitizerService: @unchecked Sendable {
     public static let shared = ExternalDriveSanitizerService()
 
-    public init() {}
+    private let volumeProvider: (@Sendable () -> [URL])?
+
+    /// - Parameter volumeProvider: The volumes `sanitize` may work on. By default, the mounted external volumes.
+    public init(volumeProvider: (@Sendable () -> [URL])? = nil) {
+        self.volumeProvider = volumeProvider
+    }
+
+    /// Folders macOS creates at the top of a volume. Below the root a folder of that name is the user's.
+    private static let volumeRootFolders: Set<String> = [".TemporaryItems", ".Spotlight-V100", ".fseventsd"]
+    /// Files that are junk wherever they are. (`desktop.ini` is not: it holds a Windows user's folder customisation.)
+    private static let phantomFileNames: Set<String> = [".DS_Store", "Thumbs.db"]
+    /// The first four bytes of every AppleDouble file.
+    private static let appleDoubleMagic = Data([0x00, 0x05, 0x16, 0x07])
 
     /// Discovers all mounted external volumes (excluding the boot disk).
     public func discoverExternalVolumes() -> [ExternalVolumeItem] {
@@ -94,40 +120,64 @@ public final class ExternalDriveSanitizerService: @unchecked Sendable {
         return items
     }
 
-    /// Scans a target volume for phantom macOS metadata files.
+    /// Scans a target volume for phantom macOS metadata files, streaming through it rather than listing the whole tree
+    /// first (a multi-terabyte drive has millions of entries).
     public func scanVolume(url: URL) async -> (fileCount: Int, byteSize: Int64, paths: [URL]) {
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: url.path) else {
-            return (0, 0, [])
-        }
+        await Task.detached(priority: .utility) {
+            Self.findPhantoms(in: url)
+        }.value
+    }
 
+    /// The names in a directory, `._*` files included. Foundation's `enumerator` and `contentsOfDirectory` both leave
+    /// those out (they are the main thing to find here), so the directory is read with POSIX `readdir`.
+    static func directoryEntries(atPath path: String) -> [String]? {
+        guard let directory = opendir(path) else { return nil }
+        defer { closedir(directory) }
+        var names: [String] = []
+        while let entry = readdir(directory) {
+            let name = withUnsafePointer(to: &entry.pointee.d_name) { pointer in
+                pointer.withMemoryRebound(to: CChar.self, capacity: Int(entry.pointee.d_namlen) + 1) { String(cString: $0) }
+            }
+            if name != "." && name != ".." {
+                names.append(name)
+            }
+        }
+        return names
+    }
+
+    /// Walks the volume one directory at a time; `lstat` tells links from real files so nothing is followed.
+    static func findPhantoms(in root: URL) -> (fileCount: Int, byteSize: Int64, paths: [URL]) {
+        let rootPath = root.standardizedFileURL.path
         var phantomPaths: [URL] = []
         var totalBytes: Int64 = 0
+        var pending = [root]
+        var directoriesVisited = 0
 
-        guard let subpaths = try? fileManager.subpathsOfDirectory(atPath: url.path) else {
-            return (0, 0, [])
-        }
+        while let directory = pending.popLast() {
+            directoriesVisited += 1
+            if directoriesVisited % 256 == 0, Task.isCancelled { break }
+            guard let names = directoryEntries(atPath: directory.path) else { continue }  // unreadable: skipped
 
-        for subpath in subpaths {
-            let fileURL = url.appendingPathComponent(subpath)
-            let filename = fileURL.lastPathComponent
+            for name in names {
+                let url = directory.appendingPathComponent(name)
+                var info = stat()
+                guard lstat(url.path, &info) == 0 else { continue }
 
-            var isPhantom = false
-            if filename == ".DS_Store" ||
-               filename.hasPrefix("._") ||
-               filename == ".TemporaryItems" ||
-               filename == ".Spotlight-V100" ||
-               filename == ".fseventsd" ||
-               filename == "Thumbs.db" ||
-               filename == "desktop.ini" {
-                isPhantom = true
-            }
-
-            if isPhantom {
-                phantomPaths.append(fileURL)
-                if let vals = try? fileURL.resourceValues(forKeys: [.fileSizeKey]),
-                   let size = vals.fileSize {
-                    totalBytes += Int64(size)
+                switch info.st_mode & S_IFMT {
+                case S_IFDIR:
+                    if volumeRootFolders.contains(name), directory.standardizedFileURL.path == rootPath {
+                        phantomPaths.append(url)
+                        totalBytes += size(of: url)
+                    } else {
+                        pending.append(url)
+                    }
+                case S_IFREG:
+                    if phantomFileNames.contains(name) || (name.hasPrefix("._") && isAppleDouble(url)) {
+                        phantomPaths.append(url)
+                        totalBytes += Int64(info.st_size)
+                    }
+                default:
+                    continue    // symlinks, sockets, devices: never touched
                 }
             }
         }
@@ -135,9 +185,42 @@ public final class ExternalDriveSanitizerService: @unchecked Sendable {
         return (phantomPaths.count, totalBytes, phantomPaths)
     }
 
+    /// A `._name` file is only AppleDouble metadata if it starts with the AppleDouble header. On a Mac-formatted drive a
+    /// file called `._notes` is quite possibly the user's own.
+    static func isAppleDouble(_ url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        return handle.readData(ofLength: 4) == appleDoubleMagic
+    }
+
+    private static func size(of directory: URL) -> Int64 {
+        var total: Int64 = 0
+        var pending = [directory]
+        while let current = pending.popLast() {
+            guard let names = directoryEntries(atPath: current.path) else { continue }
+            for name in names {
+                let url = current.appendingPathComponent(name)
+                var info = stat()
+                guard lstat(url.path, &info) == 0 else { continue }
+                switch info.st_mode & S_IFMT {
+                case S_IFDIR: pending.append(url)
+                case S_IFREG: total += Int64(info.st_blocks) * 512
+                default: continue
+                }
+            }
+        }
+        return total
+    }
+
     /// Sanitizes an external volume by permanently removing all macOS phantom metadata files.
+    /// Throws without touching anything unless `volumeURL` is the root of a mounted external volume.
     @discardableResult
     public func sanitize(volumeURL: URL) async throws -> (removedCount: Int, freedBytes: Int64) {
+        let volumes = volumeProvider?() ?? discoverExternalVolumes().map(\.url)
+        guard volumes.contains(where: { $0.standardizedFileURL.path == volumeURL.standardizedFileURL.path }) else {
+            throw ExternalDriveError.notAnExternalVolume(volumeURL.path)
+        }
+
         let (_, _, paths) = await scanVolume(url: volumeURL)
         let fileManager = FileManager.default
 
@@ -149,13 +232,17 @@ public final class ExternalDriveSanitizerService: @unchecked Sendable {
                 continue
             }
 
-            if let vals = try? path.resourceValues(forKeys: [.fileSizeKey]),
-               let size = vals.fileSize {
-                freedBytes += Int64(size)
-            }
+            let size = (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
+            let weight = (try? path.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true ? Self.size(of: path) : size
 
-            try? fileManager.removeItem(at: path)
-            removedCount += 1
+            // Count only what was really removed (a read-only share or a locked file fails here).
+            do {
+                try fileManager.removeItem(at: path)
+                removedCount += 1
+                freedBytes += weight
+            } catch {
+                continue
+            }
         }
 
         if freedBytes > 0 {

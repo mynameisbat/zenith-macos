@@ -221,8 +221,9 @@ public final class AppUninstallerService: @unchecked Sendable {
         if fileManager.fileExists(atPath: groupContainers),
            let contents = try? fileManager.contentsOfDirectory(atPath: groupContainers) {
             for dirName in contents {
-                if (!bundleId.isEmpty && dirName.localizedCaseInsensitiveContains(bundleId)) ||
-                   (!appName.isEmpty && dirName.localizedCaseInsensitiveContains(appName)) {
+                // Matched by bundle identifier only: an app's display name ("Notes", "Mail") is too common a word
+                // to decide that a shared container belongs to it.
+                if !bundleId.isEmpty && dirName.localizedCaseInsensitiveContains(bundleId) {
                     let fullPath = "\(groupContainers)/\(dirName)"
                     let size = calculateSize(of: fullPath)
                     items.append(AppLeftoverItem(name: dirName, path: fullPath, kind: .groupContainers, sizeBytes: size))
@@ -278,7 +279,7 @@ public final class AppUninstallerService: @unchecked Sendable {
 
         // 10. Launch Agents (~/Library/LaunchAgents/<BundleID>*.plist)
         let userAgents = "\(home)/Library/LaunchAgents"
-        checkLaunchAgentCandidates(base: userAgents, bundleId: bundleId, appName: appName, items: &items)
+        checkLaunchAgentCandidates(base: userAgents, bundleId: bundleId, items: &items)
 
         return items
     }
@@ -296,13 +297,12 @@ public final class AppUninstallerService: @unchecked Sendable {
         }
     }
 
-    private func checkLaunchAgentCandidates(base: String, bundleId: String, appName: String, items: inout [AppLeftoverItem]) {
+    private func checkLaunchAgentCandidates(base: String, bundleId: String, items: inout [AppLeftoverItem]) {
         guard fileManager.fileExists(atPath: base),
               let files = try? fileManager.contentsOfDirectory(atPath: base) else { return }
         for f in files where f.hasSuffix(".plist") {
-            let matchesBundle = !bundleId.isEmpty && f.hasPrefix(bundleId)
-            let matchesName = !appName.isEmpty && f.lowercased().contains(appName.lowercased())
-            if matchesBundle || matchesName {
+            // Agents are unloaded and deleted, so only those named after the app's bundle identifier qualify.
+            if !bundleId.isEmpty && f.hasPrefix(bundleId) {
                 let p = "\(base)/\(f)"
                 if !items.contains(where: { $0.path == p }) {
                     items.append(AppLeftoverItem(name: f, path: p, kind: .launchAgents, sizeBytes: calculateSize(of: p)))
@@ -424,7 +424,10 @@ public final class AppUninstallerService: @unchecked Sendable {
         let canonical = (path as NSString).standardizingPath
         let home = (NSHomeDirectory() as NSString).standardizingPath
         // Leftovers must reside inside user's ~/Library
-        guard canonical.hasPrefix("\(home)/Library") else {
+        guard canonical.hasPrefix("\(home)/Library/") else {
+            return false
+        }
+        if isAppleOwnedLeftover(canonical, home: home) {
             return false
         }
         // Protect critical user root directories
@@ -452,6 +455,23 @@ public final class AppUninstallerService: @unchecked Sendable {
         }
 
         return true
+    }
+
+    /// Names of Apple's own data folders that no third-party app's leftovers can legitimately be.
+    private static let appleOwnedLeftoverNames: Set<String> = [
+        "addressbook", "mail", "messages", "safari", "keychains", "calendars", "cloudstorage", "icloud", "mobile documents"
+    ]
+
+    /// True when `~/Library/<category>[/<name>[/…]]` is, or sits inside, something macOS itself owns:
+    /// a folder like `Keychains` or `Mail` at either level, or any `com.apple.*` entry.
+    private func isAppleOwnedLeftover(_ canonicalPath: String, home: String) -> Bool {
+        let relative = canonicalPath.dropFirst(home.count + "/Library/".count)
+        let parts = relative.split(separator: "/").map { $0.lowercased() }
+        guard let category = parts.first else { return false }
+        if Self.appleOwnedLeftoverNames.contains(category) { return true }
+        guard parts.count >= 2 else { return false }
+        let name = parts[1]
+        return name.hasPrefix("com.apple.") || name.hasPrefix("group.com.apple.") || Self.appleOwnedLeftoverNames.contains(name)
     }
 
     // MARK: - Helpers

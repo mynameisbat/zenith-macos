@@ -78,11 +78,14 @@ struct MoleFeatureServicesTests {
         let userPhoto = tempDir.appendingPathComponent("Vacation.jpg")
 
         let dummyData = Data(repeating: 0x20, count: 512)
+        // A real AppleDouble file starts with the magic number 0x00051607.
+        var appleDoubleData = Data([0x00, 0x05, 0x16, 0x07])
+        appleDoubleData.append(Data(repeating: 0x20, count: 508))
         try dummyData.write(to: dsStore)
-        try dummyData.write(to: appleDouble)
+        try appleDoubleData.write(to: appleDouble)
         try dummyData.write(to: userPhoto)
 
-        let service = ExternalDriveSanitizerService()
+        let service = ExternalDriveSanitizerService(volumeProvider: { [tempDir] in [tempDir] })
         let scanResult = await service.scanVolume(url: tempDir)
 
         #expect(scanResult.fileCount == 2)
@@ -155,7 +158,10 @@ struct MoleFeatureServicesTests {
 
     @Test("MOLE-06: System optimizer zombie cleanup and launch services execute cleanly")
     func testSystemOptimizerZombieAndLaunchServices() async throws {
-        let optimizer = SystemOptimizerService()
+        // The commands are recorded, not run: a real `lsregister -kill -r` rebuilds the Launch Services database
+        // of whoever runs the tests.
+        let commands = RecordingCommandRunner()
+        let optimizer = SystemOptimizerService(runner: commands.runner)
 
         // Zombie process cleanup
         let zombieFreed = try optimizer.execute(taskId: .zombieProcessCleanup)
@@ -164,5 +170,6 @@ struct MoleFeatureServicesTests {
         // Launch services rebuild
         let lsFreed = try optimizer.execute(taskId: .launchServicesRebuild)
         #expect(lsFreed >= 0)
+        #expect(commands.didRun("lsregister", containing: "-kill"))
     }
 }
