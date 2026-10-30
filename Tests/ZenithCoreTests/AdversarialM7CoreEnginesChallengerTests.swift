@@ -564,7 +564,7 @@ struct AdversarialM7CoreEnginesChallengerTests {
 
     @Test("ADV-M7-17: PasteboardMonitor extractClipboardItem priority and empty data rejection")
     func testExtractClipboardItemMultiFormatPriorityAndRejection() {
-        let monitor = PasteboardMonitor(pasteboard: .general)
+        let monitor = PasteboardMonitor(pasteboard: NSPasteboard.withUniqueName())
 
         // Using isolated named pasteboard
         let pbName = NSPasteboard.Name("com.goldengate.test.m7.\(UUID().uuidString)")
@@ -601,7 +601,7 @@ struct AdversarialM7CoreEnginesChallengerTests {
 
     @Test("ADV-M7-18: PasteboardMonitor concurrent startMonitoring and stopMonitoring torture")
     func testPasteboardMonitorStartStopTorture() async {
-        let monitor = PasteboardMonitor(pasteboard: .general, pollingInterval: 0.05)
+        let monitor = PasteboardMonitor(pasteboard: NSPasteboard.withUniqueName(), pollingInterval: 0.05)
 
         await withTaskGroup(of: Void.self) { group in
             for i in 0..<50 {
