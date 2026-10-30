@@ -82,16 +82,28 @@ public final class SystemOptimizerService: @unchecked Sendable {
     public static let shared = SystemOptimizerService()
 
     private let fileManager: FileManager
+    private let baseHome: String?
+    private let runner: SystemCommandRunner
 
-    public init(fileManager: FileManager = .default) {
+    /// - Parameters:
+    ///   - homeDirectory: Home directory the tasks act on; the current user's when `nil`.
+    ///   - runner: Runs `defaults`, `qlmanage`, `lsregister`, `tmutil` and friends; tests substitute a fake so that
+    ///     exercising a task never changes the machine running them.
+    public init(
+        fileManager: FileManager = .default,
+        homeDirectory: String? = nil,
+        runner: @escaping SystemCommandRunner = SystemCommand.processRunner
+    ) {
         self.fileManager = fileManager
+        self.baseHome = homeDirectory
+        self.runner = runner
     }
 
     // MARK: - Scanning
 
     /// Scans the system for maintenance opportunities and reclaimable overhead.
     public func scan(homeDirectory: String? = nil) -> [OptimizationTaskItem] {
-        let home = homeDirectory ?? NSHomeDirectory()
+        let home = homeDirectory ?? baseHome ?? NSHomeDirectory()
         var tasks: [OptimizationTaskItem] = []
 
         // 1. APFS Local Snapshots
@@ -218,16 +230,19 @@ public final class SystemOptimizerService: @unchecked Sendable {
     /// Executes the specified optimization task.
     @discardableResult
     public func execute(taskId: OptimizationTaskId, homeDirectory: String? = nil) throws -> Int64 {
-        let home = homeDirectory ?? NSHomeDirectory()
+        let home = homeDirectory ?? baseHome ?? NSHomeDirectory()
         var freedBytes: Int64 = 0
 
         switch taskId {
         case .apfsSnapshots:
             let snapshots = listApfsLocalSnapshots()
-            for date in snapshots {
-                deleteApfsSnapshot(date: date)
+            let availableBefore = availableCapacity()
+            let deleted = snapshots.filter { deleteApfsSnapshot(date: $0) }.count
+            if !snapshots.isEmpty && deleted == 0 {
+                throw OptimizerError.requiresAdministrator("macOS only lets administrators delete local snapshots (tmutil needs root)")
             }
-            freedBytes = Int64(snapshots.count) * 1_073_741_824
+            // What was really reclaimed, not an estimate: how much more free space the volume has now.
+            freedBytes = max(0, availableCapacity() - availableBefore)
 
         case .orphanLaunchAgents:
             let orphans = findOrphanLaunchAgents(home: home)
@@ -244,17 +259,8 @@ public final class SystemOptimizerService: @unchecked Sendable {
             }
 
         case .preventNetworkDsStore:
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
-            proc.arguments = ["write", "com.apple.desktopservices", "DSDontWriteNetworkStores", "-bool", "true"]
-            try? proc.run()
-            proc.waitUntilExit()
-
-            let procUSB = Process()
-            procUSB.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
-            procUSB.arguments = ["write", "com.apple.desktopservices", "DSDontWriteUSBStores", "-bool", "true"]
-            try? procUSB.run()
-            procUSB.waitUntilExit()
+            try runChecked("/usr/bin/defaults", ["write", "com.apple.desktopservices", "DSDontWriteNetworkStores", "-bool", "true"])
+            try runChecked("/usr/bin/defaults", ["write", "com.apple.desktopservices", "DSDontWriteUSBStores", "-bool", "true"])
 
         case .quickLookCacheRefresh:
             let candidatePaths = [
@@ -266,39 +272,28 @@ public final class SystemOptimizerService: @unchecked Sendable {
                 try? fileManager.removeItem(atPath: p)
             }
             // Reset qlmanage
-            let ql = Process()
-            ql.executableURL = URL(fileURLWithPath: "/usr/bin/qlmanage")
-            ql.arguments = ["-r"]
-            try? ql.run()
-            ql.waitUntilExit()
+            try runChecked("/usr/bin/qlmanage", ["-r"])
 
         case .dnsCacheFlush:
-            let dscache = Process()
-            dscache.executableURL = URL(fileURLWithPath: "/usr/bin/dscacheutil")
-            dscache.arguments = ["-flushcache"]
-            try? dscache.run()
-            dscache.waitUntilExit()
-
-            let mdns = Process()
-            mdns.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-            mdns.arguments = ["-HUP", "mDNSResponder"]
-            try? mdns.run()
-            mdns.waitUntilExit()
+            try runChecked("/usr/bin/dscacheutil", ["-flushcache"])
+            // mDNSResponder runs as root, so for a normal user this only succeeds when launched with elevated rights.
+            // Saying so is better than reporting a flush that did not happen.
+            if runner("/usr/bin/killall", ["-HUP", "mDNSResponder"])?.status != 0 {
+                throw OptimizerError.requiresAdministrator("the directory-service cache was flushed, but the system DNS responder can only be reset by an administrator")
+            }
 
         case .launchServicesRebuild:
             let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
             if fileManager.fileExists(atPath: lsregister) {
-                let proc = Process()
-                proc.executableURL = URL(fileURLWithPath: lsregister)
-                proc.arguments = ["-kill", "-r", "-domain", "local", "-domain", "system", "-domain", "user"]
-                try? proc.run()
-                proc.waitUntilExit()
+                try runChecked(lsregister, ["-kill", "-r", "-domain", "local", "-domain", "system", "-domain", "user"])
             }
 
         case .zombieProcessCleanup:
+            // A zombie is already dead, so signalling it does nothing; only its parent can reap it, and the
+            // standard nudge for that is SIGCHLD.
             let zombies = HardwareTelemetryService.shared.readCPUTelemetry().zombieProcesses
-            for z in zombies {
-                HardwareTelemetryService.shared.killProcess(pid: z.pid, force: true)
+            for zombie in zombies {
+                HardwareTelemetryService.shared.requestReap(of: zombie)
             }
         }
 
@@ -308,16 +303,7 @@ public final class SystemOptimizerService: @unchecked Sendable {
     // MARK: - Internal Helpers
 
     public func listApfsLocalSnapshots() -> [String] {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/tmutil")
-        proc.arguments = ["listlocalsnapshots", "/"]
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        try? proc.run()
-        proc.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else { return [] }
+        guard let output = runner("/usr/bin/tmutil", ["listlocalsnapshots", "/"])?.output else { return [] }
 
         // Output lines look like: "com.apple.TimeMachine.2026-10-24-123456.local"
         var dates: [String] = []
@@ -334,12 +320,27 @@ public final class SystemOptimizerService: @unchecked Sendable {
         return dates
     }
 
-    public func deleteApfsSnapshot(date: String) {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/tmutil")
-        proc.arguments = ["deletelocalsnapshots", date]
-        try? proc.run()
-        proc.waitUntilExit()
+    @discardableResult
+    public func deleteApfsSnapshot(date: String) -> Bool {
+        runner("/usr/bin/tmutil", ["deletelocalsnapshots", date])?.status == 0
+    }
+
+    /// Runs a command whose failure means the task did not do its job.
+    private func runChecked(_ executable: String, _ arguments: [String]) throws {
+        let name = URL(fileURLWithPath: executable).lastPathComponent
+        guard let result = runner(executable, arguments) else {
+            throw OptimizerError.commandFailed(tool: name, detail: "it could not be started")
+        }
+        guard result.status == 0 else {
+            let detail = result.errorOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+            throw OptimizerError.commandFailed(tool: name, detail: detail.isEmpty ? "exit status \(result.status)" : detail)
+        }
+    }
+
+    /// Free bytes on the startup volume, excluding space macOS could purge (which local snapshots count as).
+    private func availableCapacity() -> Int64 {
+        let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeAvailableCapacityKey])
+        return Int64(values?.volumeAvailableCapacity ?? 0)
     }
 
     public func findOrphanLaunchAgents(home: String) -> [String] {
@@ -404,5 +405,19 @@ public final class SystemOptimizerService: @unchecked Sendable {
             total += Int64(vals.totalFileAllocatedSize ?? vals.fileSize ?? 0)
         }
         return total
+    }
+}
+
+public enum OptimizerError: Error, LocalizedError, Equatable {
+    case commandFailed(tool: String, detail: String)
+    case requiresAdministrator(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .commandFailed(let tool, let detail):
+            return "\(tool) failed: \(detail)."
+        case .requiresAdministrator(let reason):
+            return "Administrator rights are required: \(reason)."
+        }
     }
 }

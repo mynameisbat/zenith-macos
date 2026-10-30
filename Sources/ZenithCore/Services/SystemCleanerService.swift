@@ -113,7 +113,11 @@ public final class SystemCleanerService: ObservableObject {
     @Published public var lastFreedBytes: Int64? = nil
     @Published public var statusMessage: String? = nil
 
-    public init() {
+    private let homeOverride: String?
+
+    /// - Parameter homeDirectory: The home directory to scan and clean; the current user's when `nil`.
+    public init(homeDirectory: String? = nil) {
+        self.homeOverride = homeDirectory
         refreshDiskSpace()
         refreshMemoryTelemetry()
     }
@@ -146,6 +150,14 @@ public final class SystemCleanerService: ObservableObject {
         Self.formatBytes(selectedJunkSize)
     }
 
+    /// What a clean would permanently delete, category by category, for confirmation dialogs.
+    public var selectionSummary: String {
+        categories
+            .filter { $0.selectedSize > 0 }
+            .map { "• \($0.title) — \(Self.formatBytes($0.selectedSize))" }
+            .joined(separator: "\n")
+    }
+
     // MARK: - Disk Space Telemetry
 
     public func refreshDiskSpace() {
@@ -172,9 +184,10 @@ public final class SystemCleanerService: ObservableObject {
 
         refreshDiskSpace()
 
+        let homeOverride = self.homeOverride
         let scannedCategories = await Task.detached(priority: .userInitiated) { () -> [JunkCategory] in
             let fm = FileManager.default
-            let home = fm.homeDirectoryForCurrentUser.path
+            let home = homeOverride ?? fm.homeDirectoryForCurrentUser.path
             var result: [JunkCategory] = []
 
             // 1. Browser Caches (Chrome, Arc, Brave, Edge, Firefox - cache directories only, preserving cookies & history)
@@ -290,7 +303,6 @@ public final class SystemCleanerService: ObservableObject {
                 ("Python Poetry Cache", "\(home)/Library/Caches/pypoetry"),
                 ("Android SDK & Build Cache", "\(home)/.android/cache"),
                 ("JetBrains IDE Caches", "\(home)/Library/Caches/JetBrains"),
-                ("Docker Container VM Cache", "\(home)/Library/Containers/com.docker.docker/Data/vms"),
                 ("Cursor AI Editor Cache", "\(home)/Library/Application Support/Cursor/Cache"),
                 ("Claude Desktop App Cache", "\(home)/Library/Caches/com.anthropic.claudedesktop")
             ]
@@ -405,14 +417,16 @@ public final class SystemCleanerService: ObservableObject {
 
             // 6. User Trash Bin
             let trashPath = "\(home)/.Trash"
-            if let cat = Self.scanDirectoryItems(
+            if var cat = Self.scanDirectoryItems(
                 id: "user_trash",
                 title: "Trash Bin",
-                description: "Deleted files in macOS Trash waiting to be permanently erased.",
+                description: "Deleted files in macOS Trash waiting to be permanently erased. Not selected by default: this is your own data, and emptying it cannot be undone.",
                 icon: "trash.fill",
                 basePath: trashPath,
                 fileManager: fm
             ) {
+                cat.isSelected = false
+                for index in cat.items.indices { cat.items[index].isSelected = false }
                 result.append(cat)
             }
 
@@ -495,7 +509,6 @@ public final class SystemCleanerService: ObservableObject {
             "\(home)/Library/Saved Application State",
             "\(home)/Library/pnpm",
             "\(home)/Library/iTunes",
-            "\(home)/Library/Containers/com.docker.docker/Data/vms",
             "\(home)/Library/Containers/com.apple.mail/Data/Library/Mail Downloads",
             "\(home)/Library/Application Support/Cursor/Cache",
             "\(home)/.Trash",
@@ -536,6 +549,20 @@ public final class SystemCleanerService: ObservableObject {
         ].map { URL(fileURLWithPath: $0).standardizedFileURL.path })
     }
 
+    /// True when the item's parent directory really is where its path says, relative to the (possibly symlinked) root.
+    /// The root itself may be a symlink, as when `~/.cache` lives on another drive; a symlinked directory below it may not.
+    nonisolated static func staysInsideRootPhysically(candidate: String, root: String) -> Bool {
+        let relativeParents = candidate.dropFirst(root.hasSuffix("/") ? root.count : root.count + 1)
+            .split(separator: "/")
+            .dropLast()
+        var expected = URL(fileURLWithPath: root).resolvingSymlinksInPath()
+        for component in relativeParents {
+            expected.appendPathComponent(String(component))
+        }
+        let actualParent = URL(fileURLWithPath: candidate).deletingLastPathComponent().resolvingSymlinksInPath()
+        return actualParent.path == expected.path
+    }
+
     /// Validates whether a candidate path is safe for deletion (CRIT-02, CRIT-03, HIGH-10).
     /// Standardizes relative segments with standardizedFileURL.
     /// CRITICAL: Does NOT call resolvingSymlinksInPath() to prevent symlink traversal attacks.
@@ -550,12 +577,22 @@ public final class SystemCleanerService: ObservableObject {
 
         let safeRoots = safeDirectoryRoots(home: home)
         // Candidate must be strictly within one of the safe directory roots, never equal to the root itself
-        let isStrictlyInside = safeRoots.contains { root in
+        let containingRoot = safeRoots.first { root in
             let prefix = root.hasSuffix("/") ? root : root + "/"
             return candidate.hasPrefix(prefix) && candidate != root
         }
 
-        guard isStrictlyInside else {
+        guard let root = containingRoot else {
+            return false
+        }
+
+        // Docker Desktop keeps every image, container and named volume in its VM disk under here. It is user data.
+        if candidate.contains("/Containers/com.docker.docker/") {
+            return false
+        }
+
+        // A symlink between the root and the item would send the deletion somewhere the lexical check never saw.
+        guard staysInsideRootPhysically(candidate: candidate, root: root) else {
             return false
         }
 
@@ -601,11 +638,12 @@ public final class SystemCleanerService: ObservableObject {
         let itemsToDelete = categories.flatMap { cat in
             cat.items.filter(\.isSelected)
         }
+        let homeOverride = self.homeOverride
 
         let freed = await Task.detached(priority: .userInitiated) { () -> Int64 in
             let fm = FileManager.default
             var bytesFreed: Int64 = 0
-            let home = fm.homeDirectoryForCurrentUser.path
+            let home = homeOverride ?? fm.homeDirectoryForCurrentUser.path
 
             for item in itemsToDelete {
                 let stdURL = URL(fileURLWithPath: item.path).standardizedFileURL
