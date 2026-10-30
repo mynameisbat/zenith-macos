@@ -540,13 +540,5 @@ public final class ZenithIslandWindowController: NSObject {
         panel = nil
     }
 
-    isolated deinit {
-        NotificationCenter.default.removeObserver(self)
-        if let monitor = globalMouseMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-        if let monitor = localMouseMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-    }
+    // There is no deinit: this is a singleton, `teardown()` removes the monitors, and `isolated deinit` needs Swift 6.2.
 }

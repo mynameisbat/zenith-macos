@@ -3,11 +3,37 @@ import Foundation
 import Combine
 import ZenithCore
 
+/// Owns an `NSEvent` monitor and removes it when released, on the main thread.
+///
+/// This lets a main-actor class clean up without `isolated deinit`, which needs Swift 6.2; the README promises 6.0.
+private final class EventMonitorToken: @unchecked Sendable {
+    private var monitor: Any?
+
+    init(_ monitor: Any?) {
+        self.monitor = monitor
+    }
+
+    /// Removes the monitor now. Call on the main thread.
+    @MainActor
+    func remove() {
+        guard let monitor else { return }
+        self.monitor = nil
+        NSEvent.removeMonitor(monitor)
+    }
+
+    deinit {
+        // A deinit can run on any thread; monitors must be removed on the main one.
+        guard let monitor else { return }
+        nonisolated(unsafe) let leftover = monitor
+        DispatchQueue.main.async { NSEvent.removeMonitor(leftover) }
+    }
+}
+
 /// Model managing interactive hotkey recording and NSEvent monitor lifecycle.
 @MainActor
 public final class ShortcutRecorderModel: ObservableObject {
     @Published public var isRecording: Bool = false
-    private var monitor: Any?
+    private var monitor: EventMonitorToken?
 
     public init() {}
 
@@ -15,7 +41,7 @@ public final class ShortcutRecorderModel: ObservableObject {
         guard !isRecording else { return }
         isRecording = true
 
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        monitor = EventMonitorToken(NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return event }
 
             // Escape (53) cancels recording
@@ -44,18 +70,12 @@ public final class ShortcutRecorderModel: ObservableObject {
                 self.stopRecording()
             }
             return nil
-        }
+        })
     }
 
     public func stopRecording() {
-        if let mon = monitor {
-            NSEvent.removeMonitor(mon)
-            monitor = nil
-        }
+        monitor?.remove()
+        monitor = nil
         isRecording = false
-    }
-
-    isolated deinit {
-        stopRecording()
     }
 }
