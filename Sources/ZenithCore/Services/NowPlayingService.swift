@@ -386,17 +386,17 @@ public final class NowPlayingService: ObservableObject {
         }
 
         let runner = commandRunner
-        pendingTabFetch = Task.detached(priority: .utility) { [weak self] in
-            let tab = BrowserTabProbe.activeTab(bundleIdentifier: bundleId, runner: runner)
-            await MainActor.run { [weak self] in
-                guard let self = self else { return }
-                self.pendingTabFetch = nil
-                self.tabCache = (bundleId, tab, Date())
-                // Show the title right away, but only if this browser is still the one playing.
-                if let current = self.currentTrack, current.isPlaying, current.app != .appleMusic, current.app != .spotify,
-                   let playing = self.playingApplicationProvider(), playing.bundleIdentifier == bundleId {
-                    self.updateTrackIfChanged(Self.browserTrack(for: playing, tab: tab))
-                }
+        pendingTabFetch = Task { [weak self] in
+            let tab = await Task.detached(priority: .utility) {
+                BrowserTabProbe.activeTab(bundleIdentifier: bundleId, runner: runner)
+            }.value
+            guard let self else { return }
+            self.pendingTabFetch = nil
+            self.tabCache = (bundleId, tab, Date())
+            // Show the title right away, but only if this browser is still the one playing.
+            if let current = self.currentTrack, current.isPlaying, current.app != .appleMusic, current.app != .spotify,
+               let playing = self.playingApplicationProvider(), playing.bundleIdentifier == bundleId {
+                self.updateTrackIfChanged(Self.browserTrack(for: playing, tab: tab))
             }
         }
     }
@@ -702,28 +702,32 @@ public final class NowPlayingService: ObservableObject {
     }
 
     private func fetchAppleMusicArtwork() {
-        Task.detached(priority: .utility) { [weak self] in
-            let scriptSource = "tell application \"Music\" to get raw data of artwork 1 of current track"
-            let script = NSAppleScript(source: scriptSource)
-            var errorInfo: NSDictionary?
-            if let desc = script?.executeAndReturnError(&errorInfo), desc.descriptorType == typeType || desc.data.count > 100 {
-                let data = desc.data
-                await MainActor.run {
-                    guard let self = self, let current = self.currentTrack, current.app == .appleMusic else { return }
-                    let updated = NowPlayingTrack(
-                        app: current.app,
-                        title: current.title,
-                        artist: current.artist,
-                        album: current.album,
-                        duration: current.duration,
-                        position: current.position,
-                        isPlaying: current.isPlaying,
-                        artworkData: data
-                    )
-                    self.updateTrack(updated)
-                }
-            }
+        // This task runs on the main actor; only the AppleScript call leaves it, and it hands back plain data.
+        // (Capturing `self` into a detached task and hopping back with `MainActor.run` is rejected by the Swift 6.1
+        // compiler as a possible data race.)
+        Task { [weak self] in
+            let data = await Task.detached(priority: .utility) { Self.readAppleMusicArtwork() }.value
+            guard let self, let data, let current = self.currentTrack, current.app == .appleMusic else { return }
+            self.updateTrack(NowPlayingTrack(
+                app: current.app,
+                title: current.title,
+                artist: current.artist,
+                album: current.album,
+                duration: current.duration,
+                position: current.position,
+                isPlaying: current.isPlaying,
+                artworkData: data
+            ))
         }
+    }
+
+    /// Asks Music for the current track's artwork. Blocks on an Apple Event, so call it off the main thread.
+    nonisolated private static func readAppleMusicArtwork() -> Data? {
+        let script = NSAppleScript(source: "tell application \"Music\" to get raw data of artwork 1 of current track")
+        var errorInfo: NSDictionary?
+        guard let desc = script?.executeAndReturnError(&errorInfo),
+              desc.descriptorType == typeType || desc.data.count > 100 else { return nil }
+        return desc.data
     }
 
     private func checkRunningPlayers() {
