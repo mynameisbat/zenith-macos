@@ -150,11 +150,20 @@ public final class SystemCleanerService: ObservableObject {
         Self.formatBytes(selectedJunkSize)
     }
 
-    /// What a clean would permanently delete, category by category, for confirmation dialogs.
+    /// How long a partial download must have been untouched to count as abandoned.
+    nonisolated static let abandonedDownloadAge: TimeInterval = 24 * 60 * 60
+
+    /// What a clean would permanently delete, category by category and with the largest items named, for
+    /// confirmation dialogs.
     public var selectionSummary: String {
         categories
             .filter { $0.selectedSize > 0 }
-            .map { "• \($0.title) — \(Self.formatBytes($0.selectedSize))" }
+            .map { category in
+                let names = category.items.filter(\.isSelected).sorted { $0.size > $1.size }.map(\.name)
+                let shown = names.prefix(4).joined(separator: ", ")
+                let more = names.count > 4 ? " and \(names.count - 4) more" : ""
+                return "• \(category.title) — \(Self.formatBytes(category.selectedSize)): \(shown)\(more)"
+            }
             .joined(separator: "\n")
     }
 
@@ -277,6 +286,7 @@ public final class SystemCleanerService: ObservableObject {
                 icon: "internaldrive.fill",
                 basePath: userCachesPath,
                 limit: 15,
+                skipping: Self.isDataBearingCache(named:),
                 fileManager: fm
             ) {
                 result.append(cat)
@@ -347,6 +357,9 @@ public final class SystemCleanerService: ObservableObject {
                     let ext = (file as NSString).pathExtension.lowercased()
                     if ["download", "crdownload", "part"].contains(ext) {
                         let fullPath = "\(downloadsPath)/\(file)"
+                        // A download still being written has a recent modification date; deleting it would break it.
+                        let modified = (try? fm.attributesOfItem(atPath: fullPath))?[.modificationDate] as? Date
+                        guard let modified, Date().timeIntervalSince(modified) > Self.abandonedDownloadAge else { continue }
                         let s = Self.calculateSize(of: fullPath, fileManager: fm)
                         if s > 1024 {
                             staleDownloads.append(JunkItem(name: file, path: fullPath, size: s))
@@ -357,7 +370,7 @@ public final class SystemCleanerService: ObservableObject {
                     result.append(JunkCategory(
                         id: "incomplete_downloads",
                         title: "Incomplete Downloads",
-                        description: "Interrupted and abandoned web downloads (.download, .crdownload, .part) in ~/Downloads.",
+                        description: "Interrupted web downloads (.download, .crdownload, .part) in ~/Downloads that nothing has written to for over a day.",
                         icon: "arrow.down.circle.fill",
                         items: staleDownloads
                     ))
@@ -458,6 +471,25 @@ public final class SystemCleanerService: ObservableObject {
         "com.apple.homekit",
         "com.apple.identityservicesd",
         "com.apple.coreservices"
+    ]
+
+    /// Caches in `~/Library/Caches` that hold more than rebuildable scratch data, or that macOS manages itself.
+    /// Apple's own caches (`com.apple.*`) are left to the system, apart from Xcode's; apps that keep offline media or
+    /// sync files may keep content there that would have to be downloaded again (or, for a sync client, might be waiting
+    /// to upload).
+    nonisolated public static func isDataBearingCache(named name: String) -> Bool {
+        let lower = name.lowercased()
+        if lower.hasPrefix("com.apple.") {
+            return !appleCachesSafeToClean.contains(lower)
+        }
+        return dataBearingCacheMarkers.contains { lower.contains($0) }
+    }
+
+    nonisolated private static let appleCachesSafeToClean: Set<String> = ["com.apple.dt.xcode", "com.apple.dt.instruments"]
+    nonisolated private static let dataBearingCacheMarkers = [
+        "spotify", "tidal", "deezer", "plex", "audible", "kindle",
+        "dropbox", "drivefs", "google drive", "onedrive", "nextcloud", "owncloud", "pcloud", "megasync", "syncthing",
+        "resilio", "icloud"
     ]
 
     /// Helper to determine if a bundle identifier or directory name corresponds to a protected system bundle.
@@ -588,6 +620,13 @@ public final class SystemCleanerService: ObservableObject {
 
         // Docker Desktop keeps every image, container and named volume in its VM disk under here. It is user data.
         if candidate.contains("/Containers/com.docker.docker/") {
+            return false
+        }
+
+        let cachesPrefix = "\(home)/Library/Caches/"
+        if candidate.hasPrefix(cachesPrefix),
+           let cacheName = candidate.dropFirst(cachesPrefix.count).split(separator: "/").first,
+           isDataBearingCache(named: String(cacheName)) {
             return false
         }
 
@@ -846,6 +885,7 @@ public final class SystemCleanerService: ObservableObject {
         icon: String,
         basePath: String,
         limit: Int = 15,
+        skipping: ((String) -> Bool)? = nil,
         fileManager: FileManager
     ) -> JunkCategory? {
         guard fileManager.fileExists(atPath: basePath) else { return nil }
@@ -854,6 +894,7 @@ public final class SystemCleanerService: ObservableObject {
         var items: [JunkItem] = []
         for name in contents {
             guard !name.hasPrefix(".") else { continue }
+            if let skip = skipping, skip(name) { continue }
             let fullPath = "\(basePath)/\(name)"
             if isProtectedBundle(nameOrPath: name) && !hasValidCacheDirTag(atPath: fullPath) { continue }
             var statBuf = stat()

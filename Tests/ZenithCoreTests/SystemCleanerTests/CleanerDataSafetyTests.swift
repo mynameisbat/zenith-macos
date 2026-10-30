@@ -110,6 +110,71 @@ struct CleanerDataSafetyTests {
         #expect(SystemCleanerService.isPathSafeForDeletion(home.path + "/.npm/_cacache", home: home.path) == true)
     }
 
+    @Test("SAFE-05: Offline-media, sync and Apple-managed caches are neither offered nor deletable; ordinary ones are")
+    @MainActor
+    func testDataBearingCachesAreLeftAlone() async throws {
+        let home = try makeTempDirectory("CleanHome")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let caches = home.appendingPathComponent("Library/Caches")
+        let leftAlone = ["com.spotify.client", "com.getdropbox.dropbox", "com.google.drivefs", "com.apple.bird"]
+        for name in leftAlone + ["com.apple.dt.Xcode", "com.acme.helper"] {
+            try write(caches.appendingPathComponent("\(name)/blob"), bytes: 2_000_000)
+        }
+
+        let service = SystemCleanerService(homeDirectory: home.path)
+        await service.scan()
+        let applicationCaches = try #require(service.categories.first { $0.id == "user_caches" })
+        #expect(Set(applicationCaches.items.map(\.name)) == ["com.acme.helper", "com.apple.dt.Xcode"])
+
+        for name in leftAlone {
+            #expect(SystemCleanerService.isPathSafeForDeletion(caches.path + "/" + name, home: home.path) == false)
+            #expect(SystemCleanerService.isPathSafeForDeletion(caches.path + "/" + name + "/blob", home: home.path) == false)
+        }
+        #expect(SystemCleanerService.isPathSafeForDeletion(caches.path + "/com.acme.helper", home: home.path) == true)
+    }
+
+    @Test("SAFE-06: A partial download is only offered once nothing has written to it for a day")
+    @MainActor
+    func testOnlyAbandonedDownloadsAreOffered() async throws {
+        let home = try makeTempDirectory("CleanHome")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let downloads = home.appendingPathComponent("Downloads")
+        try write(downloads.appendingPathComponent("in-progress.crdownload"))
+        try write(downloads.appendingPathComponent("abandoned.crdownload"))
+        try write(downloads.appendingPathComponent("report.pdf"))
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-3 * 24 * 60 * 60)],
+            ofItemAtPath: downloads.appendingPathComponent("abandoned.crdownload").path
+        )
+
+        let service = SystemCleanerService(homeDirectory: home.path)
+        await service.scan()
+        let partial = try #require(service.categories.first { $0.id == "incomplete_downloads" })
+        #expect(partial.items.map(\.name) == ["abandoned.crdownload"])
+
+        _ = await service.cleanSelected()
+        #expect(exists(downloads.appendingPathComponent("in-progress.crdownload")))
+        #expect(exists(downloads.appendingPathComponent("report.pdf")))
+        #expect(!exists(downloads.appendingPathComponent("abandoned.crdownload")))
+    }
+
+    @Test("SAFE-07: The confirmation names what is about to go, not just category totals")
+    @MainActor
+    func testSelectionSummaryNamesItems() async throws {
+        let home = try makeTempDirectory("CleanHome")
+        defer { try? FileManager.default.removeItem(at: home) }
+        for index in 1...6 {
+            try write(home.appendingPathComponent("Library/Caches/com.acme.app\(index)/blob"), bytes: 2_000_000 + index * 1_000)
+        }
+
+        let service = SystemCleanerService(homeDirectory: home.path)
+        await service.scan()
+        let summary = service.selectionSummary
+        #expect(summary.hasPrefix("• Application Caches — "))
+        #expect(summary.contains("com.acme.app6, com.acme.app5, com.acme.app4, com.acme.app3"))   // largest first
+        #expect(summary.contains("and 2 more"))
+    }
+
     // MARK: - Project purge
 
     private func gitRunner(ignoring ignored: Set<String>) -> SystemCommandRunner {
