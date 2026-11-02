@@ -95,6 +95,20 @@ for suite in $SUITES; do
     else
         echo "$verdict: $suite"
         printf '%s\n' "$out" | grep -E '✘ Test "|recorded an issue' | head -5 | sed 's/^/    /'
+        if [ "$verdict" = "TIMEOUT" ]; then
+            # The killed process printed nothing, so find the hanging test by running each one on its own.
+            echo "    running each test of $suite alone (40 s each):"
+            for test_id in $(swift test list --skip-build 2>/dev/null | grep "\\.${suite}/"); do
+                one="$(perl -e 'alarm shift; exec @ARGV' 40 swift test --skip-build --filter "${test_id%()}" 2>&1)"
+                one_code=$?
+                if [ "$one_code" -eq 142 ]; then
+                    echo "    | HANGS: $test_id"
+                    pkill -f swiftpm-testing-helper 2>/dev/null
+                else
+                    echo "    | ok ($(printf '%s\n' "$one" | grep -E 'Test run with' | tail -1 | cut -c1-80)): $test_id"
+                fi
+            done
+        fi
         if [ "$verdict" = "NO-RUN" ] || [ "$verdict" = "TIMEOUT" ]; then
             # No summary line: the process died or hung. What it printed last is the only clue to why.
             echo "    exit code $code; last output:"
