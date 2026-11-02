@@ -225,8 +225,12 @@ struct ZenithCommandHubTests {
     @MainActor
     func testFilteredTopHogsDefaultAndBoost() {
         let state = ZenithCommandHubState()
-        let fakeHogs = (1...10).map { i in
-            ProcessTelemetry(pid: 1000 + i, name: "proc_\(i)", cpuPercent: Double(10 - i), memoryBytes: Int64(i * 1024 * 1024))
+        var fakeHogs: [ProcessTelemetry] = []
+        for i in 1...10 {
+            let pid: Int = 1000 + i
+            let cpu: Double = Double(10 - i)
+            let memory: Int64 = Int64(i) * 1024 * 1024
+            fakeHogs.append(ProcessTelemetry(pid: pid, name: "proc_\(i)", cpuPercent: cpu, memoryBytes: memory))
         }
         state.hardwareSnapshot = HardwareSnapshot(cpu: CPUTelemetry(topHogs: fakeHogs))
 
