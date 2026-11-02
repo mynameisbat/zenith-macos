@@ -49,7 +49,7 @@ struct MoleFeatureServicesTests {
         try dummyData.write(to: pkgFile)
         try dummyData.write(to: docFile)
 
-        let service = InstallerPurgeService()
+        let service = InstallerPurgeService(runCommand: { _, _ in nil })
         let items = await service.scan(directories: [tempDir], minAgeDays: 0, minSizeBytes: 100)
 
         #expect(items.count == 2)
@@ -142,8 +142,8 @@ struct MoleFeatureServicesTests {
         let sampleFile = leftoverDir.appendingPathComponent("cache.db")
         try Data(repeating: 0x55, count: 2048).write(to: sampleFile)
 
-        let service = OrphanedAppLeftoversService()
-        let orphans = await service.scan(locations: [(tempParent, "Test Category")])
+        let service = OrphanedAppLeftoversService(locations: [(tempParent, "Test Category")], applicationRoots: [], isBundleIdentifierInUse: { _ in false }, minIdleDays: 0)
+        let orphans = await service.scan()
 
         #expect(orphans.count == 1)
         #expect(orphans.first?.appName.lowercased() == "nonexistentapp")

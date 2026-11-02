@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// Residual remnant folder or files left behind by an application previously deleted.
@@ -31,214 +32,237 @@ public struct OrphanedAppItem: Identifiable, Sendable, Equatable {
 
 /// Service that hunts orphaned leftover residue from applications previously deleted without an uninstaller,
 /// modeled after Mole's `lib/clean/apps.sh` orphaned discovery engine.
+///
+/// What is offered is deliberately narrow, because these folders can hold data that cannot be rebuilt (a sandboxed
+/// app's documents, a Docker VM disk, a browser profile):
+///   - only entries named like a bundle identifier (`com.vendor.app`). A plain name such as "Google" or "JetBrains"
+///     cannot be tied to one app, and is the vendor folder of Chrome profiles and IDE settings, so it is never offered;
+///   - never when Launch Services still knows the app, it is running, or another installed app comes from the same
+///     vendor (updaters and helpers share the vendor prefix);
+///   - never when anything inside was changed recently (`minIdleDays`): an app on an unplugged drive or a network
+///     volume looks "not installed", but it has been used lately;
+///   - `purge` re-checks all of this, so a stale or hand-made item list cannot reach anything else.
 public final class OrphanedAppLeftoversService: @unchecked Sendable {
     public static let shared = OrphanedAppLeftoversService()
 
-    public init() {}
+    /// Bundle identifier prefixes that are never offered, whatever else is true.
+    static let protectedPrefixes = ["com.apple.", "group.com.apple.", "com.docker."]
 
-    /// Scans user Library directories for residue belonging to apps no longer installed.
-    public func scan(locations: [(url: URL, category: String)]? = nil) async -> [OrphanedAppItem] {
-        let installedBundles = getInstalledBundleIdsAndNames()
-        let fileManager = FileManager.default
-        let home = fileManager.homeDirectoryForCurrentUser
+    private let locations: [(url: URL, category: String)]
+    private let applicationRoots: [URL]
+    private let isBundleIdentifierInUse: @Sendable (String) -> Bool
+    private let minIdleDays: Int
 
-        let searchLocations: [(url: URL, category: String)] = locations ?? [
-            (home.appendingPathComponent("Library/Application Support"), "Application Support"),
-            (home.appendingPathComponent("Library/Caches"), "Caches"),
-            (home.appendingPathComponent("Library/Containers"), "Containers"),
-            (home.appendingPathComponent("Library/Saved Application State"), "Saved State"),
-            (home.appendingPathComponent("Library/WebKit"), "WebKit")
+    /// - Parameters:
+    ///   - homeDirectory: Whose `Library` is scanned; tests pass a throwaway one.
+    ///   - locations: Folders to look in, with a display category; defaults to the usual spots under `homeDirectory`.
+    ///   - applicationRoots: Folders searched (a few levels deep) for installed apps.
+    ///   - isBundleIdentifierInUse: Whether the system knows or is running an app with this identifier.
+    ///   - minIdleDays: Anything touched more recently than this is left alone.
+    public init(
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        locations: [(url: URL, category: String)]? = nil,
+        applicationRoots: [URL]? = nil,
+        isBundleIdentifierInUse: @escaping @Sendable (String) -> Bool = OrphanedAppLeftoversService.systemKnowsApp,
+        minIdleDays: Int = 30
+    ) {
+        self.locations = locations ?? [
+            (homeDirectory.appendingPathComponent("Library/Application Support"), "Application Support"),
+            (homeDirectory.appendingPathComponent("Library/Caches"), "Caches"),
+            (homeDirectory.appendingPathComponent("Library/Containers"), "Containers"),
+            (homeDirectory.appendingPathComponent("Library/Saved Application State"), "Saved State"),
+            (homeDirectory.appendingPathComponent("Library/WebKit"), "WebKit")
         ]
+        self.applicationRoots = applicationRoots ?? [
+            URL(fileURLWithPath: "/Applications"),
+            URL(fileURLWithPath: "/System/Applications"),
+            URL(fileURLWithPath: "/System/Cryptexes/App/System/Applications"),
+            homeDirectory.appendingPathComponent("Applications")
+        ]
+        self.isBundleIdentifierInUse = isBundleIdentifierInUse
+        self.minIdleDays = minIdleDays
+    }
 
+    /// True if Launch Services can locate an app with this identifier, or one is running right now.
+    public static let systemKnowsApp: @Sendable (String) -> Bool = { identifier in
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier) != nil
+            || !NSRunningApplication.runningApplications(withBundleIdentifier: identifier).isEmpty
+    }
+
+    /// Scans the user Library for residue belonging to apps that are no longer installed.
+    public func scan() async -> [OrphanedAppItem] {
+        let installed = installedBundleIdentifiers()
+        let cutoff = Calendar.current.date(byAdding: .day, value: -minIdleDays, to: Date()) ?? Date()
         var orphans: [OrphanedAppItem] = []
 
-        for location in searchLocations {
-            guard fileManager.fileExists(atPath: location.url.path) else { continue }
-            guard let contents = try? fileManager.contentsOfDirectory(at: location.url, includingPropertiesForKeys: [.isDirectoryKey]) else { continue }
+        for location in locations {
+            guard let contents = try? FileManager.default.contentsOfDirectory(
+                at: location.url, includingPropertiesForKeys: nil
+            ) else { continue }
 
             for itemURL in contents {
-                let name = itemURL.lastPathComponent
+                guard let identifier = orphanIdentifier(at: itemURL, installed: installed) else { continue }
 
-                // Skip Apple system folders and whitelisted statutory items
-                if shouldIgnoreSystemItem(name: name, path: itemURL.path) {
-                    continue
-                }
+                let metrics = calculateDirectoryMetrics(url: itemURL)
+                guard metrics.size > 1024 else { continue } // Ignore empty 0-byte placeholders
+                guard metrics.newest <= cutoff else { continue }
 
-                // Check if whitelisted
-                if CleanerWhitelistService.shared.isWhitelisted(path: itemURL.path) {
-                    continue
-                }
-
-                // Determine if this item corresponds to any installed application
-                let isInstalled = isItemAssociatedWithInstalledApp(name: name, installedMap: installedBundles)
-                if !isInstalled {
-                    let (size, count) = calculateDirectoryMetrics(url: itemURL)
-                    guard size > 1024 else { continue } // Ignore empty 0-byte placeholders
-
-                    let cleanAppName = extractCleanAppName(from: name)
-                    orphans.append(OrphanedAppItem(
-                        appName: cleanAppName,
-                        bundleId: name.contains(".") ? name : nil,
-                        path: itemURL.path,
-                        byteSize: size,
-                        fileCount: count,
-                        category: location.category
-                    ))
-                }
+                orphans.append(OrphanedAppItem(
+                    appName: extractCleanAppName(from: itemURL.lastPathComponent),
+                    bundleId: identifier,
+                    path: itemURL.path,
+                    byteSize: metrics.size,
+                    fileCount: metrics.count,
+                    category: location.category
+                ))
             }
         }
 
         return orphans.sorted { $0.byteSize > $1.byteSize }
     }
 
-    /// Purges or trashes discovered orphaned application leftovers.
+    /// Trashes (or, if asked, deletes) discovered leftovers. Each item is checked again first, so an item that has
+    /// since been touched, whose app came back, or that was never a direct child of a scanned folder is skipped.
     @discardableResult
     public func purge(items: [OrphanedAppItem], moveToTrash: Bool = true) async throws -> Int64 {
         let fileManager = FileManager.default
+        let installed = installedBundleIdentifiers()
+        let cutoff = Calendar.current.date(byAdding: .day, value: -minIdleDays, to: Date()) ?? Date()
+        let allowedParents = Set(locations.map { $0.url.resolvingSymlinksInPath().path })
+
         var totalFreed: Int64 = 0
+        var purgedCount = 0
+        var firstError: Error?
 
         for item in items {
-            if CleanerWhitelistService.shared.isWhitelisted(path: item.path) {
+            let url = URL(fileURLWithPath: item.path)
+            guard allowedParents.contains(url.deletingLastPathComponent().resolvingSymlinksInPath().path),
+                  orphanIdentifier(at: url, installed: installed) != nil,
+                  calculateDirectoryMetrics(url: url).newest <= cutoff else { continue }
+
+            do {
+                if moveToTrash {
+                    try fileManager.trashItem(at: url, resultingItemURL: nil)
+                } else {
+                    try fileManager.removeItem(at: url)
+                }
+            } catch {
+                firstError = firstError ?? error
                 continue
             }
-
-            let url = URL(fileURLWithPath: item.path)
-            guard fileManager.fileExists(atPath: item.path) else { continue }
-
-            if moveToTrash {
-                try fileManager.trashItem(at: url, resultingItemURL: nil)
-            } else {
-                try fileManager.removeItem(at: url)
-            }
-
             totalFreed += item.byteSize
+            purgedCount += 1
         }
 
-        if totalFreed > 0 {
+        if purgedCount > 0 {
             SystemCleaningHistoryTracker.shared.record(
                 operationName: "Orphaned App Leftovers",
                 bytesFreed: totalFreed,
-                itemCount: items.count
+                itemCount: purgedCount
             )
         }
-
+        if let firstError, purgedCount == 0 { throw firstError }
         return totalFreed
     }
 
     // MARK: - Helpers
 
-    private func getInstalledBundleIdsAndNames() -> (bundles: Set<String>, names: Set<String>) {
-        var bundles = Set<String>()
-        var names = Set<String>()
+    /// The bundle identifier this entry would belong to if it is a leftover, or `nil` if it must be left alone.
+    private func orphanIdentifier(at url: URL, installed: InstalledIndex) -> String? {
+        let values = try? url.resourceValues(forKeys: [.isSymbolicLinkKey])
+        guard values?.isSymbolicLink != true else { return nil }
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        guard !CleanerWhitelistService.shared.isWhitelisted(path: url.path) else { return nil }
 
-        let appDirs = [
-            URL(fileURLWithPath: "/Applications"),
-            URL(fileURLWithPath: "/System/Applications"),
-            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
-        ]
+        guard let identifier = Self.bundleIdentifier(fromEntryName: url.lastPathComponent) else { return nil }
+        let lower = identifier.lowercased()
+        guard !Self.protectedPrefixes.contains(where: { lower.hasPrefix($0) }) else { return nil }
 
-        let fileManager = FileManager.default
-        for dir in appDirs {
-            guard let contents = try? fileManager.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { continue }
-            for appURL in contents where appURL.pathExtension.lowercased() == "app" {
-                let appName = appURL.deletingPathExtension().lastPathComponent.lowercased()
-                names.insert(appName)
+        // Same app, a helper or extension of it (com.spotify.client.helper), or a sibling from the same vendor.
+        guard !installed.identifiers.contains(where: { lower == $0 || lower.hasPrefix($0 + ".") }) else { return nil }
+        guard !installed.vendors.contains(Self.vendor(of: lower)) else { return nil }
+        guard !isBundleIdentifierInUse(identifier) else { return nil }
+        return identifier
+    }
 
-                if let bundle = Bundle(url: appURL), let bId = bundle.bundleIdentifier {
-                    bundles.insert(bId.lowercased())
+    /// `com.vendor.app` out of `com.vendor.app.savedState`; `nil` for names that are not bundle identifiers.
+    static func bundleIdentifier(fromEntryName name: String) -> String? {
+        var candidate = name
+        if candidate.hasSuffix(".savedState") { candidate = String(candidate.dropLast(".savedState".count)) }
+        let parts = candidate.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count >= 3 else { return nil }
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        for part in parts {
+            guard !part.isEmpty, part.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return nil }
+        }
+        return candidate
+    }
+
+    /// The first two components of a lowercased identifier, ignoring a leading `group.`.
+    static func vendor(of lowerIdentifier: String) -> String {
+        var parts = lowerIdentifier.split(separator: ".").map(String.init)
+        if parts.first == "group" { parts.removeFirst() }
+        return parts.prefix(2).joined(separator: ".")
+    }
+
+    private struct InstalledIndex {
+        var identifiers: Set<String> = []
+        var vendors: Set<String> = []
+    }
+
+    /// Identifiers of the apps found under `applicationRoots`, looking inside folders such as `Utilities`.
+    private func installedBundleIdentifiers() -> InstalledIndex {
+        var index = InstalledIndex()
+        for root in applicationRoots {
+            collectApps(in: root, depth: 0, into: &index)
+        }
+        return index
+    }
+
+    private func collectApps(in directory: URL, depth: Int, into index: inout InstalledIndex) {
+        guard depth < 4,
+              let contents = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+        for url in contents {
+            if url.pathExtension.lowercased() == "app" {
+                if let identifier = Bundle(url: url)?.bundleIdentifier?.lowercased() {
+                    index.identifiers.insert(identifier)
+                    index.vendors.insert(Self.vendor(of: identifier))
                 }
+            } else if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                collectApps(in: url, depth: depth + 1, into: &index)
             }
         }
-
-        return (bundles, names)
-    }
-
-    private func shouldIgnoreSystemItem(name: String, path: String) -> Bool {
-        let lower = name.lowercased()
-        if lower.hasPrefix("com.apple.") ||
-           lower == "apple" ||
-           lower == "icloud" ||
-           lower == "clouddocs" ||
-           lower == "addressbook" ||
-           lower == "dock" ||
-           lower == "finder" ||
-           lower == "system" ||
-           lower == "mobilesync" ||
-           lower == "coresimulator" ||
-           lower == "quicklook" ||
-           lower == "zenith" ||
-           lower == "goldengate" ||
-           path.contains("com.apple.e5rt.e5bundlecache") ||
-           path.contains("Steam/steamapps") ||
-           path.contains("Epic Games") {
-            return true
-        }
-        return false
-    }
-
-    private func isItemAssociatedWithInstalledApp(name: String, installedMap: (bundles: Set<String>, names: Set<String>)) -> Bool {
-        let lower = name.lowercased()
-
-        // 1. Direct bundle ID match
-        if installedMap.bundles.contains(lower) {
-            return true
-        }
-
-        // 2. Direct app name match
-        if installedMap.names.contains(lower) {
-            return true
-        }
-
-        // 3. Reverse DNS prefix match (e.g. com.spotify.client.savedState -> com.spotify.client)
-        for bundle in installedMap.bundles {
-            if lower.hasPrefix(bundle) {
-                return true
-            }
-        }
-
-        // 4. Name prefix match
-        for appName in installedMap.names {
-            if lower.contains(appName) && appName.count >= 4 {
-                return true
-            }
-        }
-
-        return false
     }
 
     private func extractCleanAppName(from folderName: String) -> String {
-        var clean = folderName
-        if clean.hasSuffix(".savedState") {
-            clean = clean.replacingOccurrences(of: ".savedState", with: "")
-        }
-        if clean.contains(".") {
-            let parts = clean.split(separator: ".")
-            if let last = parts.last, last.count >= 2 {
-                return last.capitalized
-            }
+        let clean = Self.bundleIdentifier(fromEntryName: folderName) ?? folderName
+        if let last = clean.split(separator: ".").last, last.count >= 2 {
+            return last.capitalized
         }
         return clean
     }
 
-    private func calculateDirectoryMetrics(url: URL) -> (size: Int64, count: Int) {
-        let fileManager = FileManager.default
-        guard let enumerator = fileManager.enumerator(
+    /// Total size and file count of everything inside, and the most recent modification date of any of it.
+    private func calculateDirectoryMetrics(url: URL) -> (size: Int64, count: Int, newest: Date) {
+        let keys: [URLResourceKey] = [.fileSizeKey, .isRegularFileKey, .contentModificationDateKey]
+        var newest = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+        guard let enumerator = FileManager.default.enumerator(
             at: url,
-            includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
+            includingPropertiesForKeys: keys,
             options: [.skipsPackageDescendants]
-        ) else { return (0, 0) }
+        ) else { return (0, 0, newest) }
 
         var totalSize: Int64 = 0
         var totalCount: Int = 0
 
         while let fileURL = enumerator.nextObject() as? URL {
-            guard let vals = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
-                  vals.isRegularFile == true,
-                  let size = vals.fileSize else { continue }
+            guard let vals = try? fileURL.resourceValues(forKeys: Set(keys)) else { continue }
+            if let modified = vals.contentModificationDate, modified > newest { newest = modified }
+            guard vals.isRegularFile == true, let size = vals.fileSize else { continue }
             totalSize += Int64(size)
             totalCount += 1
         }
 
-        return (totalSize, totalCount)
+        return (totalSize, totalCount, newest)
     }
 }
