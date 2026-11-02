@@ -9,12 +9,15 @@
 #   SUITE_TIMEOUT            seconds allowed per suite (default 120)
 #   EXPECTED_FAILING_SUITES  space-separated suites known to fail: reported as such, and they do not fail the run.
 #                            A suite listed here that starts passing is called out so it can be removed.
+#   SKIPPED_SUITES          space-separated suites not run at all (listed in the summary), e.g. ones that need a
+#                            window server on a machine that has none
 #   ONLY_SUITES              space-separated suites to run instead of all of them (for a quick check)
 set -u
 cd "$(dirname "$0")/.."
 
 TIMEOUT="${SUITE_TIMEOUT:-120}"
 EXPECTED="${EXPECTED_FAILING_SUITES:-}"
+SKIPPED="${SKIPPED_SUITES:-}"
 
 swift build --build-tests || exit 2
 
@@ -39,14 +42,31 @@ is_expected() {
     return 1
 }
 
+is_skipped() {
+    for name in $SKIPPED; do
+        [ "$name" = "$1" ] && return 0
+    done
+    return 1
+}
+
 total_tests=0
 suite_count=0
+skipped_count=0
 unexpected=""
 
 for suite in $SUITES; do
+    if is_skipped "$suite"; then
+        echo "skipped: $suite"
+        skipped_count=$((skipped_count + 1))
+        continue
+    fi
     suite_count=$((suite_count + 1))
-    out="$(perl -e 'alarm shift; exec @ARGV' "$TIMEOUT" swift test --skip-build --filter "\\.${suite}/" 2>&1)"
+    # Output goes to a file, not a variable, so that what a hung suite printed before it was killed is not lost.
+    log="$(mktemp)"
+    perl -e 'alarm shift; exec @ARGV' "$TIMEOUT" swift test --skip-build --filter "\\.${suite}/" >"$log" 2>&1
     code=$?
+    out="$(cat "$log")"
+    rm -f "$log"
 
     if [ "$code" -eq 142 ]; then
         pkill -f swiftpm-testing-helper 2>/dev/null
@@ -85,7 +105,7 @@ for suite in $SUITES; do
 done
 
 echo
-echo "$suite_count suites, $total_tests tests passed in passing suites"
+echo "$suite_count suites run, $skipped_count skipped, $total_tests tests passed in passing suites"
 if [ -n "$unexpected" ]; then
     echo "unexpected problems in:$unexpected"
     exit 1
