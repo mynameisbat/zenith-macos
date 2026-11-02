@@ -27,9 +27,7 @@ jobs:
         run: swift build -c release
 
       # Every suite runs in its own process: see the comment at the top of the script.
-      # VisionChallenger2EmpiricalTests asserts a memory ceiling for 8K OCR that this project does not meet on every
-      # machine; it is listed here so its failure is visible rather than silently skipped.
       - name: Run every test suite
         env:
-          EXPECTED_FAILING_SUITES: VisionChallenger2EmpiricalTests
+          SUITE_TIMEOUT: 300
         run: ./scripts/test_each_suite.sh

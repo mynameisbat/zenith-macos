@@ -75,6 +75,11 @@ for suite in $SUITES; do
     else
         echo "$verdict: $suite"
         printf '%s\n' "$out" | grep -E '✘ Test "|recorded an issue' | head -5 | sed 's/^/    /'
+        if [ "$verdict" = "NO-RUN" ] || [ "$verdict" = "TIMEOUT" ]; then
+            # No summary line: the process died or hung. What it printed last is the only clue to why.
+            echo "    exit code $code; last output:"
+            printf '%s\n' "$out" | tail -n 25 | cut -c1-240 | sed 's/^/    | /'
+        fi
         unexpected="$unexpected $suite"
     fi
 done
