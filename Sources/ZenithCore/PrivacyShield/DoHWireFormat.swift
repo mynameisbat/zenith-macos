@@ -59,7 +59,7 @@ enum DoHWireFormat {
                     withUnsafeMutableBytes(of: &address) { $0.copyBytes(from: bytes[dataStart..<dataStart + 16]) }
                     var buffer = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
                     guard inet_ntop(AF_INET6, &address, &buffer, socklen_t(INET6_ADDRSTRLEN)) != nil else { return nil }
-                    return String(cString: buffer)
+                    return String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
                 }
             }
             offset = dataStart + length
