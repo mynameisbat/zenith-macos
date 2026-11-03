@@ -22,7 +22,8 @@ SKIPPED="${SKIPPED_SUITES:-}"
 swift build --build-tests || exit 2
 
 # Suite names come from the test runner itself ("Module.Suite/test()").
-SUITES="$(swift test list --skip-build 2>/dev/null | sed -E 's/^[^.]+\.([^/]+)\/.*/\1/' | sort -u)"
+ALL_TESTS="$(swift test list --skip-build 2>/dev/null)"
+SUITES="$(printf '%s\n' "$ALL_TESTS" | sed -E 's/^[^.]+\.([^/]+)\/.*/\1/' | sort -u)"
 if [ -n "${ONLY_SUITES:-}" ]; then
     selected=""
     for name in $ONLY_SUITES; do
@@ -98,7 +99,7 @@ for suite in $SUITES; do
         if [ "$verdict" = "TIMEOUT" ]; then
             # The killed process printed nothing, so find the hanging test by running each one on its own.
             echo "    running each test of $suite alone (40 s each):"
-            for test_id in $(swift test list --skip-build 2>/dev/null | grep "\\.${suite}/"); do
+            for test_id in $(printf '%s\n' "$ALL_TESTS" | grep "\\.${suite}/"); do
                 one="$(perl -e 'alarm shift; exec @ARGV' 40 swift test --skip-build --filter "${test_id%()}" 2>&1)"
                 one_code=$?
                 if [ "$one_code" -eq 142 ]; then
