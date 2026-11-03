@@ -65,14 +65,31 @@ public enum DoHProvider: Identifiable, Sendable, Codable, Equatable, Hashable, C
         }
     }
 
+    /// How the endpoint wants to be asked. Google and AdGuard serve their JSON API under `/resolve` and nothing but
+    /// the binary format under `/dns-query`; Quad9 has no JSON API at all. A custom URL is tried as JSON first and
+    /// then as binary (see `DoHResolver`).
+    enum QueryFormat {
+        case json
+        case wire
+        case jsonThenWire
+    }
+
+    var queryFormat: QueryFormat {
+        switch self {
+        case .cloudflare, .adguard, .google, .nextdns: return .json
+        case .quad9: return .wire
+        case .custom: return .jsonThenWire
+        }
+    }
+
     public var endpointURL: URL {
         switch self {
         case .cloudflare:
             return URL(string: "https://1.1.1.1/dns-query")!
         case .adguard:
-            return URL(string: "https://dns.adguard-dns.com/dns-query")!
+            return URL(string: "https://dns.adguard-dns.com/resolve")!
         case .google:
-            return URL(string: "https://dns.google/dns-query")!
+            return URL(string: "https://dns.google/resolve")!
         case .quad9:
             return URL(string: "https://dns.quad9.net/dns-query")!
         case .nextdns(let profileID):

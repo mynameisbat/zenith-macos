@@ -145,12 +145,31 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
 
     /// Queries one record type (1 = A, 28 = AAAA) and returns the first valid address, or `nil` when there is none.
     private func queryRecord(domain: String, provider: DoHProvider, recordType: Int) async throws -> String? {
+        switch provider.queryFormat {
+        case .json:
+            return try await queryJSON(domain: domain, provider: provider, recordType: recordType)
+        case .wire:
+            return try await queryWire(domain: domain, provider: provider, recordType: recordType)
+        case .jsonThenWire:
+            // A custom endpoint may speak either. Anything but a clean JSON answer (typically HTTP 400 from a
+            // server that only knows the binary format) is retried in binary.
+            do {
+                return try await queryJSON(domain: domain, provider: provider, recordType: recordType)
+            } catch is URLError {
+                return try await queryWire(domain: domain, provider: provider, recordType: recordType)
+            } catch is DecodingError {
+                return try await queryWire(domain: domain, provider: provider, recordType: recordType)
+            }
+        }
+    }
+
+    private func queryJSON(domain: String, provider: DoHProvider, recordType: Int) async throws -> String? {
         // Construct DoH JSON endpoint URL
         var components = URLComponents(url: provider.endpointURL, resolvingAgainstBaseURL: false)
-        components?.queryItems = [
-            URLQueryItem(name: "name", value: domain),
-            URLQueryItem(name: "type", value: recordType == 28 ? "AAAA" : "A")
-        ]
+        var items = components?.queryItems ?? []
+        items.append(URLQueryItem(name: "name", value: domain))
+        items.append(URLQueryItem(name: "type", value: recordType == 28 ? "AAAA" : "A"))
+        components?.queryItems = items
 
         guard let queryURL = components?.url else {
             throw URLError(.badURL)
@@ -179,6 +198,31 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
             }
         }
         return nil
+    }
+
+    /// RFC 8484 GET with the binary query in the `dns` parameter.
+    private func queryWire(domain: String, provider: DoHProvider, recordType: Int) async throws -> String? {
+        guard let message = DoHWireFormat.makeQuery(domain: domain, recordType: UInt16(recordType)) else {
+            throw URLError(.badURL)
+        }
+        var components = URLComponents(url: provider.endpointURL, resolvingAgainstBaseURL: false)
+        var items = components?.queryItems ?? []
+        items.append(URLQueryItem(name: "dns", value: DoHWireFormat.base64URL(message)))
+        components?.queryItems = items
+        guard let queryURL = components?.url else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: queryURL)
+        request.httpMethod = "GET"
+        request.setValue("application/dns-message", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 4.0
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+        return DoHWireFormat.firstAddress(in: data, recordType: UInt16(recordType))
     }
 
     /// Validates whether a given string is a literal IPv4 or IPv6 address.
