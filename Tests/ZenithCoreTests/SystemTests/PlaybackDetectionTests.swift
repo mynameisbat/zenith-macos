@@ -9,6 +9,7 @@ final class PlaybackFixture: @unchecked Sendable {
     private var _osascriptOutput = ""
     private var _osascriptCalls = 0
     private var _keys: [MediaKey] = []
+    private var _keysAllowed = true
     private var _scripts: [String] = []
 
     var playing: PlayingApplication? {
@@ -21,6 +22,11 @@ final class PlaybackFixture: @unchecked Sendable {
     }
     var osascriptCalls: Int { lock.withLock { _osascriptCalls } }
     var keys: [MediaKey] { lock.withLock { _keys } }
+    /// False stands in for a missing Accessibility permission: the key press is dropped.
+    var keysAllowed: Bool {
+        get { lock.withLock { _keysAllowed } }
+        set { lock.withLock { _keysAllowed = newValue } }
+    }
     var scripts: [String] { lock.withLock { _scripts } }
 
     var runner: SystemCommandRunner {
@@ -35,7 +41,12 @@ final class PlaybackFixture: @unchecked Sendable {
 
     struct Keys: MediaKeyPosting {
         let fixture: PlaybackFixture
-        func post(_ key: MediaKey) -> Bool { fixture.lock.withLock { fixture._keys.append(key) }; return true }
+        func post(_ key: MediaKey) -> Bool {
+            fixture.lock.withLock {
+                fixture._keys.append(key)
+                return fixture._keysAllowed
+            }
+        }
     }
     var mediaKeys: MediaKeyPosting { Keys(fixture: self) }
 
@@ -276,5 +287,21 @@ struct PlaybackDetectionTests {
             "tell application \"Spotify\" to playpause",
             "tell application \"Spotify\" to next track"
         ])
+    }
+
+    @Test("PD-14: A media key that macOS will not accept (no Accessibility permission) is explained on the island")
+    @MainActor
+    func testRefusedMediaKeyIsExplained() {
+        let fixture = PlaybackFixture()
+        fixture.playing = PlaybackFixture.chrome
+        let (service, island) = makeService(fixture)
+        service.refreshFromPlaybackAssertions()
+
+        service.togglePlayPause()
+        #expect(island.activeAlert == nil)          // accepted: nothing to say
+
+        fixture.keysAllowed = false
+        service.togglePlayPause()
+        #expect(island.activeAlert?.title == "Allow Accessibility")
     }
 }

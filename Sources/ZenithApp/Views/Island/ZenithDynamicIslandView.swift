@@ -196,79 +196,104 @@ public struct ZenithDynamicIslandView: View {
 
     // MARK: - Expanded Dynamic Island (Tabbed Shelf or Now Playing)
 
+    /// The panel is a fixed 96 pt. On a notched display the hardware notch hides the first `notchRect.height` pt of it,
+    /// so the content starts below that, once, here. (Each piece used to add its own notch inset, which pushed the
+    /// tab switcher up behind the notch and the rest off the bottom whenever both Now Playing and the shelf existed.)
     private var expandedIslandContent: some View {
-        VStack(spacing: 0) {
-            // If both Now Playing and Shelf items exist, provide smooth tab switcher
-            if islandState.nowPlayingTrack != nil && !islandState.droppedItems.isEmpty {
-                tabSwitcherHeader
-            }
+        let hasTabs = islandState.nowPlayingTrack != nil && !islandState.droppedItems.isEmpty
+        let showsNowPlaying = islandState.nowPlayingTrack != nil
+            && (islandState.activeTab == .nowPlaying || islandState.droppedItems.isEmpty)
 
-            // Tab content
-            if islandState.nowPlayingTrack != nil && (islandState.activeTab == .nowPlaying || islandState.droppedItems.isEmpty) {
-                if let track = islandState.nowPlayingTrack {
+        return ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                // Without a notch the tab switcher takes its own row; with one it sits in the free strips either
+                // side of the notch (below).
+                if hasTabs && !geometry.hasNotch {
+                    tabSwitcherHeader
+                        .padding(.top, 4)
+                }
+
+                if showsNowPlaying, let track = islandState.nowPlayingTrack {
                     NowPlayingExpandedView(
                         track: track,
                         onPrevious: { NowPlayingService.shared.previousTrack() },
                         onTogglePlayPause: { NowPlayingService.shared.togglePlayPause() },
                         onNext: { NowPlayingService.shared.nextTrack() }
                     )
-                    .padding(.top, geometry.hasNotch ? (geometry.notchRect.height + 2) : 6)
+                } else {
+                    shelfContent
                 }
-            } else {
-                shelfContent
+            }
+            .padding(.top, geometry.hasNotch ? geometry.notchRect.height + 2 : (hasTabs ? 0 : 6))
+
+            if hasTabs && geometry.hasNotch {
+                tabSwitcherHeader
+                    .frame(height: geometry.notchRect.height)
             }
         }
-        .frame(width: geometry.expandedWidth, height: geometry.expandedHeight)
+        .frame(width: geometry.expandedWidth, height: geometry.expandedHeight, alignment: .top)
     }
 
+    /// With a notch the two tabs sit either side of it; without one they sit together at the left.
     private var tabSwitcherHeader: some View {
         HStack(spacing: 4) {
-            Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    islandState.activeTab = .nowPlaying
-                }
-            } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "music.note")
-                        .font(.system(size: 8.5))
-                    Text("Now Playing")
-                        .font(.system(size: 9, weight: .semibold))
-                }
-                .foregroundColor(islandState.activeTab == .nowPlaying ? .white : .white.opacity(0.45))
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2)
-                .background(
-                    Capsule()
-                        .fill(islandState.activeTab == .nowPlaying ? Color.white.opacity(0.12) : Color.clear)
-                )
+            nowPlayingTabButton
+            if geometry.hasNotch {
+                Spacer(minLength: geometry.notchRect.width + 8)
+                shelfTabButton
+            } else {
+                shelfTabButton
+                Spacer()
             }
-            .buttonStyle(.plain)
-
-            Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    islandState.activeTab = .shelf
-                }
-            } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "tray.and.arrow.down.fill")
-                        .font(.system(size: 8.5))
-                    Text("Shelf (\(islandState.droppedItems.count))")
-                        .font(.system(size: 9, weight: .semibold))
-                }
-                .foregroundColor(islandState.activeTab == .shelf ? .white : .white.opacity(0.45))
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2)
-                .background(
-                    Capsule()
-                        .fill(islandState.activeTab == .shelf ? Color.white.opacity(0.12) : Color.clear)
-                )
-            }
-            .buttonStyle(.plain)
-
-            Spacer()
         }
-        .padding(.horizontal, 10)
-        .padding(.top, geometry.hasNotch ? (geometry.notchRect.height + 2) : 4)
+        .padding(.horizontal, 8)
+    }
+
+    private func tabButton(
+        symbol: String,
+        title: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                action()
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: symbol)
+                    .font(.system(size: 8.5))
+                Text(title)
+                    .font(.system(size: 9, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .fixedSize()
+            .foregroundColor(isSelected ? .white : .white.opacity(0.45))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(
+                Capsule()
+                    .fill(isSelected ? Color.white.opacity(0.12) : Color.clear)
+            )
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var nowPlayingTabButton: some View {
+        tabButton(symbol: "music.note", title: "Now Playing", isSelected: islandState.activeTab == .nowPlaying) {
+            islandState.activeTab = .nowPlaying
+        }
+    }
+
+    private var shelfTabButton: some View {
+        tabButton(
+            symbol: "tray.and.arrow.down.fill",
+            title: "Shelf (\(islandState.droppedItems.count))",
+            isSelected: islandState.activeTab == .shelf
+        ) {
+            islandState.activeTab = .shelf
+        }
     }
 
     // MARK: - Shelf Content
@@ -282,9 +307,8 @@ public struct ZenithDynamicIslandView: View {
             }
         }
         .padding(.horizontal, 10)
-        .padding(.top, geometry.hasNotch ? (geometry.notchRect.height + 2) : 8)
         .padding(.bottom, 8)
-        .frame(width: geometry.expandedWidth, height: geometry.expandedHeight)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Empty Shelf Guidance
