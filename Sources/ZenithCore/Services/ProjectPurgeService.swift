@@ -36,6 +36,56 @@ public enum PurgeArtifactType: String, CaseIterable, Sendable, Equatable {
     }
 }
 
+extension PurgeArtifactType {
+    /// Files in the project folder showing that the project's own tooling rebuilds this folder. Entries starting with
+    /// `*.` match by suffix. A `bin` next to a `package.json` is somebody's scripts, not a build output.
+    var projectMarkers: [String] {
+        switch self {
+        case .nodeModules, .next, .nuxt, .turbo:
+            return ["package.json"]
+        case .target:
+            return ["Cargo.toml", "pom.xml"]
+        case .build:
+            return ["package.json", "build.gradle", "build.gradle.kts", "pyproject.toml", "setup.py", "pubspec.yaml"]
+        case .dist:
+            return ["package.json", "pyproject.toml", "setup.py"]
+        case .dotBuild:
+            return ["Package.swift"]
+        case .venv, .dotVenv, .pycache, .pytestCache:
+            return ["requirements.txt", "pyproject.toml", "setup.py", "Pipfile"]
+        case .derivedData:
+            return ["*.xcodeproj", "*.xcworkspace", "Package.swift"]
+        case .pods:
+            return ["Podfile"]
+        case .dartTool:
+            return ["pubspec.yaml"]
+        case .bin, .obj:
+            return ["*.csproj", "*.fsproj", "*.vbproj", "*.sln"]
+        }
+    }
+
+    /// Names that projects also use for files they commit: scripts in `bin`, hand-written assets in `build`/`dist`.
+    /// These are only offered when git says the folder is ignored (so it holds no committed content).
+    var isAmbiguous: Bool {
+        switch self {
+        case .build, .dist, .bin, .obj: return true
+        default: return false
+        }
+    }
+}
+
+public enum ProjectPurgeError: Error, LocalizedError, Equatable {
+    /// Some folders could not be removed; `freedBytes` is what the others released.
+    case someItemsFailed(paths: [String], freedBytes: Int64)
+
+    public var errorDescription: String? {
+        switch self {
+        case .someItemsFailed(let paths, _):
+            return "\(paths.count) folder\(paths.count == 1 ? "" : "s") could not be removed."
+        }
+    }
+}
+
 /// A discovered project artifact directory eligible for purging.
 public struct ProjectArtifactItem: Identifiable, Sendable, Equatable {
     public let id: String
@@ -105,11 +155,45 @@ public final class ProjectPurgeService: @unchecked Sendable {
         "pubspec.yaml",
         "composer.json",
         "build.gradle",
-        "build.gradle.kts"
+        "build.gradle.kts",
+        "setup.py",
+        "Pipfile",
+        "Podfile"
     ]
 
-    public init(fileManager: FileManager = .default) {
+    /// Project files recognised by extension rather than by name.
+    private static let projectIndicatorSuffixes = [".xcodeproj", ".xcworkspace", ".sln", ".csproj", ".fsproj", ".vbproj"]
+
+    private let runner: SystemCommandRunner
+    private let homeOverride: String?
+
+    /// - Parameters:
+    ///   - homeDirectory: The home directory folders must be inside to be purged; the current user's when `nil`.
+    ///   - runner: Runs `git` to learn whether a folder is ignored; tests substitute a fake.
+    public init(
+        fileManager: FileManager = .default,
+        homeDirectory: String? = nil,
+        runner: @escaping SystemCommandRunner = SystemCommand.processRunner
+    ) {
         self.fileManager = fileManager
+        self.homeOverride = homeDirectory
+        self.runner = runner
+    }
+
+    /// Whether `type` is a regenerable artifact of the project at `projectPath`, judged by the project's own files and,
+    /// for names that are also used for committed content, by git.
+    func isEligible(_ type: PurgeArtifactType, projectPath: String, projectContents: [String]) -> Bool {
+        let hasMarker = type.projectMarkers.contains { marker in
+            if marker.hasPrefix("*.") {
+                let suffix = String(marker.dropFirst())
+                return projectContents.contains { $0.hasSuffix(suffix) }
+            }
+            return projectContents.contains(marker)
+        }
+        guard hasMarker else { return false }
+        guard type.isAmbiguous else { return true }
+        // Exit status 0 means "ignored"; 1 "not ignored"; anything else (no git, not a repository) is not enough.
+        return runner("/usr/bin/git", ["-C", projectPath, "check-ignore", "-q", "--", type.rawValue])?.status == 0
     }
 
     /// Returns standard development workspace search roots for the current user.
@@ -187,7 +271,7 @@ public final class ProjectPurgeService: @unchecked Sendable {
 
         let contentsSet = Set(contents)
         let isProject = !contentsSet.isDisjoint(with: Self.projectIndicators) ||
-            contents.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".sln") })
+            contents.contains(where: { name in Self.projectIndicatorSuffixes.contains { name.hasSuffix($0) } })
 
         if isProject {
             projectPathsSeen.insert(currentPath)
@@ -196,13 +280,15 @@ public final class ProjectPurgeService: @unchecked Sendable {
             // Check for known artifact folders inside this project
             for artifactType in PurgeArtifactType.allCases {
                 let artifactFolder = artifactType.rawValue
-                if contentsSet.contains(artifactFolder) {
+                if contentsSet.contains(artifactFolder),
+                   isEligible(artifactType, projectPath: currentPath, projectContents: contents) {
                     let fullArtifactPath = "\(currentPath)/\(artifactFolder)"
                     var isDir: ObjCBool = false
                     if fileManager.fileExists(atPath: fullArtifactPath, isDirectory: &isDir), isDir.boolValue {
                         // Check last modified date
                         var statBuf = stat()
-                        if lstat(fullArtifactPath, &statBuf) == 0 {
+                        // A symlinked folder is not offered: its size would be the target's, and removing it frees nothing.
+                        if lstat(fullArtifactPath, &statBuf) == 0, (statBuf.st_mode & S_IFMT) != S_IFLNK {
                             let modTime = Date(timeIntervalSince1970: TimeInterval(statBuf.st_mtimespec.tv_sec))
                             let daysOld = Calendar.current.dateComponents([.day], from: modTime, to: Date()).day ?? 0
 
@@ -248,33 +334,51 @@ public final class ProjectPurgeService: @unchecked Sendable {
     // MARK: - Purging Execution
 
     /// Purges the selected project artifact folders and records metrics in history tracker.
+    ///
+    /// Each folder is checked again right before it goes: the project may have changed since the scan. A folder that
+    /// cannot be removed does not stop the others; they are reported together once the rest are done.
     @discardableResult
     public func purge(
         artifacts: [ProjectArtifactItem],
         moveToTrash: Bool = true
     ) throws -> Int64 {
         var totalFreed: Int64 = 0
+        var failedPaths: [String] = []
 
         for item in artifacts {
-            guard isPathSafeForPurge(item.artifactPath) else { continue }
+            guard isPathSafeForPurge(item.artifactPath, home: homeOverride ?? NSHomeDirectory()), isStillPurgeable(item) else { continue }
             let url = URL(fileURLWithPath: item.artifactPath)
-            if moveToTrash {
-                try fileManager.trashItem(at: url, resultingItemURL: nil)
-            } else {
-                try fileManager.removeItem(at: url)
+            do {
+                if moveToTrash {
+                    try fileManager.trashItem(at: url, resultingItemURL: nil)
+                } else {
+                    try fileManager.removeItem(at: url)
+                }
+                totalFreed += item.sizeBytes
+            } catch {
+                failedPaths.append(item.artifactPath)
             }
-            totalFreed += item.sizeBytes
         }
 
         if totalFreed > 0 {
             SystemCleaningHistoryTracker.shared.record(
                 operationName: "Project Build Artifacts",
                 bytesFreed: totalFreed,
-                itemCount: artifacts.count
+                itemCount: artifacts.count - failedPaths.count
             )
         }
 
+        if !failedPaths.isEmpty {
+            throw ProjectPurgeError.someItemsFailed(paths: failedPaths, freedBytes: totalFreed)
+        }
         return totalFreed
+    }
+
+    private func isStillPurgeable(_ item: ProjectArtifactItem) -> Bool {
+        guard let type = PurgeArtifactType(rawValue: (item.artifactPath as NSString).lastPathComponent) else { return false }
+        let parent = (item.artifactPath as NSString).deletingLastPathComponent
+        guard let contents = try? fileManager.contentsOfDirectory(atPath: parent) else { return false }
+        return isEligible(type, projectPath: parent, projectContents: contents)
     }
 
     // MARK: - Safety Invariants

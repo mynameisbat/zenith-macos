@@ -1,7 +1,19 @@
 import Foundation
+import AppKit
 import CoreGraphics
 import Observation
 import Combine
+
+// MARK: - Memory Limits
+
+/// Bounds on how much memory the clipboard history may hold. The item count alone is not a bound:
+/// 500 screenshots or large copies would otherwise be kept in RAM.
+public enum ClipboardLimits {
+    /// Largest single item kept in history. Bigger copies still reach the system pasteboard, just not this history.
+    public static let maxItemBytes = 25 * 1024 * 1024
+    /// Total size of the history; the oldest unpinned items are dropped first when it is exceeded.
+    public static let maxTotalBytes = 256 * 1024 * 1024
+}
 
 // MARK: - Fuzzy Search Engine
 
@@ -267,6 +279,9 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
     private var _capacityOverride: Int?
 
     @ObservationIgnored
+    private let maxTotalBytes: Int
+
+    @ObservationIgnored
     private var _items: [ClipboardItem] = []
 
     @ObservationIgnored
@@ -280,17 +295,26 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
     public init(
         pasteboardService: PasteboardServiceProtocol = PasteboardMonitor.shared,
         settingsStore: SettingsStore = .shared,
-        initialItems: [ClipboardItem] = []
+        initialItems: [ClipboardItem] = [],
+        maxTotalBytes: Int = ClipboardLimits.maxTotalBytes
     ) {
         self.pasteboardService = pasteboardService
         self.settingsStore = settingsStore
+        self.maxTotalBytes = maxTotalBytes
         self._items = initialItems
         self._capacityOverride = nil
     }
 
     /// Convenience initializer for unit tests with a fixed capacity limit.
-    public convenience init(capacity: Int) {
-        self.init(initialItems: [])
+    ///
+    /// It gets a private pasteboard: restoring an item from a store built this way must never overwrite
+    /// the user's real clipboard.
+    public convenience init(capacity: Int, maxTotalBytes: Int = ClipboardLimits.maxTotalBytes) {
+        self.init(
+            pasteboardService: PasteboardMonitor(pasteboard: NSPasteboard.withUniqueName()),
+            initialItems: [],
+            maxTotalBytes: maxTotalBytes
+        )
         self._capacityOverride = capacity
     }
 
@@ -548,12 +572,24 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
 
     private func enforceCapacityLocked(preserveFrontItem: Bool = false) {
         let currentCap = _capacityOverride ?? settingsStore.historyLimit
-        guard _items.count > currentCap else { return }
-
         let minIndex = preserveFrontItem ? 1 : 0
+
+        if _items.count > currentCap {
+            var index = _items.count - 1
+            while _items.count > currentCap && index >= minIndex {
+                if !_items[index].isPinned {
+                    _items.remove(at: index)
+                }
+                index -= 1
+            }
+        }
+
+        // Then the memory budget: oldest unpinned items go first, and the newest item always stays.
+        var totalBytes = _items.reduce(0) { $0 + $1.byteSize }
         var index = _items.count - 1
-        while _items.count > currentCap && index >= minIndex {
+        while totalBytes > maxTotalBytes && index >= minIndex {
             if !_items[index].isPinned {
+                totalBytes -= _items[index].byteSize
                 _items.remove(at: index)
             }
             index -= 1

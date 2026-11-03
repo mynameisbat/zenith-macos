@@ -16,17 +16,20 @@ public final class PrivacyShieldController: ObservableObject {
     }
 
     private init() {
-        // Guarantee clean state on launch:
-        // If system proxy was left on from an earlier crash or unexpected termination,
-        // cleanly reset it so user internet is never stuck in a broken state.
-        if SystemProxyManager.shared.isProxyEnabled() {
-            _ = SystemProxyManager.shared.disableProxySynchronously()
-        }
+        // Recovery of a proxy left behind by a crash runs at launch (see AppDelegate), not here:
+        // this controller is created lazily, possibly long after the user has lost connectivity.
         self.isRunning = false
         PrivacyShieldStatistics.shared.isActive = false
         let savedProvider = SettingsStore.shared.dohProvider
         LocalProxyServer.shared.provider = savedProvider
         PrivacyShieldStatistics.shared.selectedProvider = savedProvider
+
+        // If the listener dies while the shield is on, the system proxy would point at a dead port.
+        LocalProxyServer.shared.onUnexpectedStop = { [weak self] in
+            Task { @MainActor in
+                await self?.handleListenerFailure()
+            }
+        }
     }
 
     @Published public private(set) var isTransitioning: Bool = false
@@ -55,46 +58,73 @@ public final class PrivacyShieldController: ObservableObject {
         let port = UInt16(statistics.port)
         let provider = statistics.selectedProvider
 
+        // The system proxy is only pointed at the listener once it is really accepting connections;
+        // otherwise a busy port would leave all web traffic aimed at nothing while the UI says "Protected".
         do {
-            try LocalProxyServer.shared.start(port: port, provider: provider)
-            let enabled = await SystemProxyManager.shared.enableProxy(port: port)
-            guard enabled else {
-                NSLog("[PrivacyShieldController] Failed to enable system proxy via SystemProxyManager")
-                LocalProxyServer.shared.stop()
-                self.isRunning = false
-                statistics.isActive = false
-                ToastHUDController.shared.show(
-                    message: "Failed to enable system proxy",
-                    icon: "exclamationmark.triangle"
-                )
-                return
-            }
-            self.isRunning = true
-            statistics.isActive = true
-
-            ToastHUDController.shared.show(
-                message: "Privacy Shield: Protected",
-                icon: "shield.checkered"
-            )
+            try await LocalProxyServer.shared.startAndAwaitReady(port: port, provider: provider)
         } catch {
             NSLog("[PrivacyShieldController] Failed to start: \(error)")
             ToastHUDController.shared.show(
-                message: "Failed to start Privacy Shield: \(error.localizedDescription)",
-                icon: "exclamationmark.triangle"
+                message: "Privacy Shield can't listen on port \(port)",
+                icon: "exclamationmark.triangle",
+                subtitle: error.localizedDescription
             )
+            return
         }
+
+        let enabled = await SystemProxyManager.shared.enableProxy(port: port)
+        guard enabled else {
+            NSLog("[PrivacyShieldController] Failed to enable system proxy via SystemProxyManager")
+            LocalProxyServer.shared.stop()
+            self.isRunning = false
+            statistics.isActive = false
+            ToastHUDController.shared.show(
+                message: "Failed to enable system proxy",
+                icon: "exclamationmark.triangle",
+                subtitle: SystemProxyManager.shared.lastFailureReason
+            )
+            return
+        }
+        self.isRunning = true
+        statistics.isActive = true
+
+        ToastHUDController.shared.show(
+            message: "Privacy Shield: Protected",
+            icon: "shield.checkered"
+        )
     }
 
     /// Deactivates proxy engine and cleanly restores macOS network settings asynchronously.
     public func stop() async {
+        // Put the user's proxy settings back before the listener goes away, so traffic is never aimed at a dead port.
+        let restored = await SystemProxyManager.shared.disableProxy()
         LocalProxyServer.shared.stop()
-        _ = await SystemProxyManager.shared.disableProxy()
         self.isRunning = false
         statistics.isActive = false
 
+        if restored {
+            ToastHUDController.shared.show(
+                message: "Privacy Shield: Inactive",
+                icon: "shield.slash"
+            )
+        } else {
+            ToastHUDController.shared.show(
+                message: "Privacy Shield stopped, but proxy settings were not restored",
+                icon: "exclamationmark.triangle",
+                subtitle: "Zenith will retry on next launch"
+            )
+        }
+    }
+
+    /// Reacts to the local listener dying while the shield is on: restore the system proxy and show it as off.
+    private func handleListenerFailure() async {
+        guard isRunning, !isTransitioning else { return }
+        _ = await SystemProxyManager.shared.disableProxy()
+        self.isRunning = false
+        statistics.isActive = false
         ToastHUDController.shared.show(
-            message: "Privacy Shield: Inactive",
-            icon: "shield.slash"
+            message: "Privacy Shield stopped: local proxy failed",
+            icon: "exclamationmark.triangle"
         )
     }
 

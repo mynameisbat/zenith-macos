@@ -60,7 +60,7 @@ public struct CleanerSettingsTab: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Selected cache and temporary files will be permanently deleted to recover disk space.")
+            Text("These will be permanently deleted and cannot be restored:\n\(cleaner.selectionSummary)")
         }
     }
 

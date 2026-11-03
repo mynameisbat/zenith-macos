@@ -49,7 +49,7 @@ struct MoleFeatureServicesTests {
         try dummyData.write(to: pkgFile)
         try dummyData.write(to: docFile)
 
-        let service = InstallerPurgeService()
+        let service = InstallerPurgeService(runCommand: { _, _ in nil })
         let items = await service.scan(directories: [tempDir], minAgeDays: 0, minSizeBytes: 100)
 
         #expect(items.count == 2)
@@ -78,11 +78,14 @@ struct MoleFeatureServicesTests {
         let userPhoto = tempDir.appendingPathComponent("Vacation.jpg")
 
         let dummyData = Data(repeating: 0x20, count: 512)
+        // A real AppleDouble file starts with the magic number 0x00051607.
+        var appleDoubleData = Data([0x00, 0x05, 0x16, 0x07])
+        appleDoubleData.append(Data(repeating: 0x20, count: 508))
         try dummyData.write(to: dsStore)
-        try dummyData.write(to: appleDouble)
+        try appleDoubleData.write(to: appleDouble)
         try dummyData.write(to: userPhoto)
 
-        let service = ExternalDriveSanitizerService()
+        let service = ExternalDriveSanitizerService(volumeProvider: { [tempDir] in [tempDir] })
         let scanResult = await service.scanVolume(url: tempDir)
 
         #expect(scanResult.fileCount == 2)
@@ -139,8 +142,8 @@ struct MoleFeatureServicesTests {
         let sampleFile = leftoverDir.appendingPathComponent("cache.db")
         try Data(repeating: 0x55, count: 2048).write(to: sampleFile)
 
-        let service = OrphanedAppLeftoversService()
-        let orphans = await service.scan(locations: [(tempParent, "Test Category")])
+        let service = OrphanedAppLeftoversService(locations: [(tempParent, "Test Category")], applicationRoots: [], isBundleIdentifierInUse: { _ in false }, minIdleDays: 0)
+        let orphans = await service.scan()
 
         #expect(orphans.count == 1)
         #expect(orphans.first?.appName.lowercased() == "nonexistentapp")
@@ -155,7 +158,10 @@ struct MoleFeatureServicesTests {
 
     @Test("MOLE-06: System optimizer zombie cleanup and launch services execute cleanly")
     func testSystemOptimizerZombieAndLaunchServices() async throws {
-        let optimizer = SystemOptimizerService()
+        // The commands are recorded, not run: a real `lsregister -kill -r` rebuilds the Launch Services database
+        // of whoever runs the tests.
+        let commands = RecordingCommandRunner()
+        let optimizer = SystemOptimizerService(runner: commands.runner)
 
         // Zombie process cleanup
         let zombieFreed = try optimizer.execute(taskId: .zombieProcessCleanup)
@@ -164,5 +170,6 @@ struct MoleFeatureServicesTests {
         // Launch services rebuild
         let lsFreed = try optimizer.execute(taskId: .launchServicesRebuild)
         #expect(lsFreed >= 0)
+        #expect(commands.didRun("lsregister", containing: "-kill"))
     }
 }

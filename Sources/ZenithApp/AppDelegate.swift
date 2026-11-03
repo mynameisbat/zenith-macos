@@ -34,11 +34,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 7. Launch Zenith Dynamic Island & Floating Pill
         ZenithIslandWindowController.shared.setup()
+
+        // 8. Undo a system proxy left behind by an earlier crash before it leaves the user without internet
+        let shieldPort = UInt16(clamping: PrivacyShieldStatistics.shared.port)
+        Task.detached(priority: .utility) {
+            _ = SystemProxyManager.shared.recoverFromUncleanShutdown(legacyPort: shieldPort)
+        }
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
         NSLog("[Zenith] Application will terminate. Releasing resources.")
-        if PrivacyShieldController.shared.isRunning || SystemProxyManager.shared.isProxyEnabled() {
+        if SystemProxyManager.shared.hasPendingRestore {
             _ = SystemProxyManager.shared.disableProxySynchronously()
         }
         LocalProxyServer.shared.stop()

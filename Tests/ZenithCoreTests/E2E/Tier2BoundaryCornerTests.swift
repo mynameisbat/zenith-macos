@@ -476,7 +476,9 @@ struct Tier2BoundaryCornerTests {
 
         #expect(screenURL.scheme == "x-apple.systempreferences")
         #expect(accessURL.scheme == "x-apple.systempreferences")
-        #expect(!screenURL.pathComponents.isEmpty)
-        #expect(!accessURL.pathComponents.isEmpty)
+        // The pane is named after the scheme, the section after a "?". Such a URL has no path and, on some Foundation
+        // versions, no `query` either, so the string itself is what is checked.
+        #expect(screenURL.absoluteString == "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
+        #expect(accessURL.absoluteString == "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
     }
 }

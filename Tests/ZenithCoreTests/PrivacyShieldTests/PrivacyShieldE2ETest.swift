@@ -7,7 +7,12 @@ import AppKit
 @Suite("Privacy Shield End-to-End System Proxy Suite")
 struct PrivacyShieldE2ETest {
 
-    @Test("E2E-01: Full system proxy enabling, native URLSession request, and safe cleanup")
+    /// Switches the real macOS system proxy on and off and sends traffic to the internet, so it only runs on request:
+    /// `ZENITH_E2E_SYSTEM=1 swift test --filter PrivacyShieldE2ETest`.
+    @Test(
+        "E2E-01: Full system proxy enabling, native URLSession request, and safe cleanup",
+        .enabled(if: ProcessInfo.processInfo.environment["ZENITH_E2E_SYSTEM"] == "1", "Changes the machine's real system proxy; set ZENITH_E2E_SYSTEM=1 to run")
+    )
     func testE2ESystemProxy() async throws {
         let server = LocalProxyServer.shared
         try server.start(port: 8080, provider: .cloudflare)

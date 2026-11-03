@@ -180,12 +180,28 @@ struct ZenithCommandHubTests {
 
     @Test("HUB-10: Boost system executes maintenance operations and refreshes snapshot")
     @MainActor
-    func testBoostSystemExecution() {
-        let state = ZenithCommandHubState()
+    func testBoostSystemExecution() async throws {
+        // Boost clears caches and flushes DNS; here those go to a recorder and a throwaway home
+        // instead of the machine running the tests.
+        let home = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Zenith_Boost_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let commands = RecordingCommandRunner()
+        let state = ZenithCommandHubState(optimizer: SystemOptimizerService(homeDirectory: home.path, runner: commands.runner))
+
         state.boostSystem()
 
         #expect(state.hardwareSnapshot.timestamp <= Date())
         #expect(state.showTopHogs == true)
+
+        // The maintenance steps run in the background; they must all go through the injected runner.
+        for _ in 0..<40 where !commands.didRun("dscacheutil") {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        #expect(commands.didRun("qlmanage"))
+        #expect(commands.didRun("dscacheutil"))
+        // Boost is a one-click action; it must not quietly change persistent Finder preferences.
+        #expect(!commands.didRun("defaults"))
     }
 
     @Test("HUB-11: Process termination triggers hardware snapshot refresh and invalidation")
@@ -209,8 +225,12 @@ struct ZenithCommandHubTests {
     @MainActor
     func testFilteredTopHogsDefaultAndBoost() {
         let state = ZenithCommandHubState()
-        let fakeHogs = (1...10).map { i in
-            ProcessTelemetry(pid: 1000 + i, name: "proc_\(i)", cpuPercent: Double(10 - i), memoryBytes: Int64(i * 1024 * 1024))
+        var fakeHogs: [ProcessTelemetry] = []
+        for i in 1...10 {
+            let pid: Int = 1000 + i
+            let cpu: Double = Double(10 - i)
+            let memory: Int64 = Int64(i) * 1024 * 1024
+            fakeHogs.append(ProcessTelemetry(pid: pid, name: "proc_\(i)", cpuPercent: cpu, memoryBytes: memory))
         }
         state.hardwareSnapshot = HardwareSnapshot(cpu: CPUTelemetry(topHogs: fakeHogs))
 

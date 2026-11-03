@@ -135,37 +135,39 @@ struct HardwareTelemetryServiceTests {
 
     @Test("HW-07: Safe process filter isolates user apps and excludes system daemons")
     func testSafeProcessFilterExcludesSystemDaemons() {
+        // The PIDs below sit above macOS's PID_MAX (99999), so they never name a real process on the machine running the
+        // tests; `isSafeToKillProcess` then judges the command alone instead of whatever really owns the PID.
         // Disallow PID <= 1
         #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 0, command: "kernel_task"))
         #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 1, command: "/sbin/launchd"))
 
         // Disallow critical macOS system services
-        #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 608, command: "WindowServer"))
-        #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 612, command: "/System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow"))
-        #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 777, command: "com.apple.AppleUserHIDDrivers"))
-        #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 888, command: "Dock"))
-        #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 999, command: "ControlCenter"))
-        #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 1111, command: "Zenith"))
+        #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 900608, command: "WindowServer"))
+        #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 900612, command: "/System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow"))
+        #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 900777, command: "com.apple.AppleUserHIDDrivers"))
+        #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 900888, command: "Dock"))
+        #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 900999, command: "ControlCenter"))
+        #expect(!HardwareTelemetryService.isSafeToKillProcess(pid: 901111, command: "Zenith"))
 
         // Allow user applications & developer tools
-        #expect(HardwareTelemetryService.isSafeToKillProcess(pid: 1234, command: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"))
-        #expect(HardwareTelemetryService.isSafeToKillProcess(pid: 2345, command: "/Applications/Slack.app/Contents/MacOS/Slack"))
-        #expect(HardwareTelemetryService.isSafeToKillProcess(pid: 3456, command: "/Users/user/.nvm/versions/node/v20/bin/node"))
-        #expect(HardwareTelemetryService.isSafeToKillProcess(pid: 4567, command: "node"))
-        #expect(HardwareTelemetryService.isSafeToKillProcess(pid: 5678, command: "python3"))
+        #expect(HardwareTelemetryService.isSafeToKillProcess(pid: 901234, command: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"))
+        #expect(HardwareTelemetryService.isSafeToKillProcess(pid: 902345, command: "/Applications/Slack.app/Contents/MacOS/Slack"))
+        #expect(HardwareTelemetryService.isSafeToKillProcess(pid: 903456, command: "/Users/user/.nvm/versions/node/v20/bin/node"))
+        #expect(HardwareTelemetryService.isSafeToKillProcess(pid: 904567, command: "node"))
+        #expect(HardwareTelemetryService.isSafeToKillProcess(pid: 905678, command: "python3"))
 
         // parseProcessOutput with filterSafeOnly=true
         let sample = """
-         100     1 S      50.0  1.0   50000 WindowServer
-         200     1 S      40.0  2.0  100000 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
-         300     1 S      30.0  3.0  150000 /sbin/launchd
-         400     1 S      20.0  4.0  200000 /Applications/Slack.app/Contents/MacOS/Slack
+        900100     1 S      50.0  1.0   50000 WindowServer
+        900200     1 S      40.0  2.0  100000 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+        900300     1 S      30.0  3.0  150000 /sbin/launchd
+        900400     1 S      20.0  4.0  200000 /Applications/Slack.app/Contents/MacOS/Slack
         """
         let (safeHogs, _) = HardwareTelemetryService().parseProcessOutput(sample, topLimit: 5, filterSafeOnly: true)
         #expect(safeHogs.count == 2)
-        #expect(safeHogs.contains { $0.pid == 200 })
-        #expect(safeHogs.contains { $0.pid == 400 })
-        #expect(!safeHogs.contains { $0.pid == 100 })
-        #expect(!safeHogs.contains { $0.pid == 300 })
+        #expect(safeHogs.contains { $0.pid == 900200 })
+        #expect(safeHogs.contains { $0.pid == 900400 })
+        #expect(!safeHogs.contains { $0.pid == 900100 })
+        #expect(!safeHogs.contains { $0.pid == 900300 })
     }
 }

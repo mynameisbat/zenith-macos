@@ -16,6 +16,14 @@ public struct DoHJSONResponse: Codable, Sendable {
 /// Thread-safe in-memory DNS cache actor for Swift 6 strict concurrency.
 actor DNSCache {
     private var entries: [String: (ip: String, expiry: Date)] = [:]
+    private let maxEntries: Int
+
+    /// A long-running shield resolves a new name for every site visited; without a bound the cache only grows.
+    init(maxEntries: Int = 2048) {
+        self.maxEntries = maxEntries
+    }
+
+    var count: Int { entries.count }
 
     func get(domain: String) -> String? {
         if let cached = entries[domain], cached.expiry > Date() {
@@ -26,6 +34,20 @@ actor DNSCache {
 
     func set(domain: String, ip: String, ttl: TimeInterval = 300) {
         entries[domain] = (ip: ip, expiry: Date().addingTimeInterval(ttl))
+        if entries.count > maxEntries {
+            evictOverflow()
+        }
+    }
+
+    /// Drops expired entries, then the ones closest to expiring, until the cache fits again.
+    private func evictOverflow() {
+        let now = Date()
+        entries = entries.filter { $0.value.expiry > now }
+        let overflow = entries.count - maxEntries
+        guard overflow > 0 else { return }
+        for key in entries.sorted(by: { $0.value.expiry < $1.value.expiry }).prefix(overflow).map(\.key) {
+            entries.removeValue(forKey: key)
+        }
     }
 
     func clear() {
@@ -77,7 +99,8 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
         await cache.set(domain: "dns.nextdns.io", ip: "45.90.28.0", ttl: 86400)
     }
 
-    /// Resolves a domain name to an IPv4 string address using the designated DoH provider.
+    /// Resolves a domain name to an IPv4 address string (or an IPv6 one for hosts with no A record)
+    /// using the designated DoH provider.
     public func resolve(domain: String, provider: DoHProvider = .cloudflare) async throws -> String {
         let cleanDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
@@ -105,11 +128,28 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
     }
 
     private func queryDoH(domain: String, provider: DoHProvider) async throws -> String {
+        // IPv4 first; hosts that only publish AAAA records (IPv6-only sites and networks) fall back to IPv6.
+        if let ipv4 = try await queryRecord(domain: domain, provider: provider, recordType: 1) {
+            return ipv4
+        }
+        if let ipv6 = try await queryRecord(domain: domain, provider: provider, recordType: 28) {
+            return ipv6
+        }
+
+        throw NSError(
+            domain: "DoHResolver",
+            code: 404,
+            userInfo: [NSLocalizedDescriptionKey: "No IPv4 or IPv6 address found for domain \(domain)"]
+        )
+    }
+
+    /// Queries one record type (1 = A, 28 = AAAA) and returns the first valid address, or `nil` when there is none.
+    private func queryRecord(domain: String, provider: DoHProvider, recordType: Int) async throws -> String? {
         // Construct DoH JSON endpoint URL
         var components = URLComponents(url: provider.endpointURL, resolvingAgainstBaseURL: false)
         components?.queryItems = [
             URLQueryItem(name: "name", value: domain),
-            URLQueryItem(name: "type", value: "A")
+            URLQueryItem(name: "type", value: recordType == 28 ? "AAAA" : "A")
         ]
 
         guard let queryURL = components?.url else {
@@ -129,26 +169,29 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
 
         let decoded = try JSONDecoder().decode(DoHJSONResponse.self, from: data)
 
-        // Type 1 corresponds to DNS A Record (IPv4)
+        // Type 1 is a DNS A record (IPv4), type 28 an AAAA record (IPv6)
         if let answers = decoded.Answer {
-            for answer in answers where answer.type == 1 {
+            for answer in answers where answer.type == recordType {
                 let candidate = answer.data.trimmingCharacters(in: .whitespacesAndNewlines)
-                if isIPv4Address(candidate) {
+                if recordType == 28 ? isIPv6Address(candidate) : isIPv4Address(candidate) {
                     return candidate
                 }
             }
         }
-
-        throw NSError(
-            domain: "DoHResolver",
-            code: 404,
-            userInfo: [NSLocalizedDescriptionKey: "No IPv4 address found for domain \(domain)"]
-        )
+        return nil
     }
 
     /// Validates whether a given string is a literal IPv4 or IPv6 address.
     public func isIPAddress(_ str: String) -> Bool {
         isIPv4Address(str) || str.contains(":")
+    }
+
+    /// Validates standard IPv6 colon-hex notation.
+    public func isIPv6Address(_ str: String) -> Bool {
+        var sin6 = sockaddr_in6()
+        return str.withCString { cstr in
+            inet_pton(AF_INET6, cstr, &sin6.sin6_addr) == 1
+        }
     }
 
     /// Validates standard IPv4 dotted notation.

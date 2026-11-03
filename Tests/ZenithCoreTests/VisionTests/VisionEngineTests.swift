@@ -3,7 +3,9 @@ import Foundation
 import CoreGraphics
 @testable import ZenithCore
 
-@Suite("Vision Engine Core Functional Test Suite")
+// Serialized: on the CI runner (a VM with no GPU) these tests all pass when run one at a time, but the suite hangs when
+// they run concurrently, each one inside Vision's blocking `perform`.
+@Suite("Vision Engine Core Functional Test Suite", .serialized)
 struct VisionEngineTests {
 
     private let engine = VisionEngineService()

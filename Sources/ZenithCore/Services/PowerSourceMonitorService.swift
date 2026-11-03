@@ -1,4 +1,5 @@
 import Foundation
+import IOKit
 import IOKit.ps
 import Combine
 
@@ -17,7 +18,31 @@ public final class PowerSourceMonitorService: ObservableObject {
     private var lastFullBatteryAlertTime: Date?
     private var knownBluetoothDeviceNames = Set<String>()
 
-    public init() {}
+    private let islandState: ZenithIslandState
+    private let bluetoothProvider: @Sendable () -> [BluetoothDeviceTelemetry]
+
+    /// Wakes the service when an accessory's HID service appears or disappears in the I/O Registry.
+    private var accessoryNotificationPort: IONotificationPortRef?
+    private var accessoryIterators: [io_iterator_t] = []
+
+    /// How long to wait after an accessory shows up before reading it: the battery level is filled in a moment later.
+    private let accessorySettleDelay: TimeInterval
+
+    /// - Parameters:
+    ///   - islandState: Where alerts are shown.
+    ///   - bluetoothProvider: Lists the connected accessories; tests substitute a stand-in.
+    ///   - accessorySettleDelay: Seconds to wait after the registry reports a change before reading the accessories.
+    public init(
+        islandState: ZenithIslandState = .shared,
+        bluetoothProvider: @escaping @Sendable () -> [BluetoothDeviceTelemetry] = {
+            HardwareTelemetryService.shared.readBluetoothPeripherals()
+        },
+        accessorySettleDelay: TimeInterval = 1.5
+    ) {
+        self.islandState = islandState
+        self.bluetoothProvider = bluetoothProvider
+        self.accessorySettleDelay = accessorySettleDelay
+    }
 
     /// Starts native OS-level power source monitoring via IOKit run loop notifications.
     public func startMonitoring() {
@@ -30,8 +55,7 @@ public final class PowerSourceMonitorService: ObservableObject {
         self.lastPluggedIn = initial.isPluggedIn
 
         // Capture initial connected Bluetooth accessories
-        let initialDevices = HardwareTelemetryService.shared.readBluetoothPeripherals()
-        self.knownBluetoothDeviceNames = Set(initialDevices.map { $0.name })
+        self.knownBluetoothDeviceNames = Set(bluetoothProvider().map { $0.name })
 
         // Register IOKit notification callback without polling
         let source = IOPSNotificationCreateRunLoopSource({ _ in
@@ -44,6 +68,8 @@ public final class PowerSourceMonitorService: ObservableObject {
             CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
             self.runLoopSource = source
         }
+
+        startAccessoryNotifications()
     }
 
     /// Stops monitoring and unregisters run loop source.
@@ -52,7 +78,89 @@ public final class PowerSourceMonitorService: ObservableObject {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
             self.runLoopSource = nil
         }
+        stopAccessoryNotifications()
         self.isMonitoring = false
+    }
+
+    // MARK: - Bluetooth Accessories
+
+    /// Announces accessories that were not connected at the last check.
+    ///
+    /// This used to run only as part of a power-source change and was skipped by two early returns, so an accessory
+    /// connecting on its own was usually never announced (and never at all on a Mac without a battery).
+    public func evaluateBluetoothAccessories() {
+        let devices = bluetoothProvider()
+        for device in devices where !knownBluetoothDeviceNames.contains(device.name) {
+            islandState.triggerAlert(
+                icon: device.icon,
+                title: "\(device.name) (\(device.batteryPercent)%)",
+                subtitle: "Connected Accessory",
+                duration: 2.5
+            )
+        }
+        // Remember only what is connected now, so an accessory that left is announced again when it returns.
+        knownBluetoothDeviceNames = Set(devices.map { $0.name })
+    }
+
+    /// Called when the I/O Registry reports a change among accessory HID services.
+    func accessoryRegistryChanged() {
+        let delay = UInt64(accessorySettleDelay * 1_000_000_000)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: delay)
+            self?.evaluateBluetoothAccessories()
+        }
+    }
+
+    /// Subscribes to accessories appearing and disappearing, so no polling is needed.
+    private func startAccessoryNotifications() {
+        guard accessoryNotificationPort == nil, let port = IONotificationPortCreate(kIOMainPortDefault) else { return }
+        IONotificationPortSetDispatchQueue(port, DispatchQueue.main)
+
+        let callback: IOServiceMatchingCallback = { _, iterator in
+            // Walking the iterator is what re-arms the notification.
+            while case let service = IOIteratorNext(iterator), service != 0 {
+                IOObjectRelease(service)
+            }
+            Task { @MainActor in
+                PowerSourceMonitorService.shared.accessoryRegistryChanged()
+            }
+        }
+
+        var iterators: [io_iterator_t] = []
+        for notificationType in [kIOFirstMatchNotification, kIOTerminatedNotification] {
+            var iterator: io_iterator_t = 0
+            let status = IOServiceAddMatchingNotification(
+                port,
+                notificationType,
+                IOServiceMatching("AppleDeviceManagementHIDEventService"),
+                callback,
+                nil,
+                &iterator
+            )
+            guard status == KERN_SUCCESS else { continue }
+            while case let service = IOIteratorNext(iterator), service != 0 {   // the initial matches arm it
+                IOObjectRelease(service)
+            }
+            iterators.append(iterator)
+        }
+
+        guard !iterators.isEmpty else {
+            IONotificationPortDestroy(port)
+            return
+        }
+        accessoryNotificationPort = port
+        accessoryIterators = iterators
+    }
+
+    private func stopAccessoryNotifications() {
+        for iterator in accessoryIterators {
+            IOObjectRelease(iterator)
+        }
+        accessoryIterators.removeAll()
+        if let port = accessoryNotificationPort {
+            IONotificationPortDestroy(port)
+            accessoryNotificationPort = nil
+        }
     }
 
     /// Evaluates power source state change and triggers relevant Dynamic Island HUD alerts.
@@ -67,7 +175,7 @@ public final class PowerSourceMonitorService: ObservableObject {
         // 1. MagSafe / USB-C Plugged In Event
         if prevPlugged == false && current.isPluggedIn {
             let wattStr = (current.wattage != nil && current.wattage! > 0) ? "\(Int(current.wattage!))W Charger" : "Power Connected"
-            ZenithIslandState.shared.triggerAlert(
+            islandState.triggerAlert(
                 icon: "bolt.fill",
                 title: "Charging • \(current.percentage)%",
                 subtitle: wattStr,
@@ -84,7 +192,7 @@ public final class PowerSourceMonitorService: ObservableObject {
             } else {
                 timeStr = "Running on Battery"
             }
-            ZenithIslandState.shared.triggerAlert(
+            islandState.triggerAlert(
                 icon: "bolt.slash.fill",
                 title: "On Battery • \(current.percentage)%",
                 subtitle: timeStr,
@@ -101,7 +209,7 @@ public final class PowerSourceMonitorService: ObservableObject {
             }()
             if canAlert {
                 self.lastLowBatteryAlertTime = Date()
-                ZenithIslandState.shared.triggerAlert(
+                islandState.triggerAlert(
                     icon: "battery.25",
                     title: "Low Battery (\(current.percentage)%)",
                     subtitle: "Connect charger soon",
@@ -124,25 +232,11 @@ public final class PowerSourceMonitorService: ObservableObject {
                 } else {
                     subtitle = "Optimal charge reached"
                 }
-                ZenithIslandState.shared.triggerAlert(
+                islandState.triggerAlert(
                     icon: "battery.100.bolt",
                     title: "Battery Charged (\(current.percentage)%)",
                     subtitle: subtitle,
                     duration: 3.0
-                )
-            }
-        }
-
-        // 5. Check for newly connected Bluetooth accessories
-        let devices = HardwareTelemetryService.shared.readBluetoothPeripherals()
-        for device in devices {
-            if !knownBluetoothDeviceNames.contains(device.name) {
-                knownBluetoothDeviceNames.insert(device.name)
-                ZenithIslandState.shared.triggerAlert(
-                    icon: device.icon,
-                    title: "\(device.name) (\(device.batteryPercent)%)",
-                    subtitle: "Connected Accessory",
-                    duration: 2.5
                 )
             }
         }

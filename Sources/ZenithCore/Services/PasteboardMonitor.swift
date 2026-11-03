@@ -198,6 +198,15 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
         rtfData: Data?,
         plainText: String?
     ) -> ClipboardItem? {
+        // Oversized copies are not kept in history (they are still on the system pasteboard). This runs before any
+        // TIFF-to-PNG conversion so a huge image is not decoded just to be thrown away.
+        let limit = ClipboardLimits.maxItemBytes
+        if (pngData?.count ?? 0) > limit || (tiffData?.count ?? 0) > limit
+            || (rtfData?.count ?? 0) > limit || (plainText?.utf8.count ?? 0) > limit {
+            NSLog("[Clipboard] Not keeping an item larger than %d MB in history", limit / 1_048_576)
+            return nil
+        }
+
         // 1. PNG Image
         if let pngData = pngData, !pngData.isEmpty {
             let (w, h) = extractDimensions(from: pngData)

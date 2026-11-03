@@ -530,40 +530,15 @@ public struct IslandDropItemCardView: View {
 
                 if url.pathExtension.lowercased() == "app" {
                     Button {
-                        Task {
-                            if let plan = AppUninstallerService.shared.analyzeApp(atPath: url.path) {
-                                do {
-                                    let freed = try AppUninstallerService.shared.uninstall(plan: plan, moveToTrash: true)
-                                    ToastHUDController.shared.show(
-                                        message: "Uninstalled \(plan.app.displayName) (Freed \(SystemCleanerService.formatBytes(freed)))",
-                                        icon: "trash.fill"
-                                    )
-                                    islandState.removeItem(id: item.id)
-                                } catch {
-                                    ToastHUDController.shared.show(message: "Uninstall error: \(error.localizedDescription)", icon: "exclamationmark.triangle")
-                                }
-                            }
+                        IslandAppActionCoordinator.shared.confirmAndUninstall(appAt: url) {
+                            islandState.removeItem(id: item.id)
                         }
                     } label: {
                         Label("Deep Uninstall App & Leftovers", systemImage: "trash.fill")
                     }
 
                     Button {
-                        Task {
-                            if let plan = BinarySlimmerService.shared.scanApp(atPath: url.path) {
-                                do {
-                                    let saved = try BinarySlimmerService.shared.slimApp(plan: plan)
-                                    ToastHUDController.shared.show(
-                                        message: "Slimmed \(plan.appName) (Saved \(SystemCleanerService.formatBytes(saved)))",
-                                        icon: "scissors"
-                                    )
-                                } catch {
-                                    ToastHUDController.shared.show(message: "Slimming error: \(error.localizedDescription)", icon: "exclamationmark.triangle")
-                                }
-                            } else {
-                                ToastHUDController.shared.show(message: "Already native Apple Silicon binary", icon: "checkmark.seal")
-                            }
-                        }
+                        IslandAppActionCoordinator.shared.confirmAndSlim(appAt: url)
                     } label: {
                         Label("Slim Universal App (Strip Intel code)", systemImage: "scissors")
                     }

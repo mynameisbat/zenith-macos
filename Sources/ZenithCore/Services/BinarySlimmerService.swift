@@ -75,6 +75,10 @@ public final class BinarySlimmerService: @unchecked Sendable {
     public static let shared = BinarySlimmerService()
 
     private let fileManager: FileManager
+    private let runner: SystemCommandRunner
+    private let isApplicationRunning: @Sendable (String) -> Bool
+    private let disposeBackup: @Sendable (URL) throws -> Void
+    private let historyTracker: SystemCleaningHistoryTracker
 
     // Mach-O constants
     private static let FAT_MAGIC: UInt32 = 0xCAFEBABE
@@ -82,8 +86,28 @@ public final class BinarySlimmerService: @unchecked Sendable {
     private static let CPU_TYPE_X86_64: UInt32 = 0x01000007
     private static let CPU_TYPE_ARM64: UInt32 = 0x0100000C
 
-    public init(fileManager: FileManager = .default) {
+    /// - Parameters:
+    ///   - runner: Runs `lipo` / `codesign`; tests substitute a fake.
+    ///   - isApplicationRunning: Whether the app bundle at the given path is currently running.
+    ///   - disposeBackup: Gets rid of the original bundle once the slimmed one is in place (default: the Trash).
+    public init(
+        fileManager: FileManager = .default,
+        runner: @escaping SystemCommandRunner = SystemCommand.processRunner,
+        isApplicationRunning: @escaping @Sendable (String) -> Bool = BinarySlimmerService.isBundleRunning,
+        disposeBackup: @escaping @Sendable (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) },
+        historyTracker: SystemCleaningHistoryTracker = .shared
+    ) {
         self.fileManager = fileManager
+        self.runner = runner
+        self.isApplicationRunning = isApplicationRunning
+        self.disposeBackup = disposeBackup
+        self.historyTracker = historyTracker
+    }
+
+    /// True when an app bundle at `path` is currently running.
+    public static let isBundleRunning: @Sendable (String) -> Bool = { path in
+        let target = URL(fileURLWithPath: path).standardizedFileURL.path
+        return NSWorkspace.shared.runningApplications.contains { $0.bundleURL?.standardizedFileURL.path == target }
     }
 
     // MARK: - Scanning
@@ -213,60 +237,126 @@ public final class BinarySlimmerService: @unchecked Sendable {
 
     // MARK: - Slimming Execution
 
-    /// Strips the Intel x86_64 slice from universal binaries in the plan
-    /// and re-signs the application bundle.
+    /// Strips the Intel x86_64 slice from the universal binaries in the plan and re-signs the bundle.
+    ///
+    /// Nothing touches the installed app until the result is known to be good: the work happens on a copy
+    /// (an instant clone on APFS), every thinned binary is checked to be arm64-only, and the re-signed copy must pass
+    /// `codesign --verify`. Only then is it swapped in atomically, and the original goes to the Trash instead of
+    /// being deleted. Any failure before the swap leaves the installed app exactly as it was.
     @discardableResult
     public func slimApp(plan: SlimmableAppPlan) throws -> Int64 {
         guard !isProtectedSystemApp(atPath: plan.appPath) else {
             throw SlimmerError.protectedSystemApplication
         }
+        let universalBinaries = plan.binaries.filter(\.isUniversal)
+        guard !universalBinaries.isEmpty else { return 0 }
+
+        try checkSlimmable(appPath: plan.appPath)
+
+        let appURL = URL(fileURLWithPath: plan.appPath)
+        let workDirectory = fileManager.temporaryDirectory.appendingPathComponent("ZenithSlim-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: workDirectory, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: workDirectory) }
+
+        let cloneURL = workDirectory.appendingPathComponent(appURL.lastPathComponent)
+        try fileManager.copyItem(at: appURL, to: cloneURL)
 
         var totalSaved: Int64 = 0
-
-        for binary in plan.binaries where binary.isUniversal {
-            let originalPath = binary.path
-            let thinPath = "\(originalPath).arm64_thin"
-
-            // 1. Extract arm64 slice via lipo
-            let lipo = Process()
-            lipo.executableURL = URL(fileURLWithPath: "/usr/bin/lipo")
-            lipo.arguments = ["-thin", "arm64", originalPath, "-output", thinPath]
-            try lipo.run()
-            lipo.waitUntilExit()
-
-            guard lipo.terminationStatus == 0 && fileManager.fileExists(atPath: thinPath) else {
-                try? fileManager.removeItem(atPath: thinPath)
-                continue
+        for binary in universalBinaries {
+            guard binary.path.hasPrefix(plan.appPath + "/") else {
+                throw SlimmerError.binaryExtractionFailed(binary.path)
             }
-
-            // 2. Preserve permissions
-            let origAttrs = try? fileManager.attributesOfItem(atPath: originalPath)
-            if let posixPerms = origAttrs?[.posixPermissions] as? NSNumber {
-                try? fileManager.setAttributes([.posixPermissions: posixPerms], ofItemAtPath: thinPath)
-            }
-
-            // 3. Swap binary
-            try? fileManager.removeItem(atPath: originalPath)
-            try fileManager.moveItem(atPath: thinPath, toPath: originalPath)
+            let cloneBinaryPath = cloneURL.path + String(binary.path.dropFirst(plan.appPath.count))
+            try thin(binaryAt: cloneBinaryPath, reportedAs: binary.path)
             totalSaved += binary.intelSizeBytes
         }
 
-        // 4. Re-sign the slimmed application bundle with ad-hoc signature
-        let codesign = Process()
-        codesign.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
-        codesign.arguments = ["--force", "--deep", "--sign", "-", plan.appPath]
-        try? codesign.run()
-        codesign.waitUntilExit()
+        try resignAndVerify(bundleAt: cloneURL)
+        try swapIn(clone: cloneURL, replacing: appURL)
 
-        if totalSaved > 0 {
-            SystemCleaningHistoryTracker.shared.record(
-                operationName: "Binary Slimming (\(plan.appName))",
-                bytesFreed: totalSaved,
-                itemCount: plan.binaries.count
-            )
+        historyTracker.record(
+            operationName: "Binary Slimming (\(plan.appName))",
+            bytesFreed: totalSaved,
+            itemCount: universalBinaries.count
+        )
+        return totalSaved
+    }
+
+    /// Reasons an app must not be re-signed locally.
+    private func checkSlimmable(appPath: String) throws {
+        if isApplicationRunning(appPath) {
+            throw SlimmerError.applicationIsRunning
+        }
+        if fileManager.fileExists(atPath: "\(appPath)/Contents/_MASReceipt") {
+            throw SlimmerError.unsupportedApplication("it comes from the Mac App Store, and re-signing would invalidate its receipt")
+        }
+        // Entitlements tied to the developer's team (iCloud, keychain and app groups, push, …) stop working
+        // under a local ad-hoc signature.
+        if let entitlements = runner("/usr/bin/codesign", ["-d", "--entitlements", ":-", appPath]) {
+            let restricted = [
+                "com.apple.developer.",
+                "com.apple.application-identifier",
+                "com.apple.security.application-groups",
+                "keychain-access-groups"
+            ]
+            if restricted.contains(where: { entitlements.output.contains($0) }) {
+                throw SlimmerError.unsupportedApplication("it uses entitlements that only work with its original developer signature")
+            }
+        }
+    }
+
+    /// Replaces a universal binary with its arm64 slice, checking the result is really arm64-only.
+    private func thin(binaryAt path: String, reportedAs reportedPath: String) throws {
+        let thinPath = "\(path).arm64_thin"
+        defer { try? fileManager.removeItem(atPath: thinPath) }
+
+        guard let lipo = runner("/usr/bin/lipo", ["-thin", "arm64", path, "-output", thinPath]),
+              lipo.status == 0,
+              fileManager.fileExists(atPath: thinPath),
+              let archs = runner("/usr/bin/lipo", ["-archs", thinPath]),
+              archs.status == 0,
+              archs.output.trimmingCharacters(in: .whitespacesAndNewlines) == "arm64" else {
+            throw SlimmerError.binaryExtractionFailed(reportedPath)
         }
 
-        return totalSaved
+        if let permissions = (try? fileManager.attributesOfItem(atPath: path))?[.posixPermissions] {
+            try? fileManager.setAttributes([.posixPermissions: permissions], ofItemAtPath: thinPath)
+        }
+        try fileManager.removeItem(atPath: path)
+        try fileManager.moveItem(atPath: thinPath, toPath: path)
+    }
+
+    private func resignAndVerify(bundleAt url: URL) throws {
+        let sign = runner("/usr/bin/codesign", [
+            "--force", "--deep", "--sign", "-",
+            "--preserve-metadata=identifier,entitlements,flags,runtime",
+            url.path
+        ])
+        guard let sign, sign.status == 0 else {
+            throw SlimmerError.signingFailed(sign?.errorOutput ?? "codesign could not be started")
+        }
+        let verify = runner("/usr/bin/codesign", ["--verify", "--deep", "--strict", url.path])
+        guard let verify, verify.status == 0 else {
+            throw SlimmerError.signingFailed(verify?.errorOutput ?? "codesign could not be started")
+        }
+    }
+
+    private func swapIn(clone: URL, replacing appURL: URL) throws {
+        let backupName = "\(appURL.lastPathComponent).zenith-backup-\(UUID().uuidString.prefix(8))"
+        do {
+            _ = try fileManager.replaceItemAt(appURL, withItemAt: clone, backupItemName: backupName, options: [.withoutDeletingBackupItem])
+        } catch {
+            throw SlimmerError.replacementFailed(error.localizedDescription)
+        }
+
+        // The slimmed app is in place; the original stays recoverable. If it cannot be moved to the Trash it is left
+        // next to the app under its backup name rather than deleted.
+        let backupURL = appURL.deletingLastPathComponent().appendingPathComponent(backupName)
+        do {
+            try disposeBackup(backupURL)
+        } catch {
+            NSLog("[BinarySlimmer] Original app kept at %@: %@", backupURL.path, error.localizedDescription)
+        }
     }
 
     // MARK: - Helpers
@@ -306,13 +396,25 @@ public final class BinarySlimmerService: @unchecked Sendable {
 public enum SlimmerError: Error, LocalizedError, Equatable {
     case protectedSystemApplication
     case binaryExtractionFailed(String)
+    case applicationIsRunning
+    case unsupportedApplication(String)
+    case signingFailed(String)
+    case replacementFailed(String)
 
     public var errorDescription: String? {
         switch self {
         case .protectedSystemApplication:
             return "Cannot modify protected macOS system applications."
         case .binaryExtractionFailed(let path):
-            return "Failed to extract arm64 slice for binary at \(path)."
+            return "Failed to extract arm64 slice for binary at \(path). The app was not changed."
+        case .applicationIsRunning:
+            return "Quit the application before slimming it. The app was not changed."
+        case .unsupportedApplication(let reason):
+            return "This app can't be slimmed safely: \(reason)."
+        case .signingFailed(let detail):
+            return "The slimmed app could not be re-signed (\(detail.trimmingCharacters(in: .whitespacesAndNewlines))). The app was not changed."
+        case .replacementFailed(let detail):
+            return "The slimmed app could not be installed (\(detail)). The app was not changed."
         }
     }
 }

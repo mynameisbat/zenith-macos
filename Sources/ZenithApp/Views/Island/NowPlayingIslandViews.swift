@@ -227,16 +227,26 @@ public struct NowPlayingExpandedView: View {
                     }
                     .frame(height: 3)
 
-                    HStack {
-                        Text(track.formattedPosition)
-                            .font(.system(size: 8.5, weight: .medium, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.5))
+                    if track.duration > 0 {
+                        HStack {
+                            Text(track.formattedPosition)
+                                .font(.system(size: 8.5, weight: .medium, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.5))
 
-                        Spacer()
+                            Spacer()
 
-                        Text(track.formattedDuration)
-                            .font(.system(size: 8.5, weight: .medium, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.5))
+                            Text(track.formattedDuration)
+                                .font(.system(size: 8.5, weight: .medium, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                    } else {
+                        // Audio detected from a browser has no known length or position.
+                        HStack {
+                            Text("Playing now")
+                                .font(.system(size: 8.5, weight: .medium, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.5))
+                            Spacer()
+                        }
                     }
                 }
 

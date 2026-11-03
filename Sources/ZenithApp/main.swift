@@ -5,7 +5,7 @@ import ZenithCore
 let arguments = CommandLine.arguments
 
 if arguments.contains("--version") {
-    print("Zenith 2.0.0")
+    print("Zenith \(ZenithVersion.current)")
     exit(0)
 }
 
@@ -16,7 +16,7 @@ if arguments.contains("--smoke-test") {
 
 if arguments.contains("--help") {
     print("""
-    Zenith 2.0 - Precision Mac Workspace
+    Zenith \(ZenithVersion.current) - Precision Mac Workspace
     Usage:
       swift run Zenith [options]
 

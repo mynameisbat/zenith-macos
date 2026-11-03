@@ -3,7 +3,12 @@ import Foundation
 import Network
 @testable import ZenithCore
 
-@Suite("Live Proxy Curl Diagnosis Suite")
+/// Sends real traffic to the internet with `curl`, so it only runs on request:
+/// `ZENITH_E2E_NETWORK=1 swift test --filter PrivacyShieldLiveTest`.
+@Suite(
+    "Live Proxy Curl Diagnosis Suite",
+    .enabled(if: ProcessInfo.processInfo.environment["ZENITH_E2E_NETWORK"] == "1", "Needs internet access; set ZENITH_E2E_NETWORK=1 to run")
+)
 struct PrivacyShieldLiveTest {
 
     @Test("Diagnose live request to 1.1.1.1")
