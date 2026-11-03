@@ -3,8 +3,10 @@ import Foundation
 @testable import ZenithCore
 
 /// Talks to the real DoH servers, so it only runs on request: `ZENITH_E2E_NETWORK=1 swift test --filter DoHLiveTests`.
+// Serialized: the proxy tests share `LocalProxyServer.shared`, which can run on one port at a time.
 @Suite(
     "DoH Live Resolution Suite",
+    .serialized,
     .enabled(if: ProcessInfo.processInfo.environment["ZENITH_E2E_NETWORK"] == "1", "Needs internet access; set ZENITH_E2E_NETWORK=1 to run")
 )
 struct DoHLiveTests {
@@ -112,5 +114,57 @@ struct DoHLiveTests {
                 Issue.record("\(name) via \(provider.bootstrapAddress ?? "its URL") failed: \(error)")
             }
         }
+    }
+
+    /// Runs `curl` through the local proxy on a private port. The system proxy is not touched: curl is told to use
+    /// the proxy explicitly, so the proxy has to resolve the site's name itself (through DoH).
+    private func curlThroughProxy(port: UInt16, url: String) async -> (status: Int32, httpCode: String) {
+        await offPool {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
+            process.arguments = ["-sS", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "12",
+                                 "-x", "http://127.0.0.1:\(port)", url]
+            let output = Pipe()
+            process.standardOutput = output
+            process.standardError = Pipe()
+            do { try process.run() } catch { return (-1, "") }
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return (process.terminationStatus, String(decoding: data, as: UTF8.self))
+        }
+    }
+
+    @Test("DOH-L9: A real HTTPS and HTTP request through the local proxy works with every provider")
+    func testThroughLocalProxy() async throws {
+        for (index, entry) in providers.enumerated() {
+            let port = UInt16(18_081 + index)
+            await DoHResolver.shared.clearCache()      // so each provider really answers, not the previous one's cache
+            let server = LocalProxyServer.shared
+            try server.start(port: port, provider: entry.provider)
+            defer { server.stop() }
+            try await Task.sleep(nanoseconds: 300_000_000)
+
+            let https = await curlThroughProxy(port: port, url: "https://example.com/")
+            let http = await curlThroughProxy(port: port, url: "http://example.com/")
+            print("DOH-proxy \(entry.name): https=\(https.httpCode) (curl \(https.status)) http=\(http.httpCode) (curl \(http.status))")
+            #expect(https.status == 0 && https.httpCode == "200", "\(entry.name): HTTPS through the proxy failed")
+            #expect(http.status == 0 && ["200", "301", "308"].contains(http.httpCode), "\(entry.name): HTTP through the proxy failed")
+        }
+    }
+
+    @Test("DOH-L10: With a DoH server that cannot be reached the proxy fails; it does not quietly use the system DNS")
+    func testNoSilentFallbackToSystemDNS() async throws {
+        let port: UInt16 = 18_090
+        // The shared resolver remembers answers for five minutes; an earlier test may have cached this very name.
+        await DoHResolver.shared.clearCache()
+        let server = LocalProxyServer.shared
+        // Nothing listens on this port, so every DoH query fails. example.com itself resolves fine via system DNS.
+        try server.start(port: port, provider: .custom(url: URL(string: "https://127.0.0.1:9/dns-query")!, bootstrapIP: nil))
+        defer { server.stop() }
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        let https = await curlThroughProxy(port: port, url: "https://example.com/")
+        print("DOH-proxy dead-server: https=\(https.httpCode) (curl \(https.status))")
+        #expect(https.status != 0 || https.httpCode != "200", "the proxy got through without DoH, so it must have used the system DNS")
     }
 }
