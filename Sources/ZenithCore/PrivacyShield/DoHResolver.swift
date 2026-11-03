@@ -66,8 +66,12 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
 
     private let session: URLSession
     private let cache = DNSCache()
+    private let allowsHostNameFallback: Bool
 
-    public init(session: URLSession? = nil) {
+    /// - Parameter allowsHostNameFallback: When a request to a provider's bootstrap address fails to connect, retry
+    ///   it by host name (which uses the system resolver). Tests turn it off to prove the address alone is enough.
+    public init(session: URLSession? = nil, allowsHostNameFallback: Bool = true) {
+        self.allowsHostNameFallback = allowsHostNameFallback
         if let session = session {
             self.session = session
         } else {
@@ -175,14 +179,9 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
             throw URLError(.badURL)
         }
 
-        var request = URLRequest(url: queryURL)
-        request.httpMethod = "GET"
-        request.setValue("application/dns-json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 4.0
+        let (data, httpResponse) = try await fetch(queryURL, provider: provider, accept: "application/dns-json")
 
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        guard httpResponse.statusCode == 200 else {
             throw URLError(.badServerResponse)
         }
 
@@ -200,6 +199,38 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
         return nil
     }
 
+    /// Sends the GET. With a bootstrap address the connection goes to that address, the `Host` header names the real
+    /// server and the certificate is checked against the real name, so no system DNS lookup of the server happens.
+    private func fetch(_ url: URL, provider: DoHProvider, accept: String) async throws -> (Data, HTTPURLResponse) {
+        func perform(_ url: URL, hostHeader: String?, delegate: URLSessionTaskDelegate?) async throws -> (Data, HTTPURLResponse) {
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue(accept, forHTTPHeaderField: "Accept")
+            if let hostHeader { request.setValue(hostHeader, forHTTPHeaderField: "Host") }
+            request.timeoutInterval = 4.0
+            let (data, response) = try await session.data(for: request, delegate: delegate)
+            guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+            return (data, http)
+        }
+
+        if let host = url.host, !isIPAddress(host), let address = provider.bootstrapAddress,
+           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            components.host = address
+            if let addressURL = components.url {
+                do {
+                    return try await perform(addressURL, hostHeader: host, delegate: HostNameTrustDelegate(expectedHost: host))
+                } catch let error as URLError where allowsHostNameFallback && error.code != .cancelled {
+                    NSLog("[DoH] Bootstrap address %@ for %@ failed (%@); falling back to the host name", address, host, "\(error.code.rawValue)")
+                } catch let error as URLError where allowsHostNameFallback && error.code == .cancelled {
+                    // A certificate that does not match the name is reported as a cancelled challenge. That is a
+                    // reason to stop, not to ask the system resolver for another address for the same name.
+                    throw error
+                }
+            }
+        }
+        return try await perform(url, hostHeader: nil, delegate: nil)
+    }
+
     /// RFC 8484 GET with the binary query in the `dns` parameter.
     private func queryWire(domain: String, provider: DoHProvider, recordType: Int) async throws -> String? {
         guard let message = DoHWireFormat.makeQuery(domain: domain, recordType: UInt16(recordType)) else {
@@ -213,13 +244,8 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
             throw URLError(.badURL)
         }
 
-        var request = URLRequest(url: queryURL)
-        request.httpMethod = "GET"
-        request.setValue("application/dns-message", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 4.0
-
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        let (data, httpResponse) = try await fetch(queryURL, provider: provider, accept: "application/dns-message")
+        guard httpResponse.statusCode == 200 else {
             throw URLError(.badServerResponse)
         }
         return DoHWireFormat.firstAddress(in: data, recordType: UInt16(recordType))
@@ -244,5 +270,32 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
         return str.withCString { cstr in
             inet_pton(AF_INET, cstr, &sin.sin_addr) == 1
         }
+    }
+}
+
+/// Evaluates a server certificate against the host name the request is really for, when the connection was made to an
+/// IP address. (The default evaluation would compare the certificate with the IP.)
+final class HostNameTrustDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let expectedHost: String
+
+    init(expectedHost: String) {
+        self.expectedHost = expectedHost
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didReceive challenge: URLAuthenticationChallenge
+    ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let trust = challenge.protectionSpace.serverTrust else {
+            return (.performDefaultHandling, nil)
+        }
+        SecTrustSetPolicies(trust, SecPolicyCreateSSL(true, expectedHost as CFString))
+        var error: CFError?
+        guard SecTrustEvaluateWithError(trust, &error) else {
+            return (.cancelAuthenticationChallenge, nil)
+        }
+        return (.useCredential, URLCredential(trust: trust))
     }
 }

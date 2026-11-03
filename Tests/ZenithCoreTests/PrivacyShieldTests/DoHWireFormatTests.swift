@@ -32,8 +32,9 @@ final class StubWireDoHProtocol: URLProtocol {
     override func startLoading() {
         let url = request.url!
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
-        let host = url.host ?? ""
-        Self.paths.record("\(host)\(url.path)?\(items.first?.name ?? "")")
+        // The server a request is really for: the Host header when the connection goes to a bootstrap address.
+        let host = request.value(forHTTPHeaderField: "Host") ?? url.host ?? ""
+        Self.paths.record("\(host)\(url.path)?\(items.first?.name ?? "")|\(url.host ?? "")")
 
         var status = 200
         var body = Data()
@@ -130,7 +131,7 @@ struct DoHWireFormatTests {
         _ = provider
         let address = try await resolver.resolve(domain: "wire-direct.test", provider: .quad9)
         #expect(address == "93.184.216.34")
-        #expect(StubWireDoHProtocol.paths.all().contains("dns.quad9.net/dns-query?dns"))
+        #expect(StubWireDoHProtocol.paths.all().contains("dns.quad9.net/dns-query?dns|9.9.9.9"))
     }
 
     @Test("DOHW-06: A custom endpoint that only speaks binary is retried in binary after JSON is refused")
@@ -147,6 +148,29 @@ struct DoHWireFormatTests {
         let provider = DoHProvider.custom(url: URL(string: "https://json-only.test/dns-query")!, bootstrapIP: nil)
         let address = try await resolver.resolve(domain: "plain-json.test", provider: provider)
         #expect(address == "203.0.113.7")
-        #expect(!StubWireDoHProtocol.paths.all().contains("json-only.test/dns-query?dns"))
+        #expect(!StubWireDoHProtocol.paths.all().contains { $0.hasPrefix("json-only.test/dns-query?dns") })
+    }
+
+    @Test("DOHW-08: With a bootstrap address the request goes to the address, naming the server in Host")
+    func testBootstrapAddressIsConnectedTo() async throws {
+        let resolver = makeResolver()
+        let provider = DoHProvider.custom(url: URL(string: "https://json-only.test/dns-query")!, bootstrapIP: "198.51.100.9")
+        _ = try await resolver.resolve(domain: "bootstrap.test", provider: provider)
+        #expect(StubWireDoHProtocol.paths.all().contains("json-only.test/dns-query?name|198.51.100.9"))
+
+        // Without one (and for Cloudflare, whose endpoint already is an address) the host name is used as is.
+        let plain = DoHProvider.custom(url: URL(string: "https://json-only.test/dns-query")!, bootstrapIP: nil)
+        _ = try await resolver.resolve(domain: "plain.test", provider: plain)
+        #expect(StubWireDoHProtocol.paths.all().contains("json-only.test/dns-query?name|json-only.test"))
+        #expect(DoHProvider.cloudflare.bootstrapAddress == nil)
+    }
+
+    @Test("DOHW-09: Built-in providers with a host name have a bootstrap address; so does a custom one, unless blank")
+    func testBootstrapAddresses() {
+        #expect(DoHProvider.google.bootstrapAddress == "8.8.8.8")
+        #expect(DoHProvider.quad9.bootstrapAddress == "9.9.9.9")
+        #expect(DoHProvider.custom(url: URL(string: "https://x.test/q")!, bootstrapIP: " 10.1.2.3 ").bootstrapAddress == "10.1.2.3")
+        #expect(DoHProvider.custom(url: URL(string: "https://x.test/q")!, bootstrapIP: "  ").bootstrapAddress == nil)
+        #expect(DoHProvider.custom(url: URL(string: "https://x.test/q")!, bootstrapIP: nil).bootstrapAddress == nil)
     }
 }

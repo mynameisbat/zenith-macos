@@ -107,6 +107,21 @@ public enum DoHProvider: Identifiable, Sendable, Codable, Equatable, Hashable, C
         }
     }
 
+    /// The address to connect to instead of looking up the endpoint's host name, or `nil` when the endpoint is already
+    /// an address (Cloudflare) or no address is known. Looking the name up would send it to the system resolver in
+    /// plain text, which defeats DoH for the lookup that matters most and fails on a network that blocks it.
+    var bootstrapAddress: String? {
+        switch self {
+        case .cloudflare:
+            return nil
+        case .custom(_, let bootstrapIP):
+            let trimmed = bootstrapIP?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return trimmed.isEmpty ? nil : trimmed
+        case .adguard, .google, .quad9, .nextdns:
+            return directIP
+        }
+    }
+
     public var directIP: String {
         switch self {
         case .cloudflare:

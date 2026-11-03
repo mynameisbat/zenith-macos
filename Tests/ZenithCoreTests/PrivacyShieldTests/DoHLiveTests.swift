@@ -80,21 +80,36 @@ struct DoHLiveTests {
         print("DOH example.com doh=\(ip) system=\(system)")
     }
 
-    @Test("DOH-L6: A custom provider's bootstrap IP is used to reach its (unresolvable) host name")
-    func testCustomBootstrapIsUsed() async {
-        // KNOWN GAP: URLSession resolves the DoH server's own host name with the system resolver, and the bootstrap IP
-        // only ever feeds the resolver's cache for lookups *of that name*. So the host name leaks to plain DNS and
-        // a network that blocks it blocks DoH too. Remove `withKnownIssue` when the request is made to the IP.
-        await withKnownIssue("bootstrapIP is not used to reach the DoH server") {
-            // `.invalid` never resolves through DNS. If the bootstrap IP is honoured the request at least reaches
-            // 1.1.1.1 (and then fails on the certificate); if it is ignored the failure is "cannot find host".
-            let provider = DoHProvider.custom(url: URL(string: "https://doh.zenith-test.invalid/dns-query")!, bootstrapIP: "1.1.1.1")
+    @Test("DOH-L6: A custom provider is reached by its bootstrap IP alone, with the certificate checked against its name")
+    func testCustomBootstrapIsUsed() async throws {
+        // No fallback to the host name: if this resolves, the request went to 1.1.1.1 and the certificate matched
+        // "one.one.one.one" even though the URL host was the address.
+        let resolver = DoHResolver(allowsHostNameFallback: false)
+        let provider = DoHProvider.custom(url: URL(string: "https://one.one.one.one/dns-query")!, bootstrapIP: "1.1.1.1")
+        let ip = try await resolver.resolve(domain: "example.com", provider: provider)
+        #expect(resolver.isIPv4Address(ip))
+    }
+
+    @Test("DOH-L7: The wrong bootstrap address is not trusted: a certificate for another name is refused")
+    func testWrongNameIsRefused() async {
+        // 8.8.8.8 presents a certificate for dns.google, not for one.one.one.one.
+        let resolver = DoHResolver(allowsHostNameFallback: false)
+        let provider = DoHProvider.custom(url: URL(string: "https://one.one.one.one/dns-query")!, bootstrapIP: "8.8.8.8")
+        await #expect(throws: (any Error).self) {
+            _ = try await resolver.resolve(domain: "example.com", provider: provider)
+        }
+    }
+
+    @Test("DOH-L8: Every built-in provider resolves with no fallback to its host name (the address alone works)")
+    func testBuiltInsViaAddressOnly() async {
+        for (name, provider) in providers {
+            let resolver = DoHResolver(allowsHostNameFallback: false)
             do {
-                _ = try await DoHResolver().resolve(domain: "example.com", provider: provider)
-            } catch let error as URLError {
-                #expect(error.code != .cannotFindHost && error.code != .dnsLookupFailed,
-                        "the bootstrap IP was ignored: the host name went to the system resolver")
+                let ip = try await resolver.resolve(domain: "example.com", provider: provider)
+                print("DOH-bootstrap \(name) -> \(ip)")
+                #expect(resolver.isIPv4Address(ip))
             } catch {
+                Issue.record("\(name) via \(provider.bootstrapAddress ?? "its URL") failed: \(error)")
             }
         }
     }
