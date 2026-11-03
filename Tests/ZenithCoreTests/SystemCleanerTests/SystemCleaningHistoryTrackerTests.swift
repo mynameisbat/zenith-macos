@@ -7,7 +7,7 @@ struct SystemCleaningHistoryTrackerTests {
 
     @Test("HIST-01: Records cleaning operations and computes cumulative metrics accurately")
     func testRecordingAndCumulativeMetrics() {
-        let testDefaults = UserDefaults(suiteName: "Zenith_Test_History_\(UUID().uuidString)")!
+        let testDefaults = TestDefaults.make("Zenith_Test_History_\(UUID().uuidString)")!
         let tracker = SystemCleaningHistoryTracker(defaults: testDefaults)
 
         #expect(tracker.totalBytesFreed == 0)
@@ -34,7 +34,7 @@ struct SystemCleaningHistoryTrackerTests {
 
     @Test("HIST-02: Zero byte operations are ignored safely")
     func testZeroByteOperationsIgnored() {
-        let testDefaults = UserDefaults(suiteName: "Zenith_Test_History_\(UUID().uuidString)")!
+        let testDefaults = TestDefaults.make("Zenith_Test_History_\(UUID().uuidString)")!
         let tracker = SystemCleaningHistoryTracker(defaults: testDefaults)
 
         tracker.record(operationName: "No-op", bytesFreed: 0, itemCount: 0)

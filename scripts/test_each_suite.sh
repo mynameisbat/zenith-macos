@@ -50,6 +50,14 @@ is_skipped() {
     return 1
 }
 
+# Tests make throwaway UserDefaults suites (see TestDefaults.swift); each leaves a plist behind. They all start with
+# "zenith.tests." and are removed here, after the writes cfprefsd still had pending for them.
+clean_test_preferences() {
+    sleep 2
+    find "$HOME/Library/Preferences" -maxdepth 1 -name 'zenith.tests.*.plist' -delete 2>/dev/null
+}
+trap clean_test_preferences EXIT
+
 total_tests=0
 suite_count=0
 skipped_count=0
@@ -68,6 +76,7 @@ for suite in $SUITES; do
     code=$?
     out="$(cat "$log")"
     rm -f "$log"
+    find "$HOME/Library/Preferences" -maxdepth 1 -name 'zenith.tests.*.plist' -delete 2>/dev/null
 
     if [ "$code" -eq 142 ]; then
         pkill -f swiftpm-testing-helper 2>/dev/null

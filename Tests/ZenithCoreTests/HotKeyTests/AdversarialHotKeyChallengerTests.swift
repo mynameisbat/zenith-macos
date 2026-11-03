@@ -697,7 +697,7 @@ struct AdversarialHotKeyChallengerTests {
     @Test("AudioFeedbackManager: 100 concurrent tasks hammering sound triggers and mute toggling")
     func testAudioFeedbackManagerConcurrentStress() async {
         let mockBackend = MockAudioPlayerBackend()
-        let defaults = UserDefaults(suiteName: "AudioStress_\(UUID().uuidString)")!
+        let defaults = TestDefaults.make("AudioStress_\(UUID().uuidString)")!
         let store = SettingsStore(userDefaults: defaults)
         let audioManager = AudioFeedbackManager(backend: mockBackend, settingsStore: store)
 

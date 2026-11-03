@@ -114,7 +114,7 @@ struct LaunchAtLoginTests {
     @Test("LAL-06: SettingsStore Integration and State Persistence")
     func testSettingsStoreIntegration() {
         let suiteName = "LaunchAtLoginSettingsTests_\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = TestDefaults.make(suiteName)!
         let store = SettingsStore(userDefaults: defaults)
 
         #expect(store.launchAtLoginEnabled == false)

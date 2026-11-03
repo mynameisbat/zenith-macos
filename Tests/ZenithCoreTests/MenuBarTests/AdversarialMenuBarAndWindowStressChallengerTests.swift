@@ -427,7 +427,7 @@ struct AdversarialMenuBarAndWindowStressChallengerTests {
     @Test("ADV-M6-06: LaunchAtLogin 80-task concurrency torture and SettingsStore coherence")
     func testLaunchAtLoginConcurrencyAndSettingsCoherence() async {
         let suiteName = "ChallengerLALSuite_\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = TestDefaults.make(suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
 

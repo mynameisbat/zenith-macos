@@ -18,7 +18,7 @@ struct Tier3CrossFeatureTests {
 
     private func makeEphemeralDefaults() -> (UserDefaults, String) {
         let suiteName = "Tier3Suite_\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = TestDefaults.make(suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return (defaults, suiteName)
     }

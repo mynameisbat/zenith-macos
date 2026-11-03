@@ -18,7 +18,7 @@ struct Tier4ApplicationScenarioTests {
 
     private func makeEphemeralDefaults() -> (UserDefaults, String) {
         let suiteName = "Tier4Suite_\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = TestDefaults.make(suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return (defaults, suiteName)
     }

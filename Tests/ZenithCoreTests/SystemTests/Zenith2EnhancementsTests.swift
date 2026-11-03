@@ -52,7 +52,7 @@ struct Zenith2EnhancementsTests {
     @Test("AUD-04: AudioFeedbackManager routes through custom sound effect assignments")
     func testAudioFeedbackCustomRouting() {
         let suiteName = "test.audio.custom.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = TestDefaults.make(suiteName)!
         let store = SettingsStore(userDefaults: defaults)
 
         var customAssignments = SoundChoice.defaultAssignments
@@ -126,7 +126,7 @@ struct Zenith2EnhancementsTests {
     @Test("DOH-03: SettingsStore persists and reloads dohProvider accurately")
     func testSettingsStoreDoHProviderPersistence() {
         let suiteName = "test.doh.store.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = TestDefaults.make(suiteName)!
         let store = SettingsStore(userDefaults: defaults)
 
         #expect(store.dohProvider == .cloudflare)

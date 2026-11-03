@@ -184,7 +184,7 @@ struct AdversarialM6Challenger2Tests {
     @Test("CH2-M6-LAL-04: SimulatedLaunchAtLoginService combined with SettingsStore thread-safe synchronization")
     func testLaunchAtLoginWithSettingsStoreConcurrency() async {
         let suiteName = "CH2_LAL_Settings_\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
+        guard let defaults = TestDefaults.make(suiteName) else {
             Issue.record("Failed to create isolated UserDefaults suite")
             return
         }

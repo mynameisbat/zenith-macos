@@ -99,7 +99,7 @@ final class FakeNetworkSetup: @unchecked Sendable {
 struct SystemProxyManagerTests {
 
     private func makeDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "zenith.tests.proxy.\(UUID().uuidString)")!
+        TestDefaults.make("zenith.tests.proxy.\(UUID().uuidString)")!
     }
 
     private func makeManager(
