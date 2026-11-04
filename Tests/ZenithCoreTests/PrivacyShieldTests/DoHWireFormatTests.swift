@@ -19,7 +19,9 @@ final class StubWireDoHProtocol: URLProtocol {
         var bytes: [UInt8] = [0x00, 0x00, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]
         bytes.append(contentsOf: question.dropFirst(12))                                   // the question, echoed
         bytes.append(contentsOf: [0xC0, 0x0C])                                             // name: pointer to the question
-        bytes.append(contentsOf: [UInt8(type >> 8), UInt8(type & 0xFF), 0x00, 0x01])
+        let typeBytes: [UInt8] = [UInt8(type >> 8), UInt8(type & 0xFF)]
+        bytes.append(contentsOf: typeBytes)
+        bytes.append(contentsOf: [0x00, 0x01] as [UInt8])
         bytes.append(contentsOf: [0x00, 0x00, 0x00, 0x3C])                                 // TTL 60
         bytes.append(contentsOf: [0x00, UInt8(rdata.count)])
         bytes.append(contentsOf: rdata)
@@ -45,7 +47,9 @@ final class StubWireDoHProtocol: URLProtocol {
                 var padded = dns.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
                 while padded.count % 4 != 0 { padded += "=" }
                 let question = Data(base64Encoded: padded) ?? Data()
-                let type = UInt16(question.suffix(4).first ?? 1) << 8 | UInt16(question.suffix(3).first ?? 1)
+                // The question ends with the type (2 bytes) and the class (2 bytes).
+                let tail = [UInt8](question.suffix(4))
+                let type: UInt16 = tail.count == 4 ? UInt16(tail[0]) * 256 + UInt16(tail[1]) : 1
                 body = type == 28
                     ? Self.message(for: question, type: 28, rdata: [0x26, 0x06, 0x47, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0x68, 0x10, 0x84, 0xE5])
                     : Self.message(for: question, type: 1, rdata: [93, 184, 216, 34])
@@ -78,8 +82,18 @@ struct DoHWireFormatTests {
     @Test("DOHW-01: A query is a well-formed DNS message: header, labels, type, class")
     func testQueryEncoding() throws {
         let query = try #require(DoHWireFormat.makeQuery(domain: "www.example.com", recordType: 28))
-        #expect([UInt8](query.prefix(12)) == [0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0])
-        #expect([UInt8](query.dropFirst(12)) == [3] + Array("www".utf8) + [7] + Array("example".utf8) + [3] + Array("com".utf8) + [0, 0, 28, 0, 1])
+        let header: [UInt8] = [0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0]
+        // Spelled out step by step: one long `+` chain is more than Swift 6.1's type checker will take.
+        var question: [UInt8] = []
+        question.append(3)
+        question.append(contentsOf: Array("www".utf8))
+        question.append(7)
+        question.append(contentsOf: Array("example".utf8))
+        question.append(3)
+        question.append(contentsOf: Array("com".utf8))
+        question.append(contentsOf: [0, 0, 28, 0, 1] as [UInt8])
+        #expect([UInt8](query.prefix(12)) == header)
+        #expect([UInt8](query.dropFirst(12)) == question)
         #expect(DoHWireFormat.base64URL(Data([0xFB, 0xFF, 0xFE])) == "-__-")
         #expect(DoHWireFormat.makeQuery(domain: "", recordType: 1) == nil)
         #expect(DoHWireFormat.makeQuery(domain: String(repeating: "a", count: 64) + ".com", recordType: 1) == nil)
