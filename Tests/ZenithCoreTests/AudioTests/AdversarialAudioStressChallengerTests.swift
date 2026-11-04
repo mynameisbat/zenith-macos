@@ -11,7 +11,7 @@ struct AdversarialAudioStressChallengerTests {
 
     private func makeIsolatedStore(soundEffectsEnabled: Bool = true) -> (SettingsStore, String) {
         let suiteName = "ChallengerAudio_\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = TestDefaults.make(suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         defaults.set(soundEffectsEnabled, forKey: SettingsStore.Keys.soundEffectsEnabled)
         let store = SettingsStore(userDefaults: defaults)
@@ -328,7 +328,7 @@ struct AdversarialAudioStressChallengerTests {
     @Test("Adversarial SettingsStore Sync: Dynamic soundEffectsEnabled toggle bursts via UserDefaults")
     func testSettingsStoreSoundEffectsEnabledSyncBursts() {
         let suiteName = "ChallengerAudioSync_\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = TestDefaults.make(suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 

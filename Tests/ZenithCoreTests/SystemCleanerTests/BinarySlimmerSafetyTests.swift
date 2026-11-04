@@ -88,7 +88,7 @@ struct BinarySlimmerSafetyTests {
             runner: toolchain.runner,
             isApplicationRunning: { _ in running },
             disposeBackup: { disposed.record($0) },
-            historyTracker: SystemCleaningHistoryTracker(defaults: UserDefaults(suiteName: "zenith.tests.slim.\(UUID().uuidString)")!)
+            historyTracker: SystemCleaningHistoryTracker(defaults: TestDefaults.make("zenith.tests.slim.\(UUID().uuidString)")!)
         )
     }
 

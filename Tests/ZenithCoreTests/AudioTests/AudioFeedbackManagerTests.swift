@@ -8,7 +8,7 @@ struct AudioFeedbackManagerTests {
     /// A settings store of its own: the managers follow their store's changes, so sharing `SettingsStore.shared`
     /// let one test's mute toggle reset another test's manager while they ran in parallel.
     private func isolatedStore() -> SettingsStore {
-        SettingsStore(userDefaults: UserDefaults(suiteName: "zenith.tests.audio.\(UUID().uuidString)")!)
+        SettingsStore(userDefaults: TestDefaults.make("zenith.tests.audio.\(UUID().uuidString)")!)
     }
 
     /// Playback is handed to a background queue, so a count read straight after a trigger can be one short.
@@ -90,7 +90,7 @@ struct AudioFeedbackManagerTests {
     @Test("Dynamic mute sync with SettingsStore")
     func testSettingsStoreSync() {
         let suiteName = "test.audio.sync.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = TestDefaults.make(suiteName)!
         let store = SettingsStore(userDefaults: defaults)
         store.soundEffectsEnabled = true
 
@@ -168,7 +168,7 @@ struct AudioFeedbackManagerTests {
     @Test("Handles 50 concurrent dispatch tasks without data race or crash")
     func testConcurrentDispatch50Tasks() async {
         let mockBackend = MockAudioPlayerBackend()
-        let isolatedDefaults = UserDefaults(suiteName: "isolated_afm_\(UUID().uuidString)")!
+        let isolatedDefaults = TestDefaults.make("isolated_afm_\(UUID().uuidString)")!
         let store = SettingsStore(userDefaults: isolatedDefaults)
         let audioManager = AudioFeedbackManager(backend: mockBackend, settingsStore: store, isMuted: false)
 

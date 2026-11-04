@@ -11,7 +11,7 @@ struct AdversarialStressTests {
     // MARK: - Helpers
     private func makeIsolatedDefaults() -> (UserDefaults, String) {
         let suiteName = "AdversarialSuite_\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = TestDefaults.make(suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return (defaults, suiteName)
     }
