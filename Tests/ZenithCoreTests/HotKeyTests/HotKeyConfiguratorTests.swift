@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import Carbon
+import AppKit
 @testable import ZenithCore
 
 @Suite("HotKey Configurator Suite")
@@ -152,5 +153,69 @@ struct HotKeyConfiguratorTests {
 
         #expect(f.configurator.resetToDefault(id: "capture.ocr") == .applied)
         #expect(f.manager.registeredHotKeys["capture.ocr"]?.keyCode == 20)
+    }
+
+    // MARK: - Against the real Carbon hot key service
+
+    /// Registers real global hot keys for a moment, so it only runs on request: `ZENITH_E2E_SYSTEM=1`.
+    /// The combinations (⌃⌥⇧⌘ plus F18/F19) are ones nobody uses. Pressing is simulated by sending the event the
+    /// system sends, since a test process may not post keystrokes.
+    @Test(
+        "HKC-E2E: With the real Carbon backend a change moves the system registration and the handler still fires",
+        .enabled(if: ProcessInfo.processInfo.environment["ZENITH_E2E_SYSTEM"] == "1", "Registers real global hot keys; set ZENITH_E2E_SYSTEM=1 to run")
+    )
+    @MainActor
+    func testRealCarbonRegistration() async throws {
+        _ = NSApplication.shared
+        let defaults = try #require(TestDefaults.make("hotkeys_e2e_\(UUID().uuidString)"))
+        let backend = SystemCarbonBackend()
+        let manager = HotKeyManager(backend: backend)
+        let configurator = HotKeyConfigurator(store: SettingsStore(userDefaults: defaults), manager: manager)
+        defer {
+            manager.unregisterAll()
+            _ = backend.removeHandler()
+        }
+
+        let all = UInt32(cmdKey | controlKey | optionKey | shiftKey)
+        let first = HotKeyDefinition(id: "e2e.action", name: "E2E", keyCode: 79, carbonModifiers: all, keyEquivalent: "⌃⌥⇧⌘F18")
+        let second = HotKeyDefinition(id: "e2e.action", name: "E2E", keyCode: 80, carbonModifiers: all, keyEquivalent: "⌃⌥⇧⌘F19")
+        let counter = Counter()
+
+        func rawRegister(_ definition: HotKeyDefinition) -> OSStatus {
+            var ref: EventHotKeyRef?
+            let status = RegisterEventHotKey(
+                definition.keyCode, definition.carbonModifiers, EventHotKeyID(signature: 0x45324532, id: 999),
+                GetApplicationEventTarget(), 0, &ref
+            )
+            if let ref { UnregisterEventHotKey(ref) }
+            return status
+        }
+        func press(_ definition: HotKeyDefinition) async throws {
+            var hotKeyID = EventHotKeyID(signature: HotKeyManager.signature, id: try #require(manager.carbonId(for: definition.id)))
+            var event: EventRef?
+            #expect(CreateEvent(nil, OSType(kEventClassKeyboard), UInt32(kEventHotKeyPressed), 0, 0, &event) == noErr)
+            let created = try #require(event)
+            SetEventParameter(created, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                              MemoryLayout<EventHotKeyID>.size, &hotKeyID)
+            SendEventToEventTarget(created, GetApplicationEventTarget())
+            ReleaseEvent(created)
+            try await Task.sleep(nanoseconds: 100_000_000)   // the handler hops to the main queue
+        }
+
+        // 1. Registered for real: another registration of the same combination is refused by the system.
+        #expect(configurator.registerAll([(first, { counter.hit("handler") })]).isEmpty)
+        #expect(rawRegister(first) == OSStatus(eventHotKeyExistsErr))
+        try await press(first)
+        #expect(counter.hits == ["handler"])
+
+        // 2. After a change the old combination is free again, the new one is taken, and the same handler fires.
+        #expect(configurator.change(second) == .applied)
+        #expect(rawRegister(first) == noErr)
+        #expect(rawRegister(second) == OSStatus(eventHotKeyExistsErr))
+        try await press(second)
+        #expect(counter.hits == ["handler", "handler"])
+
+        // 3. The change was saved.
+        #expect(SettingsStore(userDefaults: defaults).hotkey(for: "e2e.action")?.keyCode == 80)
     }
 }
