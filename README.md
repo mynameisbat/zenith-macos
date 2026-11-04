@@ -131,17 +131,17 @@ open Zenith.app
 ### 6. 🧹 Disk Cleaner, App Uninstaller & Process Monitor (Mole-Inspired)
 Nothing here deletes without asking: each action shows what will go (the largest items by name) and waits for your confirmation.
 
-**Available in the app today**
-- **System Cleaner** (Settings → Cleaner, and the "Clean" badge in the Command Hub): scans caches, logs and temporary files in your home folder. The Trash category is listed but unselected. It never offers Docker Desktop's virtual disk, skips Apple-managed and offline-media/sync app caches, and offers partial downloads only after a day untouched.
-- **Boost** in the Command Hub: purges inactive memory and flushes the DNS cache, and tells you honestly which step failed.
+**In Settings → Cleaner** (a row of tabs: System, Projects, Installers, Leftovers, Drives). Each tab has a Scan button, a list you tick, and a confirmation that names the largest items before anything is removed.
+- **System**: caches, logs and temporary files in your home folder. The Trash category is listed but unselected. It never offers Docker Desktop's virtual disk, skips Apple-managed and offline-media/sync app caches, and offers partial downloads only after a day untouched. The "Clean" badge in the Command Hub does the same, with the same confirmation.
+- **Projects**: build folders (`node_modules`, Cargo `target`, `.build`, `venv`/`__pycache__`, `DerivedData`, `Pods`, …) of projects under `~/Projects`, `~/Code`, `~/Documents` and a few other usual folders, plus any folder you add. Offered only for a project type that rebuilds the folder, and `bin`/`obj`/`build`/`dist` only if Git ignores them. Moved to the Trash.
+- **Installers**: `.dmg`, `.pkg`, `.iso`, `.xip` and large installer `.zip` files in Downloads and Desktop that nothing has touched for three days. A mounted disk image is left out. Moved to the Trash.
+- **Leftovers**: `com.vendor.app` folders in `~/Library` whose app is gone and that nothing has touched for 30 days. **Nothing is ticked for you**: they can hold data you would want back. Moved to the Trash.
+- **Drives**: Finder and Windows junk (`.DS_Store`, `._*` files, `Thumbs.db`, …) on mounted external drives. These are deleted, not trashed, and the confirmation says so.
+
+**Elsewhere in the app**
+- **Boost** in the Command Hub purges inactive memory and flushes the DNS cache, and tells you honestly which step failed.
 - **Process monitor** in the Command Hub (see section 1).
 - **App Uninstaller and Slimmer**: drop an `.app` on the island shelf. *Deep Uninstall* moves the app and its leftovers to the Trash (leftovers are matched by bundle identifier, and Apple-owned entries are never touched). *Slim* removes unused CPU architectures from a copy, verifies the code signature, swaps it in atomically and sends the original to the Trash.
-
-**In the code and tested, but not yet reachable from the UI**
-- **Project Build Artifact Purge** (`node_modules`, Cargo `target`, `.build`, `venv`/`__pycache__`, `DerivedData`, `Pods`, …): offered only for a project type that rebuilds the folder, and `bin`/`obj`/`build`/`dist` only if Git ignores them.
-- **Stale Installer Hunt** (`.dmg`, `.pkg`, `.iso`, `.xip`, and large installer `.zip` files in Downloads and Desktop).
-- **Orphaned App Leftovers** (`com.vendor.app` folders in `~/Library` whose app is gone).
-- **External Drive Sanitizer** (macOS metadata junk on a mounted external drive).
 
 ### 7. 🛡 Privacy Shield (DoH + Anti-DPI Local Proxy)
 - **How it works**: Zenith listens on `127.0.0.1` (port 8080 by default, loopback only) and points the macOS system proxy of your primary network service at it. It looks up the name of each site you visit over **DNS-over-HTTPS** and connects to the address it gets. Your previous proxy settings are saved and put back when you switch it off, and are repaired at the next launch if Zenith was killed while it was on.
@@ -241,7 +241,7 @@ graph TD
         AnnotEngine[Vector Annotation Engine & Undo Stack]
         ExportService[High-DPI Retina Image Exporter]
         DoHProxy[DoH Local Proxy & TLS Chunker]
-        PurgeService[Cleaner, Uninstaller, Project & Installer Purge]
+        PurgeService[Cleaner tools & Uninstaller]
         Telemetry[Mach Kernel Memory & Top CPU Hogs]
         AudioMgr[Audio Feedback Manager]
         Perms[System Permissions & Deep Links]

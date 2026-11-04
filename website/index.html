@@ -144,7 +144,7 @@
               </div>
             </div>
             <h3>Cleaner, uninstaller, process monitor</h3>
-            <p>Scan caches and temporary files, uninstall or slim an app by dropping it on the shelf, and quit heavy processes.</p>
+            <p>Scan caches, build folders, old installers, deleted apps' leftovers and junk on external drives; uninstall or slim an app by dropping it on the shelf; quit heavy processes.</p>
             <ul>
               <li>Every deletion shows what goes and waits for you</li>
               <li>Docker Desktop's virtual disk is never offered</li>
@@ -254,8 +254,8 @@
             <p>It hides the names you look up, not the addresses you connect to or your IP. It covers apps that honour the system proxy, on the primary network service. The packet splitting has not been verified against a real filtering network.</p>
           </div>
           <div>
-            <h3>Some cleaners are not in the UI</h3>
-            <p>Project build-folder purge, installer hunt, orphaned-leftover cleanup and the external-drive sanitizer exist in the code and have tests, but no screen reaches them yet.</p>
+            <h3>Leftover cleanup is conservative</h3>
+            <p>Folders of deleted apps are only offered when they look like a bundle identifier, no same-vendor app is installed and nothing has touched them for 30 days. Nothing is ticked for you, because they can hold data you would want back.</p>
           </div>
           <div>
             <h3>Browser support is uneven</h3>
