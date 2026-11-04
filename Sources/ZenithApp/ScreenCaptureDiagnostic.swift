@@ -16,8 +16,12 @@ enum ScreenCaptureDiagnostic {
         print("Expected capture: \(expected.0) x \(expected.1) pixels")
 
         guard backend.hasScreenRecordingPermission else {
-            print("Screen Recording is not granted to this process (or to the app that started it), so neither method can")
-            print("see other apps' windows. Grant it in System Settings → Privacy & Security → Screen Recording and run again.")
+            // macOS lists an app under Screen Recording only after it has asked, so ask: a dialog naming the app that
+            // started this command appears (once), and that app then shows up in the list to be switched on.
+            _ = CGRequestScreenCaptureAccess()
+            print("Screen Recording is not granted to this process (or to the app that started it).")
+            print("A permission dialog should have appeared. Open System Settings → Privacy & Security → Screen Recording,")
+            print("switch on the app named in the dialog, quit and reopen that app, then run this command again.")
             return 2
         }
 
