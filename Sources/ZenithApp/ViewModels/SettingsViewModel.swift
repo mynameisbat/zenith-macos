@@ -29,7 +29,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .general: return "Startup & History"
         case .shortcuts: return "Global Hotkeys"
         case .audio: return "Sound Feedback"
-        case .privacy: return "Cloudflare DoH"
+        case .privacy: return "Encrypted DNS"
         case .cleaner: return "Caches & Junk"
         case .permissions: return "Screen & Access"
         }

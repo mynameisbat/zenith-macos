@@ -267,7 +267,7 @@ public struct ZenithPreferencesView: View {
         case .audio:
             return "Enable or disable audio feedback and sound effects."
         case .privacy:
-            return "Protect network traffic with Cloudflare DNS-over-HTTPS local proxy."
+            return "Look up the sites you visit over encrypted DNS (DoH) through a local proxy."
         case .cleaner:
             return "Scan and safely purge developer caches, logs, and build artifacts."
         case .permissions:

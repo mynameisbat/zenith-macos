@@ -261,6 +261,46 @@ struct ZenithCommandHubTests {
         #expect(state.filteredTopHogs.map(\.name) == ["Sample App"])
     }
 
+    /// Records which processes were asked to quit.
+    final class QuitRecorder: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _pids: [Int] = []
+        var pids: [Int] { lock.withLock { _pids } }
+        func record(_ pid: Int) { lock.withLock { _pids.append(pid) } }
+    }
+
+    @Test("HUB-16: Declining the confirmation quits nothing")
+    @MainActor
+    func testDecliningQuitsNothing() {
+        let state = ZenithCommandHubState()
+        let recorder = QuitRecorder()
+        state.processTerminator = { recorder.record($0) }
+        let process = ProcessTelemetry(pid: 4242, name: "Design Tool", cpuPercent: 20)
+        var asked: (String, String, String)?
+
+        let quit = state.terminate(process) { title, message, action in asked = (title, message, action); return false }
+
+        #expect(quit == false)
+        #expect(recorder.pids.isEmpty)
+        #expect(asked?.0 == "Quit Design Tool?")
+        #expect(asked?.1.contains("not saved") == true)
+        #expect(asked?.2 == "Quit")
+    }
+
+    @Test("HUB-17: Confirming asks that one process to quit, and only that one")
+    @MainActor
+    func testConfirmingQuitsThatProcess() {
+        let state = ZenithCommandHubState()
+        let recorder = QuitRecorder()
+        state.processTerminator = { recorder.record($0) }
+        state.snapshotProvider = { HardwareSnapshot() }
+
+        let quit = state.terminate(ProcessTelemetry(pid: 4242, name: "Design Tool", cpuPercent: 20)) { _, _, _ in true }
+
+        #expect(quit)
+        #expect(recorder.pids == [4242])
+    }
+
     @Test("HUB-14: Filtered top hogs filters by name, command, and PID accurately")
     @MainActor
     func testFilteredTopHogsFiltering() {
