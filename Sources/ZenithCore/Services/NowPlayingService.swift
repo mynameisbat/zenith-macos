@@ -675,7 +675,17 @@ public final class NowPlayingService: ObservableObject {
         case .some(let app) where app == .appleMusic || app == .spotify:
             scriptRunner("tell application \"\(app.rawValue)\" to \(musicCommand)")
         case .some:
-            mediaKeys.post(key)
+            // macOS drops a synthetic key from an app without Accessibility permission, with no error. Say so,
+            // otherwise the buttons just seem dead.
+            if !mediaKeys.post(key) {
+                islandState.triggerAlert(
+                    icon: "hand.raised.fill",
+                    title: "Allow Accessibility",
+                    subtitle: "Privacy & Security › Accessibility › Zenith",
+                    duration: 4,
+                    tintColor: .orange
+                )
+            }
         case .none:
             // Nothing is playing: a media key now would only make macOS launch Music.
             break
