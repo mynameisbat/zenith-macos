@@ -41,3 +41,22 @@ struct CaptureCropTests {
         #expect(crop == CGRect(x: 10, y: 10, width: 21, height: 21))
     }
 }
+
+@Suite("ScreenCaptureKit Capture Size Suite")
+struct CapturePixelSizeTests {
+    @Test("CAP-C5: A Retina display is captured at its pixel size, not its point size")
+    func testRetinaPixelSize() {
+        let size = NativeScreenCaptureBackend.capturePixelSize(pointWidth: 1512, pointHeight: 982, pointPixelScale: 2)
+        #expect(size.width == 3024 && size.height == 1964)
+    }
+
+    @Test("CAP-C6: A 1x display and a missing scale keep the point size; fractions round")
+    func testOtherScales() {
+        let plain = NativeScreenCaptureBackend.capturePixelSize(pointWidth: 1920, pointHeight: 1080, pointPixelScale: 1)
+        #expect(plain.width == 1920 && plain.height == 1080)
+        let unknown = NativeScreenCaptureBackend.capturePixelSize(pointWidth: 1920, pointHeight: 1080, pointPixelScale: 0)
+        #expect(unknown.width == 1920 && unknown.height == 1080)
+        let fractional = NativeScreenCaptureBackend.capturePixelSize(pointWidth: 1000, pointHeight: 500, pointPixelScale: 1.5)
+        #expect(fractional.width == 1500 && fractional.height == 750)
+    }
+}
