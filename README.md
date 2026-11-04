@@ -98,10 +98,10 @@ open Zenith.app
 - **Interactive 16x Loupe Magnifier**: Real-time pixel magnifier with center crosshairs and formatted RGB/HEX color sampling.
 - **Vector Annotation Studio**:
   - Swept-wing vector arrows (`A`).
-  - Numbered step badges `①`, `②`, `③` (`S`).
   - Solid and hollow rectangles (`R`).
   - Typography text callouts (`T`).
   - Pixelated / blur redaction tool (`B`) for sensitive tokens.
+  - Crop (`C`).
 - **100% Retina Fidelity**: Exports annotations directly at native physical display backing resolution (PNG & JPEG) with zero downsampling.
 - **Rapid Keyboard Workflow**:
   - `⌘C`: Flatten annotations, copy to clipboard, and close editor.
@@ -179,7 +179,7 @@ Nothing here deletes without asking: each action shows what will go (the largest
 | `R` | Annotation Editor | Select Rectangle Tool |
 | `T` | Annotation Editor | Select Text Label Tool |
 | `B` | Annotation Editor | Select Blur / Pixelate Privacy Tool |
-| `S` | Annotation Editor | Select Numbered Step Badge Tool (①, ②, ③) |
+| `C` | Annotation Editor | Select Crop Tool |
 | `1` ... `8` | Annotation Editor | Quick select palette colors 1–8 |
 | `[` / `]` | Annotation Editor | Decrease / Increase stroke width |
 | `⌘C` | Annotation Editor | Copy annotated image to clipboard and dismiss |
