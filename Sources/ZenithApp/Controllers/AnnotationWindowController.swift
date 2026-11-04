@@ -265,7 +265,9 @@ public final class AnnotationWindowController: NSObject, NSWindowDelegate, Annot
             imageWidth: image.width,
             imageHeight: image.height,
             displayVisibleFrame: visibleFrame,
-            backingScaleFactor: scale
+            backingScaleFactor: scale,
+            toolbarReserve: EditorWindowGeometryCalculator.toolbarReserve,
+            minimumWidth: EditorWindowGeometryCalculator.toolbarWidth
         )
         return WindowGeometry(
             windowFrame: geom.windowFrame,

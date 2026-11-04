@@ -219,3 +219,16 @@ struct HotKeyConfiguratorTests {
         #expect(SettingsStore(userDefaults: defaults).hotkey(for: "e2e.action")?.keyCode == 80)
     }
 }
+
+@Suite("Built-in Shortcut Lookup Suite")
+struct BuiltInShortcutTests {
+    @Test("HKC-09: Every action the app registers has a built-in shortcut to reset to, OCR included")
+    func testBuiltInLookup() {
+        #expect(HotKeyDefinition.builtIn(for: HotKeyDefinition.clipboardToggleId) == HotKeyDefinition.defaultClipboard)
+        #expect(HotKeyDefinition.builtIn(for: HotKeyDefinition.captureOCRId) == HotKeyDefinition.defaultOCR)
+        #expect(HotKeyDefinition.builtIn(for: "nope") == nil)
+        #expect(HotKeyDefinition.defaultOCR.keyCode == 20)
+        // The settings dictionary keeps its three entries: older saved settings know only those.
+        #expect(HotKeyDefinition.defaultDictionary.count == 3)
+    }
+}

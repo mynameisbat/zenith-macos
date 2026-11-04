@@ -17,22 +17,30 @@ public struct AnnotationEditorView: View {
             Color(nsColor: .windowBackgroundColor)
                 .ignoresSafeArea()
 
-            // 1. Drawing Canvas Area
-            AnnotationCanvasView(viewModel: viewModel)
-                .frame(width: viewModel.canvasSize.width, height: viewModel.canvasSize.height)
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 4)
+            // The canvas, its crop overlay and the text editor sit above a strip kept free for the toolbar.
+            VStack(spacing: 0) {
+                ZStack {
+                    // 1. Drawing Canvas Area
+                    AnnotationCanvasView(viewModel: viewModel)
+                        .frame(width: viewModel.canvasSize.width, height: viewModel.canvasSize.height)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 4)
 
-            // 2. Interactive Crop Overlay
-            if viewModel.selectedTool == .crop || viewModel.committedCropRect != nil {
-                CropOverlayView(viewModel: viewModel)
-                    .frame(width: viewModel.canvasSize.width, height: viewModel.canvasSize.height)
-            }
+                    // 2. Interactive Crop Overlay
+                    if viewModel.selectedTool == .crop || viewModel.committedCropRect != nil {
+                        CropOverlayView(viewModel: viewModel)
+                            .frame(width: viewModel.canvasSize.width, height: viewModel.canvasSize.height)
+                    }
 
-            // 3. Inline Text Input Overlay
-            if let draft = viewModel.textDraft {
-                InlineTextEditorView(viewModel: viewModel, draft: draft)
-                    .frame(width: viewModel.canvasSize.width, height: viewModel.canvasSize.height)
+                    // 3. Inline Text Input Overlay
+                    if let draft = viewModel.textDraft {
+                        InlineTextEditorView(viewModel: viewModel, draft: draft)
+                            .frame(width: viewModel.canvasSize.width, height: viewModel.canvasSize.height)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                Color.clear.frame(height: EditorWindowGeometryCalculator.toolbarReserve)
             }
 
             // 4. Floating Styling Toolbar

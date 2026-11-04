@@ -31,7 +31,7 @@ public struct ZenithPreferencesView: View {
                 .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
                 .allowsHitTesting(false)
         )
-        .frame(minWidth: 680, maxWidth: .infinity, minHeight: 490, maxHeight: .infinity)
+        .frame(minWidth: 680, maxWidth: .infinity, minHeight: 540, maxHeight: .infinity)
         .ignoresSafeArea()
     }
 

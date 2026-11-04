@@ -105,7 +105,7 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
     public static let shared = SettingsWindowController()
 
     public static let defaultWidth: CGFloat = 680
-    public static let defaultHeight: CGFloat = 490
+    public static let defaultHeight: CGFloat = 540
 
     public var viewControllerProvider: (@MainActor () -> NSViewController)?
 
@@ -150,7 +150,7 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
         }
     }
 
-    /// Creates and configures the fixed 680x490 non-resizable settings window.
+    /// Creates and configures the fixed 680x540 non-resizable settings window.
     @discardableResult
     public func createWindow() -> NSWindow {
         if let existing = window {

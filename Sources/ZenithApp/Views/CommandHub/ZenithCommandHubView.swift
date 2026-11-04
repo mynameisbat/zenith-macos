@@ -109,6 +109,11 @@ public struct ZenithCommandHubView: View {
         )
     }
 
+    /// True until system junk has been scanned once (here or in Settings), so the badge can offer "Scan".
+    private var hasNotScannedJunk: Bool {
+        cleaner.categories.isEmpty && cleaner.statusMessage == nil
+    }
+
     /// Asks before quitting, then says what happened.
     private func quit(_ hog: ProcessTelemetry) {
         let quitIt = hubState.terminate(hog) { title, message, action in
@@ -407,6 +412,8 @@ public struct ZenithCommandHubView: View {
                         .foregroundColor(.secondary)
                 }
                 .help("CPU Usage: \(String(format: "%.1f", hubState.hardwareSnapshot.cpu.totalUsagePercent))% across \(hubState.hardwareSnapshot.cpu.coreCount) cores")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("CPU usage \(Int(round(hubState.hardwareSnapshot.cpu.totalUsagePercent))) percent")
 
                 // RAM status with pressure indicator
                 HStack(spacing: 3) {
@@ -419,6 +426,8 @@ public struct ZenithCommandHubView: View {
                         .foregroundColor(.secondary)
                 }
                 .help("Memory: \(HardwareTelemetryService.formatBytes(hubState.hardwareSnapshot.memory.usedBytes)) used of \(HardwareTelemetryService.formatBytes(hubState.hardwareSnapshot.memory.totalBytes)) (\(hubState.hardwareSnapshot.memory.pressureLevel.rawValue.capitalized) pressure)")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Memory \(Int(round(hubState.hardwareSnapshot.memory.usedPercent))) percent used")
 
                 // Battery status with charge level & Maximum Capacity
                 if hubState.hardwareSnapshot.battery.hasBattery {
@@ -451,6 +460,8 @@ public struct ZenithCommandHubView: View {
                         .foregroundColor(.secondary)
                 }
                 .help("\(hubState.hardwareSnapshot.disk.volumeName): \(hubState.hardwareSnapshot.disk.freeBytes / 1_073_741_824) GB free of \(hubState.hardwareSnapshot.disk.totalBytes / 1_073_741_824) GB")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(hubState.hardwareSnapshot.disk.freeBytes / 1_073_741_824) gigabytes free on \(hubState.hardwareSnapshot.disk.volumeName)")
 
                 // Connected Bluetooth accessories
                 ForEach(hubState.hardwareSnapshot.bluetoothDevices) { dev in
@@ -480,7 +491,7 @@ public struct ZenithCommandHubView: View {
                             .fill(privacyController.isRunning ? Color(red: 0.18, green: 0.8, blue: 0.44) : Color.secondary.opacity(0.4))
                             .frame(width: 5.5, height: 5.5)
 
-                        Text("DoH")
+                        Text("Shield")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(privacyController.isRunning ? .primary : .secondary)
                     }
@@ -494,7 +505,8 @@ public struct ZenithCommandHubView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(privacyController.isTransitioning)
-                .help(privacyController.isRunning ? "DNS Protection Active (Click to disable)" : "DNS Protection Disabled (Click to enable)")
+                .help(privacyController.isRunning ? "Privacy Shield is on: encrypted DNS lookups (click to turn off)" : "Privacy Shield is off (click to turn on)")
+                .accessibilityLabel(privacyController.isRunning ? "Privacy Shield, on" : "Privacy Shield, off")
                 .onHover { isHovered in
                     if isHovered {
                         hubState.setHoveredFooter("doh")
@@ -510,8 +522,11 @@ public struct ZenithCommandHubView: View {
                         if cleaner.categories.isEmpty && !cleaner.isScanning {
                             await cleaner.scan()
                         }
-                        guard cleaner.selectedJunkSize > 0,
-                              DestructiveConfirmation.confirm(
+                        guard cleaner.selectedJunkSize > 0 else {
+                            ToastHUDController.shared.show(message: "No system junk found", icon: "checkmark.circle.fill")
+                            return
+                        }
+                        guard DestructiveConfirmation.confirm(
                                 title: "Delete \(cleaner.formatSelectedSize) permanently?",
                                 message: "These cannot be restored:\n\(cleaner.selectionSummary)",
                                 destructiveTitle: "Delete Permanently"
@@ -531,7 +546,7 @@ public struct ZenithCommandHubView: View {
                             .font(.system(size: 9.5))
                             .foregroundColor(cleaner.selectedJunkSize > 0 ? Color.orange : Color.secondary)
 
-                        Text(cleaner.isCleaning ? "Cleaning..." : (cleaner.isScanning ? "Scanning..." : (cleaner.selectedJunkSize > 0 ? cleaner.formattedSelectedJunkSize : "Clean")))
+                        Text(cleaner.isCleaning ? "Cleaning..." : (cleaner.isScanning ? "Scanning..." : (cleaner.selectedJunkSize > 0 ? cleaner.formattedSelectedJunkSize : (hasNotScannedJunk ? "Scan" : "Clean"))))
                             .font(.system(size: 10, weight: .medium))
                             .monospacedDigit()
                             .foregroundColor(cleaner.selectedJunkSize > 0 ? .primary : .secondary)
@@ -545,8 +560,10 @@ public struct ZenithCommandHubView: View {
                     .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .disabled(cleaner.isCleaning || cleaner.isScanning || cleaner.selectedJunkSize == 0)
-                .help(cleaner.selectedJunkSize > 0 ? "Clean \(cleaner.formattedSelectedJunkSize) system junk" : (historyTracker.totalSessions > 0 ? historyTracker.summaryHeadline : "System junk is clean"))
+                .disabled(cleaner.isCleaning || cleaner.isScanning || (!hasNotScannedJunk && cleaner.selectedJunkSize == 0))
+                .help(hasNotScannedJunk && cleaner.selectedJunkSize == 0
+                        ? "Scan for system junk; you confirm what to delete before anything goes"
+                        : (cleaner.selectedJunkSize > 0 ? "Clean \(cleaner.formattedSelectedJunkSize) system junk" : (historyTracker.totalSessions > 0 ? historyTracker.summaryHeadline : "No system junk found")))
                 .onHover { isHovered in
                     if isHovered {
                         hubState.setHoveredFooter("cleaner")
@@ -600,6 +617,8 @@ public struct ZenithCommandHubView: View {
                             Text("⌘,")
                                 .font(.system(size: 9, design: .monospaced))
                                 .foregroundColor(Color.secondary.opacity(0.6))
+                                .lineLimit(1)
+                                .fixedSize()
                         }
                         .foregroundColor(hubState.hoveredFooterId == "settings" ? .primary : .secondary)
                         .padding(.horizontal, 5)
@@ -613,6 +632,7 @@ public struct ZenithCommandHubView: View {
                     .buttonStyle(.plain)
                     .keyboardShortcut(",", modifiers: .command)
                     .help("Settings (⌘,)")
+                    .accessibilityLabel("Settings")
                     .onHover { isHovered in
                         if isHovered {
                             hubState.setHoveredFooter("settings")
@@ -630,6 +650,8 @@ public struct ZenithCommandHubView: View {
                             Text("⌘Q")
                                 .font(.system(size: 9, design: .monospaced))
                                 .foregroundColor(Color.secondary.opacity(0.6))
+                                .lineLimit(1)
+                                .fixedSize()
                         }
                         .foregroundColor(hubState.hoveredFooterId == "quit" ? .red : .secondary)
                         .padding(.horizontal, 5)
@@ -643,6 +665,7 @@ public struct ZenithCommandHubView: View {
                     .buttonStyle(.plain)
                     .keyboardShortcut("q", modifiers: .command)
                     .help("Quit Zenith (⌘Q)")
+                    .accessibilityLabel("Quit Zenith")
                     .onHover { isHovered in
                         if isHovered {
                             hubState.setHoveredFooter("quit")

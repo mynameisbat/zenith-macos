@@ -20,7 +20,7 @@ public extension SettingsWindowController {
             win.isMovableByWindowBackground = true
             win.isOpaque = false
             win.backgroundColor = .clear
-            win.setFrame(NSRect(origin: win.frame.origin, size: NSSize(width: 680, height: 490)), display: true)
+            win.setFrame(NSRect(origin: win.frame.origin, size: NSSize(width: SettingsWindowController.defaultWidth, height: SettingsWindowController.defaultHeight)), display: true)
             if let closeBtn = win.standardWindowButton(.closeButton) {
                 closeBtn.target = self
                 closeBtn.action = #selector(handleCloseButtonAction)

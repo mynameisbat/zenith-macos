@@ -53,6 +53,7 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
     public static let clipboardToggleId = "clipboard.toggle"
     public static let captureAreaId = "capture.area"
     public static let captureFullscreenId = "capture.fullscreen"
+    public static let captureOCRId = "capture.ocr"
 
     // MARK: - Built-in Default Shortcut Configurations
 
@@ -100,6 +101,21 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
         carbonModifiers: CarbonModifierFlags.command.rawValue | CarbonModifierFlags.shift.rawValue,
         keyEquivalent: "⌘⇧1"
     )
+
+    /// Screen OCR & barcode recognition: ⌘⇧3 (Keycode 20: '3'). Not part of `defaultDictionary`, which holds the
+    /// shortcuts older settings files know about.
+    public static let defaultOCR = HotKeyDefinition(
+        id: captureOCRId,
+        name: "Screen OCR",
+        keyCode: 20, // kVK_ANSI_3
+        carbonModifiers: CarbonModifierFlags.command.rawValue | CarbonModifierFlags.shift.rawValue,
+        keyEquivalent: "⌘⇧3"
+    )
+
+    /// The built-in shortcut of an action, if it has one.
+    public static func builtIn(for id: String) -> HotKeyDefinition? {
+        defaultDictionary[id] ?? (id == captureOCRId ? defaultOCR : nil)
+    }
 
     /// Default dictionary containing all standard shortcut presets.
     public static var defaultDictionary: [String: HotKeyDefinition] {

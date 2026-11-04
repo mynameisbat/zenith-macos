@@ -114,14 +114,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     public func setupGlobalHotKeys() {
         // Each action gets the shortcut saved in Settings, or its built-in one (see HotKeyConfigurator).
-        let ocrDefinition = HotKeyDefinition(
-            id: "capture.ocr",
-            name: "Screen OCR",
-            keyCode: 20, // kVK_ANSI_3
-            carbonModifiers: CarbonModifierFlags.command.rawValue | CarbonModifierFlags.shift.rawValue,
-            keyEquivalent: "⌘⇧3"
-        )
-
         let failed = HotKeyConfigurator.shared.registerAll([
             // Toggle Clipboard History
             (HotKeyDefinition.defaultClipboard, {
@@ -150,7 +142,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }),
             // Screen OCR & Barcode Recognition
-            (ocrDefinition, {
+            (HotKeyDefinition.defaultOCR, {
                 Task { @MainActor in
                     ScreenOCRCoordinator.shared.startAreaOCR()
                 }
