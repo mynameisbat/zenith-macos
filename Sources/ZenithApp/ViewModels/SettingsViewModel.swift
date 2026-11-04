@@ -61,6 +61,7 @@ public final class SettingsViewModel: ObservableObject {
     public let store: SettingsStore
     public let launchAtLoginService: LaunchAtLoginServiceProtocol
     public let permissionsService: PermissionsServiceProtocol
+    public let hotKeys: HotKeyConfigurator
     public var onClearHistoryRequest: (() -> Void)?
 
     private var cancellables = Set<AnyCancellable>()
@@ -69,9 +70,11 @@ public final class SettingsViewModel: ObservableObject {
         store: SettingsStore = .shared,
         launchAtLoginService: LaunchAtLoginServiceProtocol = SystemLaunchAtLoginService.shared,
         permissionsService: PermissionsServiceProtocol = SystemPermissionsService.shared,
+        hotKeys: HotKeyConfigurator = .shared,
         onClearHistoryRequest: (() -> Void)? = nil
     ) {
         self.store = store
+        self.hotKeys = hotKeys
         self.launchAtLoginService = launchAtLoginService
         self.permissionsService = permissionsService
         self.onClearHistoryRequest = onClearHistoryRequest
@@ -148,21 +151,30 @@ public final class SettingsViewModel: ObservableObject {
     }
 
     public func updateHotkey(_ definition: HotKeyDefinition) -> Bool {
-        for (existingId, existing) in store.hotkeyMappings where existingId != definition.id {
-            if existing.keyCode == definition.keyCode && existing.carbonModifiers == definition.carbonModifiers {
-                shortcutConflictError = "Shortcut '\(definition.keyEquivalent)' is already assigned to '\(existing.name)'."
-                return false
-            }
-        }
-        shortcutConflictError = nil
-        store.updateHotkey(definition)
-        return true
+        report(hotKeys.change(definition), for: definition)
     }
 
     public func resetHotkeyToDefault(id: String) {
-        if let defaultDef = HotKeyDefinition.defaultDictionary[id] {
-            store.updateHotkey(defaultDef)
+        let result = hotKeys.resetToDefault(id: id)
+        if let builtIn = HotKeyDefinition.defaultDictionary[id] {
+            _ = report(result, for: builtIn)
         }
+    }
+
+    /// Turns the outcome into the message the Shortcuts tab shows; `true` when the change took effect.
+    private func report(_ result: HotKeyChangeResult, for definition: HotKeyDefinition) -> Bool {
+        switch result {
+        case .applied:
+            shortcutConflictError = nil
+            return true
+        case .conflict(let name):
+            shortcutConflictError = "Shortcut '\(definition.keyEquivalent)' is already assigned to '\(name)'."
+        case .unavailable:
+            shortcutConflictError = "Shortcut '\(definition.keyEquivalent)' could not be registered, probably because another app uses it. The previous shortcut still works."
+        case .unknownAction:
+            shortcutConflictError = "This shortcut is not active yet. Restart Zenith and try again."
+        }
+        return false
     }
 
     // MARK: - Audio Tab Bindings
