@@ -111,8 +111,8 @@ public final class CaptureOverlayController: NSObject {
 
         Task {
             do {
+                // (ScreenCaptureManager plays the shutter sound itself; playing it here too sounded twice.)
                 let image = try await screenCaptureService.captureMainDisplay()
-                soundService?.playShutterSound()
                 await MainActor.run {
                     completion?(image)
                 }
@@ -266,7 +266,6 @@ public final class CaptureOverlayController: NSObject {
                     localCGRect,
                     displayID: displayID
                 )
-                soundService?.playShutterSound()
                 await MainActor.run {
                     completion?(captured)
                 }
