@@ -89,7 +89,7 @@ public struct PrivacySettingsTab: View {
                         .foregroundColor(controller.isRunning ? .accentColor : .secondary)
                 }
 
-                Text("Mask web traffic and bypass censorship via encrypted DoH and fragmented TLS SNI packets.")
+                Text("Looks up site names over encrypted DNS and splits the first TLS packet of each connection. It is not a VPN and does not hide your IP address.")
                     .font(.system(size: 11.5))
                     .foregroundColor(.secondary)
                     .lineLimit(2)

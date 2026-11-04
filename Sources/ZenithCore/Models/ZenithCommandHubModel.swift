@@ -78,6 +78,12 @@ public final class ZenithCommandHubState: ObservableObject {
 
     private let optimizer: SystemOptimizerService
 
+    /// Where a refresh gets its numbers. The real machine by default; screenshots and tests supply made-up ones.
+    public var snapshotProvider: @Sendable () -> HardwareSnapshot = { HardwareTelemetryService.shared.fetchSnapshot() }
+
+    /// How a process is asked to quit. A polite SIGTERM by default; tests substitute a recorder.
+    public var processTerminator: @Sendable (Int) -> Void = { HardwareTelemetryService.shared.killProcess(pid: $0, force: false) }
+
     public init(optimizer: SystemOptimizerService = .shared) {
         self.optimizer = optimizer
     }
@@ -97,12 +103,13 @@ public final class ZenithCommandHubState: ObservableObject {
     }
 
     public func refreshHardwareSnapshot(sync: Bool = false) {
+        let provider = snapshotProvider
         if sync {
-            hardwareSnapshot = HardwareTelemetryService.shared.fetchSnapshot()
+            hardwareSnapshot = provider()
             return
         }
         Task.detached(priority: .utility) { [weak self] in
-            let snapshot = HardwareTelemetryService.shared.fetchSnapshot()
+            let snapshot = provider()
             await MainActor.run { [weak self] in
                 self?.hardwareSnapshot = snapshot
             }
@@ -115,8 +122,28 @@ public final class ZenithCommandHubState: ObservableObject {
     }
 
     public func killProcess(pid: Int) {
-        HardwareTelemetryService.shared.killProcess(pid: pid, force: false)
+        processTerminator(pid)
         refreshHardwareSnapshot(sync: true)
+    }
+
+    /// What the confirmation says before a process is asked to quit.
+    public func terminationConfirmation(for process: ProcessTelemetry) -> (title: String, message: String, actionTitle: String) {
+        (
+            title: "Quit \(process.name)?",
+            message: "Zenith will ask \(process.name) (PID \(process.pid)) to quit. Anything in it that is not saved may be lost.",
+            actionTitle: "Quit"
+        )
+    }
+
+    /// Asks `confirm` first and quits the process only if it says yes. Every way of quitting an app from the hub (the
+    /// button, ⌘1–⌘4) goes through here; nothing quits an app without being asked.
+    /// - Returns: Whether the process was asked to quit.
+    @discardableResult
+    public func terminate(_ process: ProcessTelemetry, confirm: @MainActor (String, String, String) -> Bool) -> Bool {
+        let text = terminationConfirmation(for: process)
+        guard confirm(text.title, text.message, text.actionTitle) else { return false }
+        killProcess(pid: process.pid)
+        return true
     }
 
     /// Performs a full system and memory boost: flushes DNS, purges zombie processes,

@@ -61,8 +61,25 @@ public final class NativeScreenCaptureBackend: ScreenCaptureBackendProtocol, Sen
         // Capture full display first, then perform crisp pixel-accurate crop
         let fullImage = try await captureDisplay(displayID: effectiveID)
 
-        let scaleX = CGFloat(fullImage.width) / displayWidth
-        let scaleY = CGFloat(fullImage.height) / displayHeight
+        // A region that cannot be cut out is an error. (It used to hand back the whole screen, which is more than
+        // the user chose to capture.)
+        guard let cropRect = Self.pixelCropRect(
+                for: rect,
+                imageWidth: fullImage.width,
+                imageHeight: fullImage.height,
+                displaySize: CGSize(width: displayWidth, height: displayHeight)
+              ),
+              let cropped = fullImage.cropping(to: cropRect) else {
+            throw ScreenCaptureError.invalidRegion(rect)
+        }
+        return cropped
+    }
+
+    /// The part of the display image, in pixels, that a region in display points covers; `nil` if none of it is on
+    /// the display.
+    static func pixelCropRect(for rect: CGRect, imageWidth: Int, imageHeight: Int, displaySize: CGSize) -> CGRect? {
+        let scaleX = CGFloat(imageWidth) / displaySize.width
+        let scaleY = CGFloat(imageHeight) / displaySize.height
 
         let pixelRect = CGRect(
             x: rect.origin.x * scaleX,
@@ -71,26 +88,32 @@ public final class NativeScreenCaptureBackend: ScreenCaptureBackendProtocol, Sen
             height: rect.height * scaleY
         ).integral
 
-        let imageBounds = CGRect(x: 0, y: 0, width: CGFloat(fullImage.width), height: CGFloat(fullImage.height))
-        let cropRect = pixelRect.intersection(imageBounds)
-
-        if !cropRect.isNull && !cropRect.isEmpty, let cropped = fullImage.cropping(to: cropRect) {
-            return cropped
-        }
-        return fullImage
+        let imageBounds = CGRect(x: 0, y: 0, width: CGFloat(imageWidth), height: CGFloat(imageHeight))
+        let crop = pixelRect.intersection(imageBounds)
+        return crop.isNull || crop.isEmpty ? nil : crop
     }
 
     // MARK: - ScreenCaptureKit Helper
 
-    private func captureViaScreenCaptureKit(displayID: CGDirectDisplayID) async throws -> CGImage? {
+    /// The size in pixels a capture of a display should have. ScreenCaptureKit reports a display's size in points but
+    /// takes the capture size in pixels, so using the points gives a half-resolution image on a Retina display.
+    static func capturePixelSize(pointWidth: Int, pointHeight: Int, pointPixelScale: Float) -> (width: Int, height: Int) {
+        let scale = pointPixelScale > 0 ? CGFloat(pointPixelScale) : 1
+        return (max(1, Int((CGFloat(pointWidth) * scale).rounded())), max(1, Int((CGFloat(pointHeight) * scale).rounded())))
+    }
+
+    /// Captures a display with ScreenCaptureKit alone. This is the fallback of `captureDisplay`; it is public so the
+    /// `--check-screen-capture` diagnostic can exercise it directly.
+    public func captureViaScreenCaptureKit(displayID: CGDirectDisplayID) async throws -> CGImage? {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         guard let display = content.displays.first(where: { $0.displayID == displayID }) ?? content.displays.first else {
             return nil
         }
         let filter = SCContentFilter(display: display, excludingWindows: [])
         let config = SCStreamConfiguration()
-        config.width = display.width
-        config.height = display.height
+        let size = Self.capturePixelSize(pointWidth: display.width, pointHeight: display.height, pointPixelScale: filter.pointPixelScale)
+        config.width = size.width
+        config.height = size.height
         config.showsCursor = false
         return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
     }

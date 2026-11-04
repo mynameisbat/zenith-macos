@@ -5,9 +5,56 @@ import ZenithCore
 public struct CleanerSettingsTab: View {
     @ObservedObject public var cleaner: SystemCleanerService = .shared
 
+    private enum Section: String, CaseIterable, Identifiable {
+        case system = "System", projects = "Projects", installers = "Installers", leftovers = "Leftovers", drives = "Drives"
+        var id: String { rawValue }
+    }
+
+    /// (Not `@State`: the SwiftUI macro plugin is not available to a Command Line Tools build.)
+    private final class SectionModel: ObservableObject {
+        @Published var section: Section = .system
+    }
+
+    @StateObject private var sectionModel = SectionModel()
+    private let tools = CleanupTools.shared
+
     public init() {}
 
+    private func tool(for section: Section) -> CleanupToolModel? {
+        switch section {
+        case .system: return nil
+        case .projects: return tools.projects
+        case .installers: return tools.installers
+        case .leftovers: return tools.leftovers
+        case .drives: return tools.drives
+        }
+    }
+
     public var body: some View {
+        VStack(spacing: 0) {
+            Picker("Cleaner", selection: $sectionModel.section) {
+                ForEach(Section.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 24)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
+
+            if let model = tool(for: sectionModel.section) {
+                ScrollView(.vertical, showsIndicators: true) {
+                    CleanupToolView(model: model, projectRoots: tools.projectRoots)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                }
+                .id(sectionModel.section)
+            } else {
+                systemCleaner
+            }
+        }
+    }
+
+    private var systemCleaner: some View {
         ScrollView(.vertical, showsIndicators: true) {
             VStack(alignment: .leading, spacing: 14) {
                 // 1. Storage Status & Action Banner

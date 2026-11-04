@@ -19,7 +19,7 @@ public struct PermissionsGuideView: View {
 
                     permissionRow(
                         title: "Screen Recording",
-                        description: "Required by ScreenCaptureKit to capture screen pixels, coordinate marquee crops, and render high-resolution Retina snapshots.",
+                        description: "Needed to capture the screen and to read text from it (OCR). Without it, capture and OCR cannot see anything but the desktop picture.",
                         isGranted: viewModel.screenRecordingGranted,
                         actionTitle: "Open Screen Recording Settings...",
                         action: { viewModel.openScreenRecordingSettings() }
@@ -35,7 +35,7 @@ public struct PermissionsGuideView: View {
 
                     permissionRow(
                         title: "Accessibility (Optional)",
-                        description: "Zenith uses zero-permission Carbon HotKeys by default (no Accessibility required). Enabling Accessibility allows future synthetic paste automation.",
+                        description: "Global shortcuts do not need it. Accessibility lets Zenith press ⌘V to paste for you and send the media keys that control a browser tab. Without it, items are only copied and the island says how to allow it.",
                         isGranted: viewModel.accessibilityGranted,
                         actionTitle: "Open Accessibility Settings...",
                         action: { viewModel.openAccessibilitySettings() }

@@ -197,7 +197,7 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
                 return true
             }
 
-            // ⌘1..⌘4: Terminate top hog at index
+            // ⌘1..⌘4: quit the app in that row (after a confirmation)
             let numberKeyCodes: [UInt16] = [18, 19, 20, 21] // 1, 2, 3, 4
             if let index = numberKeyCodes.firstIndex(of: event.keyCode) {
                 return handleQuickActionAtIndex(index)
@@ -219,8 +219,13 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
             return false
         }
         let hog = hogs[index]
-        ZenithCommandHubState.shared.killProcess(pid: hog.pid)
-        ToastHUDController.shared.show(message: "Terminated \(hog.name)", icon: "xmark.circle.fill")
+        // Asks first, like the button does.
+        let quitIt = ZenithCommandHubState.shared.terminate(hog) { title, message, action in
+            DestructiveConfirmation.confirm(title: title, message: message, destructiveTitle: action)
+        }
+        if quitIt {
+            ToastHUDController.shared.show(message: "Asked \(hog.name) to quit", icon: "xmark.circle.fill")
+        }
         return true
     }
 

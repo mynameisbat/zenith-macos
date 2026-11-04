@@ -113,38 +113,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Global HotKey Wiring
 
     public func setupGlobalHotKeys() {
-        let hotKeyManager = HotKeyManager.shared
-
-        // ⌘⇧V - Toggle Clipboard History
-        hotKeyManager.registerHotKey(HotKeyDefinition.defaultClipboard) {
-            Task { @MainActor in
-                ClipboardPanelController.shared.toggle()
-            }
-        }
-
-        // ⌘⇧2 - Area Screen Capture
-        hotKeyManager.registerHotKey(HotKeyDefinition.defaultAreaCapture) {
-            Task { @MainActor in
-                CaptureOverlayController.shared.startAreaCapture { image in
-                    guard let image = image else { return }
-                    NSLog("[Zenith] Area captured: \(image.width)x\(image.height)")
-                    AnnotationWindowController.shared.present(image: image)
-                }
-            }
-        }
-
-        // ⌘⇧1 - Fullscreen Screen Capture
-        hotKeyManager.registerHotKey(HotKeyDefinition.defaultFullscreenCapture) {
-            Task { @MainActor in
-                CaptureOverlayController.shared.captureFullscreen { image in
-                    guard let image = image else { return }
-                    NSLog("[Zenith] Fullscreen captured: \(image.width)x\(image.height)")
-                    AnnotationWindowController.shared.present(image: image)
-                }
-            }
-        }
-
-        // ⌘⇧3 - Screen OCR & Barcode Recognition
+        // Each action gets the shortcut saved in Settings, or its built-in one (see HotKeyConfigurator).
         let ocrDefinition = HotKeyDefinition(
             id: "capture.ocr",
             name: "Screen OCR",
@@ -152,9 +121,51 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             carbonModifiers: CarbonModifierFlags.command.rawValue | CarbonModifierFlags.shift.rawValue,
             keyEquivalent: "⌘⇧3"
         )
-        hotKeyManager.registerHotKey(ocrDefinition) {
+
+        let failed = HotKeyConfigurator.shared.registerAll([
+            // Toggle Clipboard History
+            (HotKeyDefinition.defaultClipboard, {
+                Task { @MainActor in
+                    ClipboardPanelController.shared.toggle()
+                }
+            }),
+            // Area Screen Capture
+            (HotKeyDefinition.defaultAreaCapture, {
+                Task { @MainActor in
+                    CaptureOverlayController.shared.startAreaCapture { image in
+                        guard let image = image else { return }
+                        NSLog("[Zenith] Area captured: \(image.width)x\(image.height)")
+                        AnnotationWindowController.shared.present(image: image)
+                    }
+                }
+            }),
+            // Fullscreen Screen Capture
+            (HotKeyDefinition.defaultFullscreenCapture, {
+                Task { @MainActor in
+                    CaptureOverlayController.shared.captureFullscreen { image in
+                        guard let image = image else { return }
+                        NSLog("[Zenith] Fullscreen captured: \(image.width)x\(image.height)")
+                        AnnotationWindowController.shared.present(image: image)
+                    }
+                }
+            }),
+            // Screen OCR & Barcode Recognition
+            (ocrDefinition, {
+                Task { @MainActor in
+                    ScreenOCRCoordinator.shared.startAreaOCR()
+                }
+            })
+        ])
+
+        // A key combination another app holds cannot be registered. Say so instead of leaving a dead shortcut.
+        if !failed.isEmpty {
+            let names = failed.map { "\($0.keyEquivalent) (\($0.name))" }.joined(separator: ", ")
+            NSLog("[Zenith] Shortcuts not registered: \(names)")
             Task { @MainActor in
-                ScreenOCRCoordinator.shared.startAreaOCR()
+                ToastHUDController.shared.show(
+                    message: "Shortcut \(failed[0].keyEquivalent) is taken by another app. Change it in Settings → Shortcuts.",
+                    icon: "exclamationmark.triangle.fill"
+                )
             }
         }
     }

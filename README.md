@@ -8,13 +8,13 @@
 
 **Zenith** is a premium, native macOS powerhouse utility and creative workspace built entirely with **Swift 6**, **SwiftUI**, and **AppKit**.
 
-Zenith lives quietly in your Menu Bar as an ultra-lightweight accessory (idle RAM ~25 MB, idle CPU <0.3%), replacing scattered, battery-draining Electron apps with a single, unified high-performance binary:
-1. **Native Screen OCR & Barcode/QR Extractor (`⌘⇧3`)** with on-device Apple Vision neural engine and instant clipboard formatting.
-2. **MacBook Dynamic Island & Drop Shelf** with live audio visualizer, Now Playing controls, MagSafe charging HUD, and file previews.
-3. **Smart In-Memory Clipboard Manager (`⌘⇧V`)** with sub-millisecond fuzzy search and automatic exclusion of passwords copied from password managers.
+Zenith lives in your Menu Bar as a lightweight accessory app (no Dock icon), bringing several small utilities together in one native binary:
+1. **Native Screen OCR & Barcode/QR Extractor (`⌘⇧3`)** using on-device Apple Vision, with the result copied to the clipboard.
+2. **MacBook Dynamic Island & Drop Shelf** with a Now Playing display and controls (Apple Music, Spotify and browser audio), a charging HUD, and file previews.
+3. **Clipboard Manager (`⌘⇧V`)** with fuzzy search and automatic exclusion of items that password managers mark as concealed.
 4. **Shottr-Grade Screen Capture & Annotation (`⌘⇧2`)** with a live 16x pixel Loupe magnifier.
-5. **Developer Deep Purge & Safe App Monitor (Mole-Inspired)** to reclaim tens of gigabytes and safely kill heavy user processes.
-6. **Privacy Shield (DNS-over-HTTPS + Anti-DPI)** with in-process TLS ClientHello SNI chunking without VPN ping overhead.
+5. **Disk cleaner, app uninstaller and process monitor (Mole-inspired)**, with a confirmation before anything is deleted.
+6. **Privacy Shield**: a local proxy that looks names up over DNS-over-HTTPS and splits the TLS handshake in two. It is not a VPN and does not hide your IP address.
 
 🌐 **Visit the official website:** [https://mynameisbat.github.io/zenith-macos/](https://mynameisbat.github.io/zenith-macos/)
 
@@ -42,7 +42,7 @@ xattr -cr /Applications/Zenith.app
 open /Applications/Zenith.app
 ```
 
-> **Note for macOS Gatekeeper:** If macOS warns about an unidentified developer, right-click (or Control-click) `Zenith.app` in `/Applications` and select **Open**, then click **Open** in the prompt.
+> **Note for macOS Gatekeeper:** Zenith is signed ad hoc and is **not notarized** (that needs an Apple Developer ID), so macOS will warn about an unidentified developer. Right-click (or Control-click) `Zenith.app` in `/Applications`, select **Open**, then click **Open** in the prompt.
 
 ### Option 2: Build from Source
 **Prerequisites:** macOS 14.0 (Sonoma) or higher, Xcode 16+ or Command Line Tools with Swift 6.0 toolchain.
@@ -52,8 +52,9 @@ open /Applications/Zenith.app
 git clone https://github.com/mynameisbat/zenith-macos.git
 cd zenith-macos
 
-# Run the automated test suites (hermetic: they never change your system proxy, Finder preferences or clipboard)
-swift test
+# Run the automated test suites, one process per suite (hermetic: they never change your system proxy, Finder
+# preferences or clipboard). A single `swift test` over everything can stall; see CLAUDE.md for why.
+./scripts/test_each_suite.sh
 
 # Build and assemble Zenith.app bundle
 ./scripts/bundle_app.sh
@@ -69,26 +70,27 @@ open Zenith.app
 
 ## ✨ Key Features & Architecture
 
-### 1. 🎛 Menu Bar Command Hub (`⌥Space`)
-- Minimalist macOS popover designed with Precision Apple Sapphire Blue (`#0F62FE`).
-- **Instant Search**: Type to search across all your clipboard items, launch screen captures, or run system cleaner actions.
+### 1. 🎛 Menu Bar Command Hub
+- Opens from the Zenith icon in the menu bar (there is no global hotkey for it). A minimalist popover in Apple Sapphire Blue (`#0F62FE`).
+- **Search**: type to filter quick actions and the running apps you can quit, or type `/boost`.
 - **Direct Quick Action Tiles**:
   - **Capture Area** (`⌘⇧2`) with real-time Loupe magnifier.
   - **Capture Screen** (`⌘⇧1`).
   - **Screen OCR & QR Reader** (`⌘⇧3`).
   - **Open Preferences** (`⌘,`).
-- **Live System Telemetry**: Displays real-time CPU usage, RAM pressure, and Privacy Shield active status.
+- **Live System Telemetry**: CPU usage, memory pressure, the heaviest user processes (quit with `SIGTERM`, then `SIGKILL` if needed) and the Privacy Shield status.
 
 ### 2. 🔍 Native Screen OCR & Barcode/QR Extractor (`⌘⇧3`)
-- **100% On-Device Neural Vision Engine**: Uses Apple Vision framework (`VNRecognizeTextRequest`, `VNDetectBarcodesRequest`) running on Apple Silicon Neural Engine / Metal with **0.00% idle overhead**.
-- **Instant Clipboard & Toast Feedback**: Snip any region on your display $\rightarrow$ text or URL from QR codes/barcodes is extracted in $<25$ms, auto-formatted, copied to clipboard, and announced via HUD.
-- **Multilingual Recognition**: Accurate character recognition across Latin, Japanese, Chinese, Cyrillic, and monospace code blocks.
+- **On-Device Vision**: Uses the Apple Vision framework (`VNRecognizeTextRequest`, `VNDetectBarcodesRequest`); nothing leaves your Mac.
+- **Clipboard & Toast Feedback**: Snip any region of your display and the recognised text, or the payload of a QR code or barcode, is copied to the clipboard and announced with a HUD.
+- **Languages**: Whatever Apple Vision supports for your system languages.
 - **Actor-Isolated Concurrency Ceiling**: Throttles parallel recognition with zero memory spikes and cooperative task cancellation (`Task.isCancelled` $\rightarrow$ `VNRequest.cancel()`).
 
 ### 3. 📋 Smart Clipboard Manager (`⌘⇧V` or `⌥V`)
 - **Global Hotkey (`⌘⇧V` or `⌥V`)**: Instantly opens clipboard history directly at cursor or center screen with zero Accessibility permissions required.
-- **Sub-Millisecond Search**: In-memory UTF-8 Boyer-Moore algorithm and Unicode fuzzy search for instant recall under 0.65ms.
-- **Sensitive Data Auto-Exclusion**: Automatically detects and ignores sensitive pasteboard data from 1Password, Bitwarden, KeePassXC, and Apple Keychain.
+- **Fast search**: in-memory search over the history with Unicode-aware fuzzy matching.
+- **Bounded memory**: an item over 25 MB is not kept, and the history as a whole is capped at 256 MB.
+- **Sensitive Data Exclusion**: ignores pasteboard items marked as concealed or transient (the `org.nspasteboard` markers) and items from 1Password, Bitwarden and KeePassXC.
 - **Item Pinning (`⌘P`)**: Pinned items are permanently preserved from FIFO eviction.
 - **Keyboard-Driven Workflow**: `⌘1`–`⌘9` instant paste, `⌘⌫` delete, `Ctrl+N` / `Ctrl+P` Emacs navigation.
 
@@ -96,10 +98,10 @@ open Zenith.app
 - **Interactive 16x Loupe Magnifier**: Real-time pixel magnifier with center crosshairs and formatted RGB/HEX color sampling.
 - **Vector Annotation Studio**:
   - Swept-wing vector arrows (`A`).
-  - Numbered step badges `①`, `②`, `③` (`S`).
   - Solid and hollow rectangles (`R`).
   - Typography text callouts (`T`).
   - Pixelated / blur redaction tool (`B`) for sensitive tokens.
+  - Crop (`C`).
 - **100% Retina Fidelity**: Exports annotations directly at native physical display backing resolution (PNG & JPEG) with zero downsampling.
 - **Rapid Keyboard Workflow**:
   - `⌘C`: Flatten annotations, copy to clipboard, and close editor.
@@ -113,31 +115,39 @@ open Zenith.app
   - Track changes for **Apple Music** and **Spotify** arrive as system notifications (no polling); a light 1–2 s tick keeps the progress bar and other audio sources in sync.
   - **Left Wing**: Mini spinning vinyl disc with app badge / album artwork.
   - **Right Wing**: Animated jumping 4-bar equalizer visualizer with brand-matched dynamic color palettes.
-  - **Expanded Player**: Hover over the island to reveal full track metadata, interactive scrub bar, and media controls (Play/Pause, Skip, Previous).
-  - **Tab Switcher**: Seamlessly switch between `[🎵 Now Playing]` and `[📦 Shelf]` when parked items coexist.
+  - **Expanded Player**: Hover over the island to reveal track metadata, a progress bar, and media controls (Play/Pause, Skip, Previous).
+  - **Browser audio**: Chrome-family browsers (Chrome, Edge, Brave, Arc, Vivaldi, Opera) and Safari are detected from the audio they hold open, because macOS 15.4+ no longer gives other apps Now Playing data. For known media sites (YouTube, X, SoundCloud, Twitch and a few more) the tab title is shown; for any other site only the browser name is. Firefox is not checked for its tab title.
+  - **Controls**: Music and Spotify are controlled over AppleScript; a browser is controlled with the hardware media key, which needs the Accessibility permission (the island says so when macOS refuses it).
+  - **Tab Switcher**: Switch between `[🎵 Now Playing]` and `[📦 Shelf]` when parked items coexist; on a notched display the two tabs sit either side of the notch.
 - **MagSafe & USB-C Charging HUD**:
-  - Native IOKit RunLoop listener (`IOPSNotificationCreateRunLoopSource`) with 0.0% polling overhead.
-  - Glowing neon green rim light capsule displaying battery charge and charger wattage (e.g. `Charging • 85% (67W Charger)`).
-  - Intelligent unplugged battery notice, low battery 20% alert with 5-minute throttling, and full charge notification with battery Maximum Capacity health readout.
-  - Instant Bluetooth accessory battery percentage HUD on connection.
+  - Driven by an IOKit run-loop notification (`IOPSNotificationCreateRunLoopSource`), not polling.
+  - A green rim-light capsule shows the battery charge and the charger wattage (e.g. `Charging • 85% (67W Charger)`).
+  - An unplugged notice, a low-battery alert at 20% (at most once every 5 minutes), and a full-charge notice with the battery's Maximum Capacity.
+  - A battery percentage when a Bluetooth accessory connects, as far as macOS reports it (notified by the I/O Registry, not polled).
 - **Interactive Drop Shelf & Quick Look Preview**:
   - Drag any file, image, or text snippet to the top edge of your screen to park it on the notch shelf.
   - High-resolution hover preview modal (`IslandPreviewWindowController`) with auto-dismiss lifecycle and drag-out staging.
 
-### 6. 🧹 Developer Deep Purge (Mole-Inspired)
-- **Project Build Artifact Purge**: Recursively scans and purges heavy build directories:
-  - `node_modules` & `pnpm` stores (Node.js/TypeScript).
-  - Xcode `DerivedData` & Device Simulator runtimes.
-  - Cargo `target/` (Rust).
-  - `.venv` & `__pycache__` (Python).
-  - Swift Package Manager `.build/`.
-- **Stale Installer Hunt**: Discovers multi-gigabyte `.dmg`, `.pkg`, and `.iso` installers sitting in `~/Downloads` that have already been installed.
-- **App Uninstaller**: Eradicates `.app` bundles along with orphaned leftovers hidden in `~/Library/Application Support`, `~/Library/Caches`, and `LaunchAgents`.
-- **Hardware Telemetry Service**: Real-time memory pressure telemetry and active Top CPU Hogs process monitor with graceful `SIGTERM` and `SIGKILL`.
+### 6. 🧹 Disk Cleaner, App Uninstaller & Process Monitor (Mole-Inspired)
+Nothing here deletes without asking: each action shows what will go (the largest items by name) and waits for your confirmation.
+
+**In Settings → Cleaner** (a row of tabs: System, Projects, Installers, Leftovers, Drives). Each tab has a Scan button, a list you tick, and a confirmation that names the largest items before anything is removed.
+- **System**: caches, logs and temporary files in your home folder. The Trash category is listed but unselected. It never offers Docker Desktop's virtual disk, skips Apple-managed and offline-media/sync app caches, and offers partial downloads only after a day untouched. The "Clean" badge in the Command Hub does the same, with the same confirmation.
+- **Projects**: build folders (`node_modules`, Cargo `target`, `.build`, `venv`/`__pycache__`, `DerivedData`, `Pods`, …) of projects under `~/Projects`, `~/Code`, `~/Documents` and a few other usual folders, plus any folder you add. Offered only for a project type that rebuilds the folder, and `bin`/`obj`/`build`/`dist` only if Git ignores them. Moved to the Trash.
+- **Installers**: `.dmg`, `.pkg`, `.iso`, `.xip` and large installer `.zip` files in Downloads and Desktop that nothing has touched for three days. A mounted disk image is left out. Moved to the Trash.
+- **Leftovers**: `com.vendor.app` folders in `~/Library` whose app is gone and that nothing has touched for 30 days. **Nothing is ticked for you**: they can hold data you would want back. Moved to the Trash.
+- **Drives**: Finder and Windows junk (`.DS_Store`, `._*` files, `Thumbs.db`, …) on mounted external drives. These are deleted, not trashed, and the confirmation says so.
+
+**Elsewhere in the app**
+- **Boost** in the Command Hub purges inactive memory and flushes the DNS cache, and tells you honestly which step failed.
+- **Process monitor** in the Command Hub (see section 1).
+- **App Uninstaller and Slimmer**: drop an `.app` on the island shelf. *Deep Uninstall* moves the app and its leftovers to the Trash (leftovers are matched by bundle identifier, and Apple-owned entries are never touched). *Slim* removes unused CPU architectures from a copy, verifies the code signature, swaps it in atomically and sends the original to the Trash.
 
 ### 7. 🛡 Privacy Shield (DoH + Anti-DPI Local Proxy)
-- **DNS-over-HTTPS (DoH)**: Built-in local resolver routing system DNS requests over encrypted HTTPS to **Cloudflare** (`1.1.1.1`) or **Google** (`8.8.8.8`).
-- **TLS ClientHello SNI Chunker**: Splits the initial TLS handshake packet into dual micro-chunks directly on `127.0.0.1:8080`, evading Deep Packet Inspection (DPI) firewalls with no VPN subscription needed and only a 5 ms pause between the two fragments of each HTTPS handshake.
+- **How it works**: Zenith listens on `127.0.0.1` (port 8080 by default, loopback only) and points the macOS system proxy of your primary network service at it. It looks up the name of each site you visit over **DNS-over-HTTPS** and connects to the address it gets. Your previous proxy settings are saved and put back when you switch it off, and are repaired at the next launch if Zenith was killed while it was on.
+- **DoH providers**: Cloudflare, Google, Quad9, AdGuard, NextDNS, or your own endpoint. The DoH server itself is reached by its IP address (so its name is not looked up in plain DNS) and its certificate is checked against its real name.
+- **TLS ClientHello chunker**: splits the first TLS handshake packet of a connection into two pieces (after the first 2 bytes), with a 5 ms pause between them, which can defeat simple Deep Packet Inspection.
+- **Limits**: it is not a VPN and does not hide your IP address or the addresses you connect to. It only covers traffic from apps that honour the system proxy, and only the primary network service. SOCKS and PAC proxy settings are ignored, and the local proxy has no authentication. The anti-DPI split has not been verified against a real filtering network.
 
 ### 8. 🔊 Native Audio Feedback
 - 14 customizable native macOS sound cues (Pop, Tink, Hero, Bottle, Funk, Ping, Purr, Submarine, etc.) with custom sound file import (`.wav`, `.aiff`, `.m4a`).
@@ -153,7 +163,6 @@ open Zenith.app
 | `⌘⇧3` | Global | Screen OCR &amp; Barcode / QR Code Recognition |
 | `⌘⇧1` | Global | Capture Entire Active Display |
 | `⌘⇧V` | Global | Open Clipboard History Manager (Preset alt: `⌥V`) |
-| `⌥Space` | Global | Open Zenith Command Hub Popover |
 | **Clipboard History Hub** | | *(Floating Panel &amp; Menu Bar)* |
 | `↑` / `↓` | Clipboard Hub | Navigate up / down |
 | `⇞` / `⇟` (PageUp/Down) | Clipboard Hub | Scroll 5 items up / down |
@@ -170,7 +179,7 @@ open Zenith.app
 | `R` | Annotation Editor | Select Rectangle Tool |
 | `T` | Annotation Editor | Select Text Label Tool |
 | `B` | Annotation Editor | Select Blur / Pixelate Privacy Tool |
-| `S` | Annotation Editor | Select Numbered Step Badge Tool (①, ②, ③) |
+| `C` | Annotation Editor | Select Crop Tool |
 | `1` ... `8` | Annotation Editor | Quick select palette colors 1–8 |
 | `[` / `]` | Annotation Editor | Decrease / Increase stroke width |
 | `⌘C` | Annotation Editor | Copy annotated image to clipboard and dismiss |
@@ -196,8 +205,11 @@ Zenith is designed with privacy-first principles and minimal permission requirem
 
 2. **Accessibility (`kTCCServiceAccessibility`)** — **Optional**:
    - **Zero-Permission Hotkeys**: Zenith uses macOS Carbon Event HotKeys for all global triggers (`⌘⇧V`, `⌘⇧2`, `⌘⇧1`), which require **zero Accessibility permissions**.
-   - **What Accessibility is for**: Enabling Accessibility allows Zenith's `AutoPasteService` to synthesize a native `⌘V` keystroke to paste directly into your background application upon selection.
-   - If Accessibility is not enabled, selecting an item copies it to your clipboard with a toast notification, allowing you to paste manually with `⌘V`.
+   - **What Accessibility is for**: it lets Zenith synthesize keystrokes: `⌘V` to paste a clipboard item straight into the front app (`AutoPasteService`), and the media keys that control browser playback from the island.
+   - Without it, selecting an item only copies it (paste with `⌘V` yourself), and the island's buttons cannot control a browser tab (it shows an "Allow Accessibility" notice).
+
+3. **Automation (Apple Events)** — **Optional**:
+   - Lets Zenith control Music and Spotify and read the front tab of Safari and Chromium browsers for the Now Playing title. macOS asks the first time, once per app.
 
 ---
 
@@ -229,7 +241,7 @@ graph TD
         AnnotEngine[Vector Annotation Engine & Undo Stack]
         ExportService[High-DPI Retina Image Exporter]
         DoHProxy[DoH Local Proxy & TLS Chunker]
-        PurgeService[Project & Installer Deep Purge]
+        PurgeService[Cleaner tools & Uninstaller]
         Telemetry[Mach Kernel Memory & Top CPU Hogs]
         AudioMgr[Audio Feedback Manager]
         Perms[System Permissions & Deep Links]
@@ -272,10 +284,11 @@ graph TD
 └────────────────────────────────────────────────────────┘
 ```
 
-Run test suite:
+Run the test suites (one process per suite, as CI does):
 ```bash
-swift test
+./scripts/test_each_suite.sh
 ```
+CI (`.github/workflows/tests.yml`) skips four suites that create a menu-bar item or a window, because the runner has no window server; run them on a Mac with `ONLY_SUITES="MenuBarControllerTests" ./scripts/test_each_suite.sh`. Suites that touch the system or the network are opt-in: `ZENITH_E2E_SYSTEM=1` (changes the real system proxy) and `ZENITH_E2E_NETWORK=1` (uses the internet).
 
 ---
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import ZenithCore
 import AppKit
 
 /// Central design system tokens and Apple Design Award aesthetic for Zenith 2.0.
@@ -7,7 +8,7 @@ public enum ZenithTheme {
     // MARK: - Brand Identity
     public static let appName = "Zenith"
     public static let appTagline = "Precision Mac Workspace"
-    public static let appVersion = "2.0.0"
+    public static let appVersion = ZenithVersion.current
 
     // MARK: - Color Palette & Canvas Materials
     /// Deep Obsidian Canvas: blended on top of .ultraThinMaterial for authentic desktop glass depth

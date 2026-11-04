@@ -78,7 +78,7 @@ public struct ZenithCommandHubView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.secondary)
 
-            TextField("Search actions, apps to terminate (or /boost)...", text: $hubState.searchText)
+            TextField("Search actions or running apps (or /boost)...", text: $hubState.searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12.5))
                 .focused($isSearchFocused)
@@ -109,6 +109,16 @@ public struct ZenithCommandHubView: View {
         )
     }
 
+    /// Asks before quitting, then says what happened.
+    private func quit(_ hog: ProcessTelemetry) {
+        let quitIt = hubState.terminate(hog) { title, message, action in
+            DestructiveConfirmation.confirm(title: title, message: message, destructiveTitle: action)
+        }
+        if quitIt {
+            ToastHUDController.shared.show(message: "Asked \(hog.name) to quit", icon: "xmark.circle.fill")
+        }
+    }
+
     private func handleSubmit() {
         let query = hubState.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if query.lowercased() == "/boost" || query.lowercased() == "boost" {
@@ -128,9 +138,6 @@ public struct ZenithCommandHubView: View {
         // When query is non-empty:
         if let firstAction = matchingActions.first, matchingActions.count < ZenithHubAction.allCases.count {
             executeAction(firstAction)
-        } else if let firstHog = hubState.filteredTopHogs.first {
-            hubState.killProcess(pid: firstHog.pid)
-            ToastHUDController.shared.show(message: "Terminated \(firstHog.name)", icon: "xmark.circle.fill")
         } else if let firstAction = matchingActions.first {
             executeAction(firstAction)
         }
@@ -224,7 +231,7 @@ public struct ZenithCommandHubView: View {
                         .font(.system(size: 10.5))
                         .foregroundColor(hubState.hardwareSnapshot.cpu.totalUsagePercent > 60 ? .red : .orange)
 
-                    Text(hubState.searchText.isEmpty ? "RUNNING APPS (SAFE TO KILL)" : "MATCHING APPS (\(hogs.count))")
+                    Text(hubState.searchText.isEmpty ? "RUNNING APPS" : "MATCHING APPS (\(hogs.count))")
                         .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
                         .foregroundColor(Color.secondary.opacity(0.75))
                 }
@@ -343,15 +350,15 @@ public struct ZenithCommandHubView: View {
 
             // Termination Button
             Button {
-                hubState.killProcess(pid: hog.pid)
-                ToastHUDController.shared.show(message: "Terminated \(hog.name)", icon: "xmark.circle.fill")
+                quit(hog)
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 13))
                     .foregroundColor(.red.opacity(isHovered ? 1.0 : 0.75))
             }
             .buttonStyle(.plain)
-            .help("Terminate \(hog.name) (PID \(hog.pid))")
+            .help("Quit \(hog.name) (PID \(hog.pid)); asks first")
+            .accessibilityLabel("Quit \(hog.name)")
         }
         .padding(.horizontal, 7)
         .padding(.vertical, 4)
