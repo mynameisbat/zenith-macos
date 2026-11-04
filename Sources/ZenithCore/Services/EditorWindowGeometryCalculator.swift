@@ -16,11 +16,22 @@ public struct EditorWindowGeometry: Equatable, Sendable {
 
 /// Pure calculation engine for sizing and positioning the post-capture annotation editor window (F21).
 public struct EditorWindowGeometryCalculator: Sendable {
+    /// Height kept free under the image for the floating toolbar (the toolbar and its margin), so it never covers
+    /// the part of the screenshot being annotated.
+    public static let toolbarReserve: CGFloat = 84
+    /// Width the toolbar needs; a window narrower than this would clip it.
+    public static let toolbarWidth: CGFloat = 820
+
+    /// - Parameters:
+    ///   - toolbarReserve: Extra window height under the image that stays free of it.
+    ///   - minimumWidth: The narrowest window to open, whatever the image size.
     public static func calculate(
         imageWidth: Int,
         imageHeight: Int,
         displayVisibleFrame: CGRect,
-        backingScaleFactor: CGFloat = 2.0
+        backingScaleFactor: CGFloat = 2.0,
+        toolbarReserve: CGFloat = 0,
+        minimumWidth: CGFloat = 520
     ) -> EditorWindowGeometry {
         let safeImageW = max(1, imageWidth)
         let safeImageH = max(1, imageHeight)
@@ -32,8 +43,8 @@ public struct EditorWindowGeometryCalculator: Sendable {
             ? displayVisibleFrame
             : CGRect(x: 0, y: 0, width: 1920, height: 1080)
         let maxW = max(300, vf.width - 96)
-        let maxH = max(300, vf.height - 96)
-        let minW: CGFloat = 520
+        let maxH = max(300, vf.height - 96 - toolbarReserve)
+        let minW: CGFloat = minimumWidth
         let minH: CGFloat = 360
 
         var fitW = max(1.0, imagePtWidth)
@@ -46,7 +57,7 @@ public struct EditorWindowGeometryCalculator: Sendable {
         }
 
         let winW = max(minW, fitW)
-        let winH = max(minH, fitH)
+        let winH = max(minH, fitH + toolbarReserve)
 
         let x = vf.midX - winW / 2
         let y = vf.midY - winH / 2

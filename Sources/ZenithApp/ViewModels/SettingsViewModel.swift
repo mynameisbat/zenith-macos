@@ -156,7 +156,7 @@ public final class SettingsViewModel: ObservableObject {
 
     public func resetHotkeyToDefault(id: String) {
         let result = hotKeys.resetToDefault(id: id)
-        if let builtIn = HotKeyDefinition.defaultDictionary[id] {
+        if let builtIn = HotKeyDefinition.builtIn(for: id) {
             _ = report(result, for: builtIn)
         }
     }
@@ -243,5 +243,9 @@ public final class SettingsViewModel: ObservableObject {
 
     public func openAccessibilitySettings() {
         _ = permissionsService.openAccessibilitySettings()
+    }
+
+    public func openAutomationSettings() {
+        _ = SystemPermissions.openAutomationSettings()
     }
 }

@@ -264,11 +264,11 @@ public struct ZenithDynamicIslandView: View {
                 Image(systemName: symbol)
                     .font(.system(size: 8.5))
                 Text(title)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 10, weight: .semibold))
                     .lineLimit(1)
             }
             .fixedSize()
-            .foregroundColor(isSelected ? .white : .white.opacity(0.45))
+            .foregroundColor(isSelected ? .white : .white.opacity(0.72))
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(
@@ -278,6 +278,8 @@ public struct ZenithDynamicIslandView: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var nowPlayingTabButton: some View {
@@ -330,6 +332,21 @@ public struct ZenithDynamicIslandView: View {
         )
     }
 
+    /// Empties the shelf. Several items, or text that exists nowhere else, are not dropped without asking.
+    private func clearShelf() {
+        let count = islandState.droppedItems.count
+        let hasText = islandState.droppedItems.contains { $0.textContent != nil }
+        if count > 1 || hasText {
+            let noun = count == 1 ? "item" : "items"
+            guard DestructiveConfirmation.confirm(
+                title: "Remove \(count) \(noun) from the shelf?",
+                message: "Files stay where they are; only their place on the shelf goes. Text snippets are lost.",
+                destructiveTitle: "Remove"
+            ) else { return }
+        }
+        islandState.clearAll()
+    }
+
     // MARK: - Populated Shelf Dock
 
     private var populatedShelfDock: some View {
@@ -360,15 +377,16 @@ public struct ZenithDynamicIslandView: View {
 
             // Clear shelf button
             Button {
-                islandState.clearAll()
+                clearShelf()
             } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.35))
+                Image(systemName: "trash.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.6))
                     .padding(4)
             }
             .buttonStyle(.plain)
-            .help("Clear Shelf")
+            .help("Remove everything from the shelf")
+            .accessibilityLabel("Clear the shelf")
         }
     }
 

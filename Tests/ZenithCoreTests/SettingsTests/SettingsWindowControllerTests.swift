@@ -62,7 +62,7 @@ struct SettingsWindowControllerTests {
         #expect(controller.isVisible == true)
         let upEvt = NSEvent.mouseEvent(
             with: .leftMouseUp,
-            location: NSPoint(x: 16, y: 474),
+            location: NSPoint(x: 16, y: window.frame.height - 16),
             modifierFlags: [],
             timestamp: ProcessInfo.processInfo.systemUptime,
             windowNumber: window.windowNumber,
@@ -101,11 +101,11 @@ struct SettingsWindowControllerTests {
         let window = controller.createWindow()
 
         #expect(window.frame.width == 680)
-        #expect(window.frame.height == 490)
+        #expect(window.frame.height == 540)         // tall enough for the General tab without scrolling
         #expect(window.minSize.width == 680)
-        #expect(window.minSize.height == 490)
+        #expect(window.minSize.height == 540)
         #expect(window.maxSize.width == 680)
-        #expect(window.maxSize.height == 490)
+        #expect(window.maxSize.height == 540)
 
         controller.dismiss()
     }
@@ -291,10 +291,10 @@ struct SettingsWindowControllerTests {
         controller.show()
         #expect(controller.isVisible == true)
 
-        // Simulate click in top-left traffic light zone (x: 14, y: 476)
+        // Simulate click in top-left traffic light zone (14 pt from the left, 14 pt from the top)
         let evt = NSEvent.mouseEvent(
             with: .leftMouseDown,
-            location: NSPoint(x: 14, y: 476),
+            location: NSPoint(x: 14, y: window.frame.height - 14),
             modifierFlags: [],
             timestamp: ProcessInfo.processInfo.systemUptime,
             windowNumber: window.windowNumber,

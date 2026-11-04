@@ -66,6 +66,21 @@ public struct ShortcutsSettingsTab: View {
                     )
                     .zenithSettingsCard()
                 }
+
+                // 4. Screen OCR Shortcut
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("SCREEN OCR SHORTCUT")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.secondary)
+
+                    shortcutRow(
+                        id: HotKeyDefinition.captureOCRId,
+                        title: "Screen OCR & QR Reader",
+                        defaultPreset: HotKeyDefinition.defaultOCR,
+                        altPreset: nil
+                    )
+                    .zenithSettingsCard()
+                }
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
@@ -79,10 +94,11 @@ public struct ShortcutsSettingsTab: View {
         altPreset: HotKeyDefinition?
     ) -> some View {
         let current = viewModel.hotkey(for: id) ?? defaultPreset
+        let isDefault = current.keyCode == defaultPreset.keyCode && current.carbonModifiers == defaultPreset.carbonModifiers
         return HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                Text(current.name)
+                Text(isDefault ? "Click the shortcut to record another one." : "Changed from \(defaultPreset.keyEquivalent). Click the shortcut to record another one.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -97,19 +113,22 @@ public struct ShortcutsSettingsTab: View {
                 }
             )
 
-            if let alt = altPreset {
-                Button(alt.keyEquivalent) {
+            // A ready-made alternative, offered only while it is not the one in use.
+            if let alt = altPreset, current.keyCode != alt.keyCode || current.carbonModifiers != alt.carbonModifiers {
+                Button("Use \(alt.keyEquivalent)") {
                     _ = viewModel.updateHotkey(alt)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             }
 
-            Button("Reset (\(defaultPreset.keyEquivalent))") {
-                viewModel.resetHotkeyToDefault(id: id)
+            if !isDefault {
+                Button("Reset to \(defaultPreset.keyEquivalent)") {
+                    viewModel.resetHotkeyToDefault(id: id)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
     }
 }

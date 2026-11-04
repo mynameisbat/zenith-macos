@@ -41,6 +41,15 @@ public struct PermissionsGuideView: View {
                         action: { viewModel.openAccessibilitySettings() }
                     )
                     .zenithSettingsCard()
+
+                    permissionRow(
+                        title: "Automation (Optional)",
+                        description: "Lets Zenith control Music and Spotify and read the front tab of Safari and Chromium browsers for the Now Playing title. macOS asks the first time, once for each app. Without it the island still shows that a browser is playing, but not what.",
+                        isGranted: nil,
+                        actionTitle: "Open Automation Settings...",
+                        action: { viewModel.openAutomationSettings() }
+                    )
+                    .zenithSettingsCard()
                 }
 
                 // 3. Refresh Action
@@ -67,7 +76,7 @@ public struct PermissionsGuideView: View {
     private func permissionRow(
         title: String,
         description: String,
-        isGranted: Bool,
+        isGranted: Bool?,
         actionTitle: String,
         action: @escaping () -> Void
     ) -> some View {
@@ -92,7 +101,25 @@ public struct PermissionsGuideView: View {
         }
     }
 
-    private func statusBadge(isGranted: Bool) -> some View {
+    private func statusBadge(isGranted: Bool?) -> some View {
+        guard let isGranted else {
+            // Automation is asked per app, so there is no single answer to show.
+            return AnyView(
+                Text("Asked per app")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(Color.primary.opacity(0.04))
+                    )
+            )
+        }
+        return AnyView(grantedBadge(isGranted: isGranted))
+    }
+
+    private func grantedBadge(isGranted: Bool) -> some View {
         HStack(spacing: 4) {
             Image(systemName: isGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                 .font(.system(size: 10))

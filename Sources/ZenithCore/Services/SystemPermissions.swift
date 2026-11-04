@@ -15,6 +15,12 @@ public struct SystemPermissions {
         string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
     )!
 
+    /// Deep link to macOS System Settings -> Privacy & Security -> Automation, where each app that Zenith controls
+    /// (Music, Spotify, a browser) is listed once macOS has asked.
+    public static let automationSettingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
+    )!
+
     /// Checks whether Zenith currently has permission to record/capture the screen.
     /// Does not present a dialog if permission is denied or not yet requested.
     public static func checkScreenRecordingPermission() -> Bool {
@@ -48,6 +54,11 @@ public struct SystemPermissions {
     @discardableResult
     public static func openAccessibilitySettings() -> Bool {
         NSWorkspace.shared.open(accessibilitySettingsURL)
+    }
+
+    @discardableResult
+    public static func openAutomationSettings() -> Bool {
+        NSWorkspace.shared.open(automationSettingsURL)
     }
 }
 
