@@ -248,6 +248,19 @@ struct ZenithCommandHubTests {
         #expect(state.filteredTopHogs.count == 5)
     }
 
+    @Test("HUB-15: A refresh takes its numbers from the snapshot provider, not from the machine")
+    @MainActor
+    func testSnapshotProviderIsUsed() {
+        let state = ZenithCommandHubState()
+        let sample = HardwareSnapshot(cpu: CPUTelemetry(topHogs: [ProcessTelemetry(pid: 4242, name: "Sample App")]))
+        state.snapshotProvider = { sample }
+
+        state.refreshHardwareSnapshot(sync: true)
+
+        #expect(state.hardwareSnapshot == sample)
+        #expect(state.filteredTopHogs.map(\.name) == ["Sample App"])
+    }
+
     @Test("HUB-14: Filtered top hogs filters by name, command, and PID accurately")
     @MainActor
     func testFilteredTopHogsFiltering() {

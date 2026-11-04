@@ -14,6 +14,11 @@ if arguments.contains("--smoke-test") {
     exit(0)
 }
 
+if let flag = arguments.firstIndex(of: "--render-screenshots"), flag + 1 < arguments.count {
+    let directory = URL(fileURLWithPath: arguments[flag + 1])
+    exit(MainActor.assumeIsolated { ScreenshotRenderer.run(outputDirectory: directory) })
+}
+
 if arguments.contains("--help") {
     print("""
     Zenith \(ZenithVersion.current) - Precision Mac Workspace
@@ -23,6 +28,8 @@ if arguments.contains("--help") {
     Options:
       --smoke-test    Verify executable launch and exit immediately
       --version       Print application version
+      --render-screenshots DIR
+                      Write PNGs of the main views, drawn with made-up data, into DIR (used for the website)
       --help          Show this help message
     """)
     exit(0)

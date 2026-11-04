@@ -78,6 +78,9 @@ public final class ZenithCommandHubState: ObservableObject {
 
     private let optimizer: SystemOptimizerService
 
+    /// Where a refresh gets its numbers. The real machine by default; screenshots and tests supply made-up ones.
+    public var snapshotProvider: @Sendable () -> HardwareSnapshot = { HardwareTelemetryService.shared.fetchSnapshot() }
+
     public init(optimizer: SystemOptimizerService = .shared) {
         self.optimizer = optimizer
     }
@@ -97,12 +100,13 @@ public final class ZenithCommandHubState: ObservableObject {
     }
 
     public func refreshHardwareSnapshot(sync: Bool = false) {
+        let provider = snapshotProvider
         if sync {
-            hardwareSnapshot = HardwareTelemetryService.shared.fetchSnapshot()
+            hardwareSnapshot = provider()
             return
         }
         Task.detached(priority: .utility) { [weak self] in
-            let snapshot = HardwareTelemetryService.shared.fetchSnapshot()
+            let snapshot = provider()
             await MainActor.run { [weak self] in
                 self?.hardwareSnapshot = snapshot
             }

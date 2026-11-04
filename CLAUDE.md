@@ -12,6 +12,7 @@ swift run Zenith                     # run the menu-bar app (also: --smoke-test,
 swift test                           # whole suite (Swift Testing: @Suite/@Test/#expect)
 swift test --filter NowPlayingAndBatteryHUDTests   # one suite; a test function name also works
 ./scripts/test_each_suite.sh         # every suite in its own process (what CI runs); ONLY_SUITES="A B" limits it
+swift run Zenith --render-screenshots DIR   # PNGs of the island, Command Hub and clipboard with made-up data (website/assets/shots)
 ./scripts/bundle_app.sh              # release build -> Zenith.app (ad-hoc signed) + GoldenGate.app mirror
 ./scripts/create_dmg.sh              # release DMG
 ```
@@ -23,6 +24,8 @@ swift test --filter NowPlayingAndBatteryHUDTests   # one suite; a test function 
 - **Tests must not change the machine running them.** Services that touch the OS take an injected seam (`SystemCommandRunner` for `networksetup`/`lipo`/`codesign`/`defaults`/`lsregister`, a pasteboard, an event poster), and tests use `RecordingCommandRunner` / `FakeNetworkSetup` / `NSPasteboard.withUniqueName()`. `ClipboardStore(capacity:)` already gets a private pasteboard. The two suites that really do change things are opt-in: `ZENITH_E2E_SYSTEM=1` (`PrivacyShieldE2ETest`, flips the real system proxy) and `ZENITH_E2E_NETWORK=1` (`PrivacyShieldLiveTest`, uses the internet).
 - `--filter` matches test *function* and *suite* names, not the `"LP-07: …"` display names; a filter that matches nothing still prints a passing run, so check the test count.
 - Test bodies are `async`, so blocking socket calls inside them starve the cooperative thread pool that the code under test also needs. Run blocking I/O with the `offPool { }` helper in `LocalProxyServerBehaviorTests.swift`.
+
+- The site in `website/` is plain HTML/CSS/JS with no third-party requests and is deployed by `deploy-pages.yml` on every push to `main`. Its screenshots come from `--render-screenshots`, which draws the real views in an off-screen `NSWindow` (`ImageRenderer` cannot draw text fields or scroll views). `ZenithCommandHubState.snapshotProvider` exists so those images show made-up processes: the hub refreshes itself from the real machine when it appears, so never publish a render that skipped it.
 
 ## Architecture
 
