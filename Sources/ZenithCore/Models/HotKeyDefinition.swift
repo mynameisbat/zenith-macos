@@ -102,15 +102,29 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
         keyEquivalent: "⌘⇧1"
     )
 
-    /// Screen OCR & barcode recognition: ⌘⇧3 (Keycode 20: '3'). Not part of `defaultDictionary`, which holds the
-    /// shortcuts older settings files know about.
+    /// Screen OCR & barcode recognition: ⌃⌥T (Keycode 17: 'T', "T for text").
+    /// It used to be ⌘⇧3, which is also macOS's own "screenshot of the whole screen" shortcut: pressing it ran both.
+    /// ⌘⇧3, ⌘⇧4, ⌘⇧5 and ⌘⇧6 belong to the system (see `macOSScreenshotShortcuts`). Not part of `defaultDictionary`,
+    /// which holds the shortcuts older settings files know about.
     public static let defaultOCR = HotKeyDefinition(
         id: captureOCRId,
         name: "Screen OCR",
-        keyCode: 20, // kVK_ANSI_3
-        carbonModifiers: CarbonModifierFlags.command.rawValue | CarbonModifierFlags.shift.rawValue,
-        keyEquivalent: "⌘⇧3"
+        keyCode: 17, // kVK_ANSI_T
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue,
+        keyEquivalent: "⌃⌥T"
     )
+
+    /// Key codes (with ⌘⇧) of macOS's screenshot shortcuts: 3, 4, 5 and 6. A Zenith shortcut on one of these fires
+    /// together with the system's.
+    public static let macOSScreenshotShortcuts: [(keyCode: UInt32, carbonModifiers: UInt32)] = {
+        let modifiers = CarbonModifierFlags.command.rawValue | CarbonModifierFlags.shift.rawValue
+        return [20, 21, 23, 22].map { (keyCode: UInt32($0), carbonModifiers: modifiers) }   // 3, 4, 5, 6
+    }()
+
+    /// Whether a shortcut would fire together with one of macOS's screenshot shortcuts.
+    public var clashesWithMacOSScreenshot: Bool {
+        Self.macOSScreenshotShortcuts.contains { $0.keyCode == keyCode && $0.carbonModifiers == carbonModifiers }
+    }
 
     /// The built-in shortcut of an action, if it has one.
     public static func builtIn(for id: String) -> HotKeyDefinition? {
