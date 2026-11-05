@@ -177,7 +177,7 @@ extension CleanupToolModel {
         return CleanupToolModel(
             kind: .projects,
             title: "Project build folders",
-            explanation: "Folders a project rebuilds by itself, such as node_modules, Cargo target and .build. Only projects Zenith recognises are listed, and folders named build, dist, bin or obj only if Git ignores them.",
+            explanation: "Folders a project rebuilds by itself, such as node_modules, Cargo target and .build. Only projects Zenith recognises are listed, and folders named build, dist, bin or obj only if Git ignores them. Projects touched in the last week are not ticked for you.",
             actionTitle: "Move to Trash",
             movesToTrash: true,
             scan: {
@@ -189,7 +189,8 @@ extension CleanupToolModel {
                         title: "\($0.projectName) / \($0.artifactName)",
                         detail: "\(tilde($0.artifactPath)) · untouched \($0.daysSinceModified) days",
                         bytes: $0.sizeBytes,
-                        isSelected: true
+                        // A project worked on this week is probably open in an editor or being built right now.
+                        isSelected: $0.daysSinceModified >= 7
                     )
                 }
             },
@@ -236,7 +237,13 @@ extension CleanupToolModel {
                 let found = await service.scan()
                 store.replace(Dictionary(found.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }))
                 return found.map {
-                    CleanupCandidate(id: $0.id, title: $0.appName, detail: "\($0.category) · \(tilde($0.path))", bytes: $0.byteSize, isSelected: false)
+                    CleanupCandidate(
+                        id: $0.id,
+                        title: $0.appName,
+                        detail: "\($0.category) · \(tilde($0.path))" + ($0.category == "Containers" ? " · holds that app's own data, such as saved games" : ""),
+                        bytes: $0.byteSize,
+                        isSelected: false
+                    )
                 }
             },
             clean: { chosen in

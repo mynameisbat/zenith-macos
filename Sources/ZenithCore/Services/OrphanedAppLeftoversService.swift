@@ -81,7 +81,10 @@ public final class OrphanedAppLeftoversService: @unchecked Sendable {
             URL(fileURLWithPath: "/Applications"),
             URL(fileURLWithPath: "/System/Applications"),
             URL(fileURLWithPath: "/System/Cryptexes/App/System/Applications"),
-            homeDirectory.appendingPathComponent("Applications")
+            homeDirectory.appendingPathComponent("Applications"),
+            // iPhone/iPad apps run through PlayCover live here and are not registered with Launch Services, so
+            // without this their containers (saved games and settings) would look like leftovers of deleted apps.
+            homeDirectory.appendingPathComponent("Library/Containers/io.playcover.PlayCover/Applications")
         ]
         self.isBundleIdentifierInUse = isBundleIdentifierInUse
         self.minIdleDays = minIdleDays
