@@ -52,6 +52,7 @@ public final class OrphanedAppLeftoversService: @unchecked Sendable {
     private let applicationRoots: [URL]
     private let isBundleIdentifierInUse: @Sendable (String) -> Bool
     private let minIdleDays: Int
+    private let trashMover: TrashMover
 
     /// - Parameters:
     ///   - homeDirectory: Whose `Library` is scanned; tests pass a throwaway one.
@@ -59,13 +60,16 @@ public final class OrphanedAppLeftoversService: @unchecked Sendable {
     ///   - applicationRoots: Folders searched (a few levels deep) for installed apps.
     ///   - isBundleIdentifierInUse: Whether the system knows or is running an app with this identifier.
     ///   - minIdleDays: Anything touched more recently than this is left alone.
+    ///   - trashMover: How an item is moved to the Trash (retried through Finder where macOS refuses the app).
     public init(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         locations: [(url: URL, category: String)]? = nil,
         applicationRoots: [URL]? = nil,
         isBundleIdentifierInUse: @escaping @Sendable (String) -> Bool = OrphanedAppLeftoversService.systemKnowsApp,
-        minIdleDays: Int = 30
+        minIdleDays: Int = 30,
+        trashMover: TrashMover = .system
     ) {
+        self.trashMover = trashMover
         self.locations = locations ?? [
             (homeDirectory.appendingPathComponent("Library/Application Support"), "Application Support"),
             (homeDirectory.appendingPathComponent("Library/Caches"), "Caches"),
@@ -132,7 +136,7 @@ public final class OrphanedAppLeftoversService: @unchecked Sendable {
 
         var totalFreed: Int64 = 0
         var purgedCount = 0
-        var firstError: Error?
+        var failures: [(name: String, reason: String)] = []
 
         for item in items {
             let url = URL(fileURLWithPath: item.path)
@@ -142,12 +146,12 @@ public final class OrphanedAppLeftoversService: @unchecked Sendable {
 
             do {
                 if moveToTrash {
-                    try fileManager.trashItem(at: url, resultingItemURL: nil)
+                    try trashMover.move(url)
                 } else {
                     try fileManager.removeItem(at: url)
                 }
             } catch {
-                firstError = firstError ?? error
+                failures.append((name: url.lastPathComponent, reason: error.localizedDescription))
                 continue
             }
             totalFreed += item.byteSize
@@ -161,8 +165,23 @@ public final class OrphanedAppLeftoversService: @unchecked Sendable {
                 itemCount: purgedCount
             )
         }
-        if let firstError, purgedCount == 0 { throw firstError }
+        if let first = failures.first {
+            throw PurgeError.someFailed(moved: purgedCount, failed: failures.count, firstReason: first.reason)
+        }
         return totalFreed
+    }
+
+    /// Some items could not be removed. What did go is already gone and recorded.
+    public enum PurgeError: Error, LocalizedError, Equatable {
+        case someFailed(moved: Int, failed: Int, firstReason: String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .someFailed(let moved, let failed, let reason):
+                let done = moved > 0 ? "\(moved) moved. " : ""
+                return "\(done)\(failed) could not be moved. \(reason)"
+            }
+        }
     }
 
     // MARK: - Helpers
