@@ -76,7 +76,7 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Zenith uses Apple Events to see what Music, Spotify and your browser are playing and to control playback from the Dynamic Island.</string>
+    <string>Zenith uses Apple Events to see what Music, Spotify and your browser are playing, to control playback from the Dynamic Island, and to ask Finder to move to the Trash a leftover folder that macOS does not let other apps move.</string>
 </dict>
 </plist>
 EOF

@@ -126,8 +126,26 @@ public final class SystemCleanerService: ObservableObject {
         categories.reduce(0) { $0 + $1.totalSize }
     }
 
+    /// The selected items, without any that repeat or lie inside another selected item. Deleting the outer folder
+    /// already removes the inner one, so counting both inflated the size, and the "freed" figure, by the overlap (the
+    /// Chrome cache is in "Browser Caches" and again inside "Application Caches" as part of `Caches/Google`).
+    public var effectiveSelectedItems: [JunkItem] {
+        Self.withoutOverlaps(categories.flatMap { $0.items.filter(\.isSelected) })
+    }
+
+    nonisolated static func withoutOverlaps(_ items: [JunkItem]) -> [JunkItem] {
+        let paths = items.map { ($0.path as NSString).standardizingPath }
+        var seen = Set<String>()
+        var kept: [JunkItem] = []
+        for (item, path) in zip(items, paths) {
+            let isInsideAnother = paths.contains { other in other != path && path.hasPrefix(other + "/") }
+            if !isInsideAnother, seen.insert(path).inserted { kept.append(item) }
+        }
+        return kept
+    }
+
     public var selectedJunkSize: Int64 {
-        categories.reduce(0) { $0 + $1.selectedSize }
+        effectiveSelectedItems.reduce(0) { $0 + $1.size }
     }
 
     public var totalItemCount: Int {
@@ -135,7 +153,7 @@ public final class SystemCleanerService: ObservableObject {
     }
 
     public var selectedItemCount: Int {
-        categories.reduce(0) { $0 + $1.items.filter(\.isSelected).count }
+        effectiveSelectedItems.count
     }
 
     public var formattedTotalJunkSize: String {
@@ -156,13 +174,15 @@ public final class SystemCleanerService: ObservableObject {
     /// What a clean would permanently delete, category by category and with the largest items named, for
     /// confirmation dialogs.
     public var selectionSummary: String {
-        categories
-            .filter { $0.selectedSize > 0 }
-            .map { category in
-                let names = category.items.filter(\.isSelected).sorted { $0.size > $1.size }.map(\.name)
+        let effectiveIDs = Set(effectiveSelectedItems.map(\.id))
+        return categories
+            .compactMap { category -> String? in
+                let items = category.items.filter { effectiveIDs.contains($0.id) }.sorted { $0.size > $1.size }
+                guard !items.isEmpty else { return nil }
+                let names = items.map(\.name)
                 let shown = names.prefix(4).joined(separator: ", ")
                 let more = names.count > 4 ? " and \(names.count - 4) more" : ""
-                return "• \(category.title) — \(Self.formatBytes(category.selectedSize)): \(shown)\(more)"
+                return "• \(category.title) — \(Self.formatBytes(items.reduce(0) { $0 + $1.size })): \(shown)\(more)"
             }
             .joined(separator: "\n")
     }
@@ -387,6 +407,10 @@ public final class SystemCleanerService: ObservableObject {
                 basePath: mailDownloadsPath,
                 fileManager: fm
             ) {
+                // Attachments you opened and edited may exist nowhere else, so this is yours to tick.
+                var cat = cat
+                cat.isSelected = false
+                for index in cat.items.indices { cat.items[index].isSelected = false }
                 result.append(cat)
             }
 
@@ -674,9 +698,7 @@ public final class SystemCleanerService: ObservableObject {
         isCleaning = true
         statusMessage = "Cleaning selected items..."
 
-        let itemsToDelete = categories.flatMap { cat in
-            cat.items.filter(\.isSelected)
-        }
+        let itemsToDelete = effectiveSelectedItems
         let homeOverride = self.homeOverride
 
         let freed = await Task.detached(priority: .userInitiated) { () -> Int64 in

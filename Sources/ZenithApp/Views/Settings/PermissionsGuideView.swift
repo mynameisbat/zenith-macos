@@ -44,7 +44,7 @@ public struct PermissionsGuideView: View {
 
                     permissionRow(
                         title: "Automation (Optional)",
-                        description: "Lets Zenith control Music and Spotify and read the front tab of Safari and Chromium browsers for the Now Playing title. macOS asks the first time, once for each app. Without it the island still shows that a browser is playing, but not what.",
+                        description: "Lets Zenith control Music and Spotify and read the front tab of Safari and Chromium browsers for the Now Playing title. macOS asks the first time, once for each app. Without it the island still shows that a browser is playing, but not what. Cleaner → Leftovers also asks Finder to move folders that macOS protects (such as those in ~/Library/Containers) to the Trash.",
                         isGranted: nil,
                         actionTitle: "Open Automation Settings...",
                         action: { viewModel.openAutomationSettings() }

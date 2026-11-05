@@ -227,8 +227,37 @@ struct BuiltInShortcutTests {
         #expect(HotKeyDefinition.builtIn(for: HotKeyDefinition.clipboardToggleId) == HotKeyDefinition.defaultClipboard)
         #expect(HotKeyDefinition.builtIn(for: HotKeyDefinition.captureOCRId) == HotKeyDefinition.defaultOCR)
         #expect(HotKeyDefinition.builtIn(for: "nope") == nil)
-        #expect(HotKeyDefinition.defaultOCR.keyCode == 20)
+        #expect(HotKeyDefinition.defaultOCR.keyCode == 17)
+        #expect(HotKeyDefinition.defaultOCR.keyEquivalent == "⌃⌥T")
         // The settings dictionary keeps its three entries: older saved settings know only those.
         #expect(HotKeyDefinition.defaultDictionary.count == 3)
+    }
+}
+
+@Suite("macOS Screenshot Shortcut Clash Suite")
+struct ScreenshotShortcutClashTests {
+    @Test("HKC-10: No built-in Zenith shortcut is also one of macOS's screenshot shortcuts")
+    func testNoBuiltInClashesWithMacOS() {
+        let builtIns: [HotKeyDefinition] = Array(HotKeyDefinition.defaultDictionary.values) + [
+            HotKeyDefinition.defaultOCR,
+            HotKeyDefinition.alternativeClipboardOptionV,
+            HotKeyDefinition.alternativeAreaCaptureX
+        ]
+        for definition in builtIns {
+            #expect(!definition.clashesWithMacOSScreenshot, "\(definition.keyEquivalent) (\(definition.name)) is a macOS screenshot shortcut")
+        }
+    }
+
+    @Test("HKC-11: The clash check knows the system's shortcuts, and only those")
+    func testClashCheck() {
+        let cmdShift = CarbonModifierFlags.command.rawValue | CarbonModifierFlags.shift.rawValue
+        func definition(_ keyCode: UInt32, _ modifiers: UInt32) -> HotKeyDefinition {
+            HotKeyDefinition(id: "x", name: "X", keyCode: keyCode, carbonModifiers: modifiers, keyEquivalent: "?")
+        }
+        #expect(definition(20, cmdShift).clashesWithMacOSScreenshot)        // ⌘⇧3
+        #expect(definition(21, cmdShift).clashesWithMacOSScreenshot)        // ⌘⇧4
+        #expect(definition(23, cmdShift).clashesWithMacOSScreenshot)        // ⌘⇧5
+        #expect(!definition(19, cmdShift).clashesWithMacOSScreenshot)       // ⌘⇧2 is free
+        #expect(!definition(20, CarbonModifierFlags.control.rawValue).clashesWithMacOSScreenshot)
     }
 }

@@ -9,7 +9,7 @@
 **Zenith** is a premium, native macOS powerhouse utility and creative workspace built entirely with **Swift 6**, **SwiftUI**, and **AppKit**.
 
 Zenith lives in your Menu Bar as a lightweight accessory app (no Dock icon), bringing several small utilities together in one native binary:
-1. **Native Screen OCR & Barcode/QR Extractor (`⌘⇧3`)** using on-device Apple Vision, with the result copied to the clipboard.
+1. **Native Screen OCR & Barcode/QR Extractor (`⌃⌥T`)** using on-device Apple Vision, with the result copied to the clipboard.
 2. **MacBook Dynamic Island & Drop Shelf** with a Now Playing display and controls (Apple Music, Spotify and browser audio), a charging HUD, and file previews.
 3. **Clipboard Manager (`⌘⇧V`)** with fuzzy search and automatic exclusion of items that password managers mark as concealed.
 4. **Shottr-Grade Screen Capture & Annotation (`⌘⇧2`)** with a live 16x pixel Loupe magnifier.
@@ -76,11 +76,11 @@ open Zenith.app
 - **Direct Quick Action Tiles**:
   - **Capture Area** (`⌘⇧2`) with real-time Loupe magnifier.
   - **Capture Screen** (`⌘⇧1`).
-  - **Screen OCR & QR Reader** (`⌘⇧3`).
+  - **Screen OCR & QR Reader** (`⌃⌥T`).
   - **Open Preferences** (`⌘,`).
 - **Live System Telemetry**: CPU usage, memory pressure, the heaviest user processes (quit with `SIGTERM`, then `SIGKILL` if needed) and the Privacy Shield status.
 
-### 2. 🔍 Native Screen OCR & Barcode/QR Extractor (`⌘⇧3`)
+### 2. 🔍 Native Screen OCR & Barcode/QR Extractor (`⌃⌥T`)
 - **On-Device Vision**: Uses the Apple Vision framework (`VNRecognizeTextRequest`, `VNDetectBarcodesRequest`); nothing leaves your Mac.
 - **Clipboard & Toast Feedback**: Snip any region of your display and the recognised text, or the payload of a QR code or barcode, is copied to the clipboard and announced with a HUD.
 - **Languages**: Whatever Apple Vision supports for your system languages.
@@ -160,7 +160,7 @@ Nothing here deletes without asking: each action shows what will go (the largest
 | :--- | :--- | :--- |
 | **Global Hotkeys** | | *(Configurable in Settings → Global Hotkeys)* |
 | `⌘⇧2` | Global | Start Area Screen Capture &amp; Loupe Magnifier (Preset alt: `⌘⇧X`) |
-| `⌘⇧3` | Global | Screen OCR &amp; Barcode / QR Code Recognition |
+| `⌃⌥T` | Global | Screen OCR &amp; Barcode / QR Code Recognition (not `⌘⇧3`: macOS uses that for its own screenshot) |
 | `⌘⇧1` | Global | Capture Entire Active Display |
 | `⌘⇧V` | Global | Open Clipboard History Manager (Preset alt: `⌥V`) |
 | **Clipboard History Hub** | | *(Floating Panel &amp; Menu Bar)* |
