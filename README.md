@@ -16,6 +16,8 @@ Zenith lives in your Menu Bar as a lightweight accessory app (no Dock icon), bri
 5. **Disk cleaner, app uninstaller and process monitor (Mole-inspired)**, with a confirmation before anything is deleted.
 6. **Privacy Shield**: a local proxy that looks names up over DNS-over-HTTPS and splits the TLS handshake in two. It is not a VPN and does not hide your IP address.
 
+🗣 **Languages and accessibility:** English and Vietnamese (Zenith follows the language set in macOS). Controls have VoiceOver labels, and alerts on the island are read aloud.
+
 🌐 **Visit the official website:** [https://mynameisbat.github.io/zenith-macos/](https://mynameisbat.github.io/zenith-macos/)
 
 ---
@@ -25,7 +27,7 @@ Zenith lives in your Menu Bar as a lightweight accessory app (no Dock icon), bri
 ### Option 1: Download Pre-built DMG Installer (Recommended)
 Download the latest disk image from [GitHub Releases](https://github.com/mynameisbat/zenith-macos/releases):
 
-1. Download **`Zenith-2.2.0.dmg`** (or latest release).
+1. Download **`Zenith-2.3.0.dmg`** (or latest release).
 2. Double-click the DMG file to mount it.
 3. Drag **Zenith.app** into your **Applications** folder.
 4. Launch Zenith from Spotlight or Applications.
@@ -33,7 +35,7 @@ Download the latest disk image from [GitHub Releases](https://github.com/mynamei
 #### Terminal / CLI Installation
 ```bash
 # Mount DMG and copy to /Applications
-hdiutil attach Zenith-2.2.0.dmg
+hdiutil attach Zenith-2.3.0.dmg
 cp -R "/Volumes/Zenith/Zenith.app" /Applications/
 hdiutil detach "/Volumes/Zenith"
 
@@ -71,14 +73,16 @@ open Zenith.app
 ## ✨ Key Features & Architecture
 
 ### 1. 🎛 Menu Bar Command Hub
-- Opens from the Zenith icon in the menu bar (there is no global hotkey for it). A minimalist popover in Apple Sapphire Blue (`#0F62FE`).
-- **Search**: type to filter quick actions and the running apps you can quit, or type `/boost`.
-- **Direct Quick Action Tiles**:
-  - **Capture Area** (`⌘⇧2`) with real-time Loupe magnifier.
-  - **Capture Screen** (`⌘⇧1`).
-  - **Screen OCR & QR Reader** (`⌃⌥T`).
-  - **Open Preferences** (`⌘,`).
-- **Live System Telemetry**: CPU usage, memory pressure, the heaviest user processes (quit with `SIGTERM`, then `SIGKILL` if needed) and the Privacy Shield status.
+- Opens from the Zenith icon in the menu bar (there is no global hotkey for it). The whole app follows macOS: your accent color, Light and Dark mode, and the system's materials and controls.
+- **Search**: type to filter quick actions and the running apps you can quit; Return runs the first action, and `boost` runs Boost.
+- **Quick action tiles** (each shows the shortcut you set in Settings → Shortcuts):
+  - **Capture Area** (`⇧⌘2`) with real-time Loupe magnifier.
+  - **Capture Screen** (`⇧⌘1`).
+  - **Copy Text** (`⌃⌥T`): OCR, QR codes and barcodes.
+  - **Clipboard** (`⇧⌘V`).
+- **Running apps**: the heaviest user processes with their app icons, memory and CPU; quit one (after a confirmation) with its ✕ or `⌘1`–`⌘4` (`SIGTERM`, then `SIGKILL` if needed).
+- **Meters**: CPU, memory, free storage and battery, plus Bluetooth accessories' battery.
+- **Switches**: Privacy Shield on/off, Scan/Clean system junk (asks first) and Boost; **Settings…** and **Quit Zenith** at the bottom, as in a menu.
 
 ### 2. 🔍 Native Screen OCR & Barcode/QR Extractor (`⌃⌥T`)
 - **On-Device Vision**: Uses the Apple Vision framework (`VNRecognizeTextRequest`, `VNDetectBarcodesRequest`); nothing leaves your Mac.
@@ -88,11 +92,13 @@ open Zenith.app
 
 ### 3. 📋 Smart Clipboard Manager (`⌘⇧V` or `⌥V`)
 - **Global Hotkey (`⌘⇧V` or `⌥V`)**: Instantly opens clipboard history directly at cursor or center screen with zero Accessibility permissions required.
+- **Two panes**: the history on the left, grouped by day (Today, Yesterday, Earlier), and a preview of the selected item on the right: the full text with its character, word and line counts, an image at full size, a color swatch for a hex code (`#0F62FE`), or a link with an Open button.
+- **Filters**: All, Text, Links, Images and Pinned, together with search.
 - **Fast search**: in-memory search over the history with Unicode-aware fuzzy matching.
-- **Bounded memory**: an item over 25 MB is not kept, and the history as a whole is capped at 256 MB.
+- **Bounded memory**: an item over 25 MB is not kept, and the history as a whole is capped at 256 MB. The preview draws at most the first 20,000 characters.
 - **Sensitive Data Exclusion**: ignores pasteboard items marked as concealed or transient (the `org.nspasteboard` markers) and items from 1Password, Bitwarden and KeePassXC.
 - **Item Pinning (`⌘P`)**: Pinned items are permanently preserved from FIFO eviction.
-- **Keyboard-Driven Workflow**: `⌘1`–`⌘9` instant paste, `⌘⌫` delete, `Ctrl+N` / `Ctrl+P` Emacs navigation.
+- **Keyboard-Driven Workflow**: a click selects, a double-click or Return pastes; `⌘1`–`⌘9` instant paste, `⌘⌫` delete, `Ctrl+N` / `Ctrl+P` Emacs navigation. Right-click an item for Paste, Pin and Delete.
 
 ### 4. 📸 Precision Screen Capture & Annotation Editor (`⌘⇧2`)
 - **Interactive 16x Loupe Magnifier**: Real-time pixel magnifier with center crosshairs and formatted RGB/HEX color sampling.
@@ -118,7 +124,10 @@ open Zenith.app
   - **Expanded Player**: Hover over the island to reveal track metadata, a progress bar, and media controls (Play/Pause, Skip, Previous).
   - **Browser audio**: Chrome-family browsers (Chrome, Edge, Brave, Arc, Vivaldi, Opera) and Safari are detected from the audio they hold open, because macOS 15.4+ no longer gives other apps Now Playing data. For known media sites (YouTube, X, SoundCloud, Twitch and a few more) the tab title is shown; for any other site only the browser name is. Firefox is not checked for its tab title.
   - **Controls**: Music and Spotify are controlled over AppleScript; a browser is controlled with the hardware media key, which needs the Accessibility permission (the island says so when macOS refuses it).
-  - **Tab Switcher**: Switch between `[🎵 Now Playing]` and `[📦 Shelf]` when parked items coexist; on a notched display the two tabs sit either side of the notch.
+  - **Tab Switcher**: Switch between Now Playing, Widgets and the Shelf when more than one is there; on a notched display the tabs sit either side of the notch (icons only when there are three).
+- **Widgets** (Settings → Dynamic Island):
+  - **Focus timer**: a Pomodoro-style timer (25-minute focus, 5-minute break by default, both adjustable). While it runs, a progress ring and the time left sit either side of the notch; pause, resume or stop it from the island or from Settings. When it ends the island says so (with a sound if sound effects are on) and offers the break, or the next focus session.
+  - **Next calendar event**: your next timed event in the next 12 hours (or the one going on now) with how long until it starts, in its calendar's color. Off until you turn it on; macOS then asks for Calendar access. Events are read on your Mac only, through EventKit.
 - **MagSafe & USB-C Charging HUD**:
   - Driven by an IOKit run-loop notification (`IOPSNotificationCreateRunLoopSource`), not polling.
   - A green rim-light capsule shows the battery charge and the charger wattage (e.g. `Charging • 85% (67W Charger)`).
@@ -210,6 +219,9 @@ Zenith is designed with privacy-first principles and minimal permission requirem
 
 3. **Automation (Apple Events)** — **Optional**:
    - Lets Zenith control Music and Spotify and read the front tab of Safari and Chromium browsers for the Now Playing title. macOS asks the first time, once per app.
+
+4. **Calendars** — **Optional**:
+   - Only for the island's "Next calendar event" widget. macOS asks when you turn the widget on in Settings → Dynamic Island, never before. Without it the widget shows how to allow it. (A build run with `swift run` has no Info.plist, so it cannot ask; use the bundled `Zenith.app`.)
 
 ---
 

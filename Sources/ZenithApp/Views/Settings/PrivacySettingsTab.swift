@@ -14,6 +14,11 @@ public final class PrivacyTabViewModel: ObservableObject {
         case custom = "Custom DoH"
 
         public var id: String { rawValue }
+
+        /// The name shown in the menu.
+        public var title: String {
+            self == .custom ? String(localized: "Custom DoH") : rawValue
+        }
     }
 
     @Published public var selectedProviderType: ProviderType = .cloudflare
@@ -51,8 +56,8 @@ public struct PrivacySettingsTab: View {
                 // 5. Diagnostic Self-Test Card
                 diagnosticCard
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
         }
         .onAppear {
             syncFromCurrentProvider()
@@ -78,7 +83,7 @@ public struct PrivacySettingsTab: View {
                 HStack(spacing: 6) {
                     Text("Privacy Shield")
                         .font(.system(size: 13, weight: .semibold))
-                    Text(controller.isRunning ? "ACTIVE" : "OFF")
+                    Text(controller.isRunning ? "On" : "Off")
                         .font(.system(size: 9.5, weight: .bold, design: .monospaced))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
@@ -109,14 +114,12 @@ public struct PrivacySettingsTab: View {
 
     private var telemetryCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("REAL-TIME TELEMETRY")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.secondary)
+            ZenithSettingsHeader("Activity")
 
             VStack(spacing: 8) {
                 telemetryRow(
                     label: "DPI Bypassed Requests",
-                    value: "\(stats.totalRequestsProtected) requests (\(stats.formattedShieldedBytes))",
+                    value: String(localized: "\(stats.totalRequestsProtected) requests (\(stats.formattedShieldedBytes))"),
                     icon: "lock.shield"
                 )
                 Rectangle()
@@ -125,7 +128,7 @@ public struct PrivacySettingsTab: View {
 
                 telemetryRow(
                     label: "DoH Resolver Latency",
-                    value: stats.dohLatencyMs > 0 ? "\(stats.dohLatencyMs) ms" : "Untested",
+                    value: stats.dohLatencyMs > 0 ? String(localized: "\(stats.dohLatencyMs) ms") : String(localized: "Untested"),
                     icon: "network"
                 )
                 Rectangle()
@@ -134,7 +137,7 @@ public struct PrivacySettingsTab: View {
 
                 telemetryRow(
                     label: "Last Protected Domain",
-                    value: stats.lastProtectedDomain ?? "None yet",
+                    value: stats.lastProtectedDomain ?? String(localized: "None yet"),
                     icon: "globe"
                 )
             }
@@ -142,7 +145,7 @@ public struct PrivacySettingsTab: View {
         }
     }
 
-    private func telemetryRow(label: String, value: String, icon: String) -> some View {
+    private func telemetryRow(label: LocalizedStringKey, value: String, icon: String) -> some View {
         HStack {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .medium))
@@ -152,7 +155,7 @@ public struct PrivacySettingsTab: View {
                 .font(.system(size: 12))
                 .foregroundColor(.primary)
             Spacer()
-            Text(value)
+            Text(verbatim: value)
                 .font(.system(size: 11.5, weight: .medium, design: .monospaced))
                 .monospacedDigit()
                 .foregroundColor(.secondary)
@@ -162,9 +165,7 @@ public struct PrivacySettingsTab: View {
     private var liveInspectorCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("LIVE TRAFFIC INSPECTOR")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.secondary)
+                ZenithSettingsHeader("Recent Connections")
 
                 if !stats.recentRequests.isEmpty {
                     Text("\(stats.recentRequests.count)")
@@ -264,7 +265,7 @@ public struct PrivacySettingsTab: View {
                         .font(.system(size: 11.5, weight: .medium, design: .monospaced))
                         .foregroundColor(.primary)
                         .lineLimit(1)
-                    Text(":\(req.port)")
+                    Text(verbatim: ":\(req.port)")
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundColor(.secondary)
                 }
@@ -304,7 +305,7 @@ public struct PrivacySettingsTab: View {
                     Color.accentColor.opacity(0.12),
                     Color.accentColor,
                     Color.accentColor.opacity(0.25),
-                    req.chunkSize > 0 ? "SHIELDED (\(req.chunkSize)B)" : "SHIELDED"
+                    req.chunkSize > 0 ? String(localized: "SHIELDED (\(req.chunkSize)B)") : String(localized: "SHIELDED")
                 )
             case .plain:
                 return (
@@ -318,7 +319,7 @@ public struct PrivacySettingsTab: View {
                     Color.red.opacity(0.12),
                     Color.red,
                     Color.red.opacity(0.25),
-                    "FAILED"
+                    String(localized: "FAILED")
                 )
             }
         }()
@@ -340,9 +341,7 @@ public struct PrivacySettingsTab: View {
 
     private var configurationCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("DOH RESOLVER CONFIGURATION")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.secondary)
+            ZenithSettingsHeader("DNS-over-HTTPS Server")
 
             VStack(alignment: .leading, spacing: 10) {
                 Picker("Resolver Provider", selection: Binding(
@@ -353,7 +352,7 @@ public struct PrivacySettingsTab: View {
                     }
                 )) {
                     ForEach(ProviderType.allCases) { type in
-                        Text(type.rawValue).tag(type)
+                        Text(verbatim: type.title).tag(type)
                     }
                 }
                 .pickerStyle(.menu)
@@ -431,7 +430,7 @@ public struct PrivacySettingsTab: View {
                                 .foregroundColor(.secondary)
 
                             if controller.isRunning {
-                                Text("\(stats.port)")
+                                Text(verbatim: "\(stats.port)")
                                     .font(.system(size: 11.5, weight: .medium, design: .monospaced))
                                     .monospacedDigit()
                                     .foregroundColor(.secondary)
@@ -476,9 +475,7 @@ public struct PrivacySettingsTab: View {
 
     private var diagnosticCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("DIAGNOSTIC VERIFICATION")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.secondary)
+            ZenithSettingsHeader("Check That It Works")
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack {

@@ -33,7 +33,12 @@ public final class IslandAppActionCoordinator {
             let name = plan.app.displayName
             let leftoverCount = plan.leftovers.count
             let size = SystemCleanerService.formatBytes(plan.totalReclaimableBytes)
-            let related = leftoverCount == 0 ? "no related files" : "\(leftoverCount) related \(leftoverCount == 1 ? "item" : "items")"
+            let related: String
+            switch leftoverCount {
+            case 0: related = String(localized: "no related files")
+            case 1: related = String(localized: "1 related item")
+            default: related = String(localized: "\(leftoverCount) related items")
+            }
             guard DestructiveConfirmation.confirm(
                 title: "Uninstall \(name)?",
                 message: "\(name) and \(related) (\(size) in total) will be moved to the Trash. You can restore them from there.",
@@ -49,7 +54,7 @@ public final class IslandAppActionCoordinator {
                 ToastHUDController.shared.show(
                     message: "Uninstalled \(name)",
                     icon: "trash.fill",
-                    subtitle: "Freed \(SystemCleanerService.formatBytes(freed)) · in the Trash"
+                    subtitle: String(localized: "Freed \(SystemCleanerService.formatBytes(freed)) · in the Trash")
                 )
                 onFinished()
             case .failure(let error):
@@ -78,9 +83,7 @@ public final class IslandAppActionCoordinator {
             let name = plan.appName
             guard DestructiveConfirmation.confirm(
                 title: "Remove Intel code from \(name)?",
-                message: "This saves about \(SystemCleanerService.formatBytes(plan.reclaimableIntelBytes)) but changes the app: "
-                    + "it is re-signed on this Mac, so its developer signature is lost and automatic updates may stop working. "
-                    + "The original app is moved to the Trash, and nothing is changed if anything goes wrong. Quit \(name) first.",
+                message: "This saves about \(SystemCleanerService.formatBytes(plan.reclaimableIntelBytes)) but changes the app: it is re-signed on this Mac, so its developer signature is lost and automatic updates may stop working. The original app is moved to the Trash, and nothing is changed if anything goes wrong. Quit \(name) first.",
                 destructiveTitle: "Slim App"
             ) else { return }
 
@@ -93,7 +96,7 @@ public final class IslandAppActionCoordinator {
                 ToastHUDController.shared.show(
                     message: "Slimmed \(name)",
                     icon: "scissors",
-                    subtitle: "Saved \(SystemCleanerService.formatBytes(saved)) · original in the Trash"
+                    subtitle: String(localized: "Saved \(SystemCleanerService.formatBytes(saved)) · original in the Trash")
                 )
             case .failure(let error):
                 ToastHUDController.shared.show(message: "Slimming error", icon: "exclamationmark.triangle", subtitle: error.localizedDescription)

@@ -2,19 +2,23 @@ import SwiftUI
 import AppKit
 import ZenithCore
 
-/// Native macOS Command Hub Menu Bar Popover for Zenith.
-/// Follows Apple Human Interface Guidelines: top search field, quick action rows with shortcut badges,
-/// recent clipboard history with fuzzy search filtering, and subtle system status indicators at the footer.
+/// The Command Hub: the popover under Zenith's menu bar icon.
+///
+/// Laid out like a macOS menu bar extra: a search field, four quick actions as Control Center-style tiles, the
+/// running apps that use the most CPU (each can be quit, after a confirmation), system meters, a few switches, and
+/// "Settings…" / "Quit Zenith" at the bottom the way a menu ends.
 public struct ZenithCommandHubView: View {
     @ObservedObject public var hubState: ZenithCommandHubState = .shared
     @ObservedObject public var privacyController: PrivacyShieldController = .shared
     @ObservedObject public var cleaner: SystemCleanerService = .shared
     @ObservedObject public var historyTracker: SystemCleaningHistoryTracker = .shared
+    @ObservedObject private var settings: SettingsStore = .shared
 
     @FocusState private var isSearchFocused: Bool
 
     public var onAreaCapture: () -> Void
     public var onFullscreenCapture: () -> Void
+    public var onScreenOCR: () -> Void
     public var onOpenClipboard: () -> Void
     public var onOpenPreferences: () -> Void
     public var onQuit: () -> Void
@@ -23,6 +27,7 @@ public struct ZenithCommandHubView: View {
     public init(
         onAreaCapture: @escaping () -> Void = {},
         onFullscreenCapture: @escaping () -> Void = {},
+        onScreenOCR: @escaping () -> Void = {},
         onOpenClipboard: @escaping () -> Void = {},
         onOpenPreferences: @escaping () -> Void = {},
         onQuit: @escaping () -> Void = {},
@@ -30,34 +35,50 @@ public struct ZenithCommandHubView: View {
     ) {
         self.onAreaCapture = onAreaCapture
         self.onFullscreenCapture = onFullscreenCapture
+        self.onScreenOCR = onScreenOCR
         self.onOpenClipboard = onOpenClipboard
         self.onOpenPreferences = onOpenPreferences
         self.onQuit = onQuit
         self.onClose = onClose
     }
 
-    public var body: some View {
-        VStack(spacing: 8) {
-            // 1. TOP SEARCH BAR
-            searchBar
+    private static let width: CGFloat = 340
 
-            // 2. QUICK ACTIONS LIST (when query is empty or matches actions)
+    public var body: some View {
+        VStack(spacing: 0) {
+            searchBar
+                .padding(.horizontal, 12)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
+
             if !matchingActions.isEmpty {
-                quickActionsList
-                hairlineDivider
+                actionGrid
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 10)
             }
 
-            // 3. TOP HOGS MONITOR (replaces Recent Clips)
-            topHogsSection
+            sectionDivider
 
-            hairlineDivider
+            runningAppsSection
+                .padding(.horizontal, 6)
+                .padding(.vertical, 8)
 
-            // 4. SUBTLE STATUS & CONTROL FOOTER
-            footerRow
+            sectionDivider
+
+            VStack(spacing: 12) {
+                metersRow
+                controlsRow
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+
+            sectionDivider
+
+            appRow
+                .padding(.horizontal, 6)
+                .padding(.vertical, 5)
         }
-        .padding(10)
-        .frame(width: 320)
-        .background(.ultraThinMaterial)
+        .frame(width: Self.width)
         .onExitCommand {
             onClose()
         }
@@ -70,21 +91,30 @@ public struct ZenithCommandHubView: View {
         }
     }
 
-    // MARK: - 1. Top Search Bar
+    private var sectionDivider: some View {
+        Divider().padding(.horizontal, 12)
+    }
+
+    private var trimmedQuery: String {
+        hubState.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: - Search
 
     private var searchBar: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.secondary)
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
 
-            TextField("Search actions or running apps (or /boost)...", text: $hubState.searchText)
+            TextField("Search actions and apps", text: $hubState.searchText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12.5))
+                .font(.system(size: 13))
                 .focused($isSearchFocused)
                 .onSubmit {
                     handleSubmit()
                 }
+                .help("Type to filter actions and running apps. Return runs the first action; \"boost\" runs Boost.")
 
             if !hubState.searchText.isEmpty {
                 Button {
@@ -92,20 +122,21 @@ public struct ZenithCommandHubView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 9)
+        .frame(height: 30)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(0.045))
+                .fill(Color.primary.opacity(0.06))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                .strokeBorder(isSearchFocused ? ZenithTheme.accent.opacity(0.55) : Color.clear, lineWidth: 1)
         )
     }
 
@@ -117,102 +148,121 @@ public struct ZenithCommandHubView: View {
     /// Asks before quitting, then says what happened.
     private func quit(_ hog: ProcessTelemetry) {
         let quitIt = hubState.terminate(hog) { title, message, action in
-            DestructiveConfirmation.confirm(title: title, message: message, destructiveTitle: action)
+            DestructiveConfirmation.confirm(verbatimTitle: title, message: message, destructiveTitle: action)
         }
         if quitIt {
             ToastHUDController.shared.show(message: "Asked \(hog.name) to quit", icon: "xmark.circle.fill")
         }
     }
 
+    private func runBoost() {
+        hubState.boostSystem()
+        ToastHUDController.shared.show(message: "Boost: memory purged, DNS cache flushed", icon: "bolt.fill")
+    }
+
     private func handleSubmit() {
-        let query = hubState.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.lowercased() == "/boost" || query.lowercased() == "boost" {
-            hubState.boostSystem()
-            ToastHUDController.shared.show(message: "Zenith Boost: Memory Purged & DNS Flushed", icon: "sparkles")
+        let query = trimmedQuery.lowercased()
+        if query == "/boost" || query == "boost" {
+            runBoost()
             hubState.searchText = ""
             return
         }
-
-        if query.isEmpty {
-            if let firstAction = matchingActions.first {
-                executeAction(firstAction)
-            }
-            return
-        }
-
-        // When query is non-empty:
-        if let firstAction = matchingActions.first, matchingActions.count < ZenithHubAction.allCases.count {
-            executeAction(firstAction)
-        } else if let firstAction = matchingActions.first {
+        if let firstAction = matchingActions.first {
             executeAction(firstAction)
         }
     }
 
-    // MARK: - 2. Quick Actions List
+    // MARK: - Quick Actions
 
     private var matchingActions: [ZenithHubAction] {
-        let query = hubState.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = trimmedQuery
         if query.isEmpty {
             return ZenithHubAction.allCases
         }
         return ZenithHubAction.allCases.filter { $0.matches(query: query) }
     }
 
-    private var quickActionsList: some View {
-        VStack(spacing: 2) {
-            ForEach(matchingActions, id: \.self) { action in
-                quickActionRow(action: action)
+    private var actionGrid: some View {
+        let actions = matchingActions
+        let rowStarts = Array(stride(from: 0, to: actions.count, by: 2))
+        return VStack(spacing: 6) {
+            ForEach(rowStarts, id: \.self) { start in
+                HStack(spacing: 6) {
+                    actionTile(actions[start], isReturnTarget: !trimmedQuery.isEmpty && start == 0)
+                    if start + 1 < actions.count {
+                        actionTile(actions[start + 1], isReturnTarget: false)
+                    } else {
+                        Color.clear.frame(maxWidth: .infinity).frame(height: 1)
+                    }
+                }
             }
         }
     }
 
-    private func quickActionRow(action: ZenithHubAction) -> some View {
-        Button {
+    private func tint(for action: ZenithHubAction) -> Color {
+        switch action {
+        case .area: return ZenithTint.capture
+        case .screen: return ZenithTint.screen
+        case .ocr: return ZenithTint.ocr
+        case .clipboard: return ZenithTint.clipboard
+        }
+    }
+
+    /// The shortcut the action really has (the user may have changed it in Settings), written like a menu.
+    private func shortcutText(for action: ZenithHubAction) -> String {
+        settings.effectiveHotkey(for: action.hotKeyId)?.menuStyleKeyEquivalent
+            ?? HotKeyDefinition.menuStyle(action.shortcut)
+    }
+
+    private func actionTile(_ action: ZenithHubAction, isReturnTarget: Bool) -> some View {
+        let isHovered = hubState.hoveredActionId == action.rawValue
+        return Button {
             executeAction(action)
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: action.icon)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundColor(.primary)
-                    .frame(width: 18, alignment: .center)
+                ZenithIconTile(systemName: action.icon, tint: tint(for: action), size: 26)
 
-                Text(action.title)
-                    .font(.system(size: 12.5, weight: .regular))
-                    .foregroundColor(.primary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(action.title)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(shortcutText(for: action))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
-                Spacer()
-
-                Text(action.shortcut)
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Color.primary.opacity(0.06))
-                    )
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.primary.opacity(hubState.hoveredActionId == action.rawValue ? 0.06 : 0.0))
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isHovered ? ZenithTheme.surfaceActive : ZenithTheme.groupedFill)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(
+                        isReturnTarget ? ZenithTheme.accent : ZenithTheme.groupedStroke,
+                        lineWidth: isReturnTarget ? 1.5 : ZenithTheme.hairline
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
-        .keyboardShortcut(
-            action == .area ? "2" : "1",
-            modifiers: [.command, .shift]
-        )
-        .onHover { isHovered in
-            if isHovered {
+        .help("\(action.detail) (\(shortcutText(for: action)))")
+        .accessibilityLabel(action.title)
+        .accessibilityHint(action.detail)
+        .onHover { hovering in
+            if hovering {
                 hubState.setHoveredAction(action.rawValue)
             } else {
                 hubState.clearHoveredAction(ifCurrent: action.rawValue)
             }
         }
-        .animation(.easeInOut(duration: 0.12), value: hubState.hoveredActionId == action.rawValue)
+        .animation(.easeOut(duration: 0.1), value: isHovered)
     }
 
     private func executeAction(_ action: ZenithHubAction) {
@@ -222,156 +272,119 @@ public struct ZenithCommandHubView: View {
             onAreaCapture()
         case .screen:
             onFullscreenCapture()
+        case .ocr:
+            onScreenOCR()
+        case .clipboard:
+            onOpenClipboard()
         }
     }
 
-    // MARK: - 3. Top Hogs Monitor Section (Replaces Recent Clips)
+    // MARK: - Running Apps
 
-    private var topHogsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            let hogs = hubState.filteredTopHogs
-            HStack {
-                HStack(spacing: 4) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 10.5))
-                        .foregroundColor(hubState.hardwareSnapshot.cpu.totalUsagePercent > 60 ? .red : .orange)
-
-                    Text(hubState.searchText.isEmpty ? "RUNNING APPS" : "MATCHING APPS (\(hogs.count))")
-                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
-                        .foregroundColor(Color.secondary.opacity(0.75))
-                }
-
-                Spacer()
-
-                Text("\(hubState.hardwareSnapshot.cpu.coreCount) Cores • \(Int(round(hubState.hardwareSnapshot.cpu.totalUsagePercent)))% CPU")
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundColor(.secondary)
+    private var runningAppsSection: some View {
+        let hogs = hubState.filteredTopHogs
+        let cpu = hubState.hardwareSnapshot.cpu
+        return VStack(alignment: .leading, spacing: 4) {
+            ZenithSectionHeader(trimmedQuery.isEmpty ? "Running Apps" : "Matching Apps") {
+                Text("\(Int(round(cpu.totalUsagePercent)))% CPU · \(cpu.coreCount) cores")
             }
-            .padding(.horizontal, 4)
-            .padding(.top, 1)
+            .padding(.bottom, 2)
 
             if hogs.isEmpty {
-                HStack {
-                    Spacer()
-                    Text(hubState.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Zero heavy user applications running" : "No matching applications found")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 12)
-                    Spacer()
-                }
+                Text(trimmedQuery.isEmpty ? "No app is using much CPU right now" : "No running app matches \u{201C}\(trimmedQuery)\u{201D}")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
             } else {
-                VStack(spacing: 3) {
+                VStack(spacing: 1) {
                     ForEach(Array(hogs.enumerated()), id: \.element.pid) { index, hog in
                         hogRow(index: index, hog: hog)
                     }
                 }
             }
 
-            // Defunct / Zombie Processes Banner
-            if !hubState.hardwareSnapshot.cpu.zombieProcesses.isEmpty {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.yellow)
-                        .font(.system(size: 10))
-                    Text("\(hubState.hardwareSnapshot.cpu.zombieProcesses.count) Defunct Zombie(s)")
-                        .font(.system(size: 9.5, weight: .medium))
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Button("Purge") {
-                        _ = try? SystemOptimizerService.shared.execute(taskId: .zombieProcessCleanup)
-                        hubState.refreshHardwareSnapshot()
-                        ToastHUDController.shared.show(message: "Zombies Purged", icon: "bolt.fill")
-                    }
-                    .font(.system(size: 9, weight: .bold))
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.mini)
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.yellow.opacity(0.1))
-                )
+            if !cpu.zombieProcesses.isEmpty {
+                zombieBanner(count: cpu.zombieProcesses.count)
+                    .padding(.horizontal, 2)
+                    .padding(.top, 4)
             }
         }
     }
 
+    private func zombieBanner(count: Int) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(.yellow)
+            Text(count == 1 ? "1 defunct process" : "\(count) defunct processes")
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Clean Up") {
+                _ = try? SystemOptimizerService.shared.execute(taskId: .zombieProcessCleanup)
+                hubState.refreshHardwareSnapshot()
+                ToastHUDController.shared.show(message: "Defunct processes cleaned up", icon: "bolt.fill")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.yellow.opacity(0.12))
+        )
+    }
+
+    private func cpuColor(_ percent: Double) -> Color {
+        if percent > 50 { return ZenithTheme.danger }
+        if percent > 20 { return ZenithTheme.warning }
+        return .secondary
+    }
+
     private func hogRow(index: Int, hog: ProcessTelemetry) -> some View {
         let isHovered = hubState.hoveredProcessId == hog.pid
-        return HStack(spacing: 8) {
-            // Process Icon
-            ZStack {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(Color.primary.opacity(0.04))
-                Image(systemName: iconForProcess(hog.name))
-                    .font(.system(size: 11))
-                    .foregroundColor(hog.cpuPercent > 30 ? .red : .secondary)
-            }
-            .frame(width: 26, height: 26)
+        let shortcutHint = index < 4 ? " (⌘\(index + 1))" : ""
+        return HStack(spacing: 9) {
+            ProcessIconView(process: hog)
 
-            // Name, PID & Memory
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text(hog.name)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-
-                    Text("(\(hog.pid))")
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundColor(.secondary.opacity(0.75))
-                }
-
+            VStack(alignment: .leading, spacing: 0) {
+                Text(hog.name)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 Text(HardwareTelemetryService.formatBytes(hog.memoryBytes))
-                    .font(.system(size: 9.5, design: .monospaced))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
             }
 
-            Spacer(minLength: 4)
+            Spacer(minLength: 6)
 
-            // CPU percentage badge
-            Text("\(String(format: "%.1f", hog.cpuPercent))%")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundColor(hog.cpuPercent > 50 ? .red : (hog.cpuPercent > 20 ? .orange : .primary))
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .background(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(Color.primary.opacity(0.05))
-                )
+            Text(String(format: "%.1f%%", hog.cpuPercent))
+                .font(.system(size: 12, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(cpuColor(hog.cpuPercent))
 
-            // Shortcut badge (⌘1..⌘4)
-            if index < 4 {
-                Text("⌘\(index + 1)")
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                    .foregroundColor(Color.secondary.opacity(0.55))
-                    .padding(.horizontal, 3.5)
-                    .padding(.vertical, 1.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
-                            .fill(Color.primary.opacity(0.04))
-                    )
-            }
-
-            // Termination Button
             Button {
                 quit(hog)
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 13))
-                    .foregroundColor(.red.opacity(isHovered ? 1.0 : 0.75))
+                    .font(.system(size: 14))
+                    .foregroundStyle(isHovered ? AnyShapeStyle(ZenithTheme.danger) : AnyShapeStyle(.tertiary))
             }
             .buttonStyle(.plain)
-            .help("Quit \(hog.name) (PID \(hog.pid)); asks first")
+            .help("Quit \(hog.name)\(shortcutHint); asks first")
             .accessibilityLabel("Quit \(hog.name)")
         }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(isHovered ? 0.05 : 0.02))
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .zenithRowBackground(isHovered: isHovered)
+        .help(Text(verbatim: "\(hog.name), PID \(hog.pid)"))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text("\(hog.name), \(Int(round(hog.cpuPercent))) percent CPU, \(HardwareTelemetryService.formatBytes(hog.memoryBytes))"))
         .onHover { hovered in
             if hovered {
                 hubState.setHoveredProcess(hog.pid)
@@ -379,313 +392,324 @@ public struct ZenithCommandHubView: View {
                 hubState.clearHoveredProcess(ifCurrent: hog.pid)
             }
         }
-        .animation(.easeInOut(duration: 0.12), value: isHovered)
     }
 
-    private func iconForProcess(_ name: String) -> String {
+    // MARK: - Meters
+
+    private var metersRow: some View {
+        let snapshot = hubState.hardwareSnapshot
+        let cpuPercent = snapshot.cpu.totalUsagePercent
+        let memory = snapshot.memory
+        let disk = snapshot.disk
+        let battery = snapshot.battery
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 14) {
+                HubMeterView(
+                    title: "CPU",
+                    value: "\(Int(round(cpuPercent)))%",
+                    fraction: cpuPercent / 100,
+                    tint: cpuPercent > 75 ? ZenithTheme.danger : (cpuPercent > 40 ? ZenithTheme.warning : ZenithTheme.accent)
+                )
+                .help(String(format: "CPU: %.1f%% across %d cores", cpuPercent, snapshot.cpu.coreCount))
+
+                HubMeterView(
+                    title: "Memory",
+                    value: "\(Int(round(memory.usedPercent)))%",
+                    fraction: memory.usedPercent / 100,
+                    tint: memory.pressureLevel == .critical ? ZenithTheme.danger : (memory.pressureLevel == .warning ? ZenithTheme.warning : ZenithTheme.accent)
+                )
+                .help("Memory: \(HardwareTelemetryService.formatBytes(memory.usedBytes)) used of \(HardwareTelemetryService.formatBytes(memory.totalBytes)), \(memory.pressureLevel.rawValue) pressure")
+
+                HubMeterView(
+                    title: "Storage",
+                    value: String(localized: "\(HardwareTelemetryService.formatBytes(disk.freeBytes)) free"),
+                    fraction: disk.usedPercent / 100,
+                    tint: disk.usedPercent > 90 ? ZenithTheme.danger : ZenithTheme.accent
+                )
+                .help("\(disk.volumeName): \(HardwareTelemetryService.formatBytes(disk.freeBytes)) free of \(HardwareTelemetryService.formatBytes(disk.totalBytes))")
+
+                if battery.hasBattery {
+                    HubMeterView(
+                        title: battery.isCharging ? "Charging" : "Battery",
+                        value: "\(battery.percentage)%",
+                        fraction: Double(battery.percentage) / 100,
+                        tint: battery.isCharging ? ZenithTheme.success : (battery.percentage <= 20 ? ZenithTheme.danger : ZenithTheme.success)
+                    )
+                    .help("Battery \(battery.percentage)%, maximum capacity \(battery.healthPercent ?? 100)%, \(battery.cycleCount ?? 0) cycles, condition \(battery.condition)")
+                }
+            }
+
+            if !snapshot.bluetoothDevices.isEmpty {
+                HStack(spacing: 10) {
+                    ForEach(snapshot.bluetoothDevices) { device in
+                        HStack(spacing: 4) {
+                            Image(systemName: device.icon)
+                                .font(.system(size: 11))
+                            Text("\(device.batteryPercent)%")
+                                .font(.system(size: 11))
+                                .monospacedDigit()
+                        }
+                        .foregroundStyle(.secondary)
+                        .help("\(device.name): \(device.batteryPercent)%")
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(device.name), battery \(device.batteryPercent) percent")
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
+    // MARK: - Controls
+
+    private var cleanTitle: String {
+        if cleaner.isCleaning { return String(localized: "Cleaning…") }
+        if cleaner.isScanning { return String(localized: "Scanning…") }
+        if cleaner.selectedJunkSize > 0 { return String(localized: "Clean \(cleaner.formattedSelectedJunkSize)") }
+        return hasNotScannedJunk ? String(localized: "Scan") : String(localized: "Clean")
+    }
+
+    private var cleanHelp: String {
+        if hasNotScannedJunk && cleaner.selectedJunkSize == 0 {
+            return String(localized: "Scan for system junk; you confirm what to delete before anything goes")
+        }
+        if cleaner.selectedJunkSize > 0 {
+            return String(localized: "Clean \(cleaner.formattedSelectedJunkSize) of system junk (asks first)")
+        }
+        return historyTracker.totalSessions > 0 ? historyTracker.summaryHeadline : String(localized: "No system junk found")
+    }
+
+    private func runCleaner() {
+        Task {
+            // Nothing has been scanned yet: look first, so there is something to confirm.
+            if cleaner.categories.isEmpty && !cleaner.isScanning {
+                await cleaner.scan()
+            }
+            guard cleaner.selectedJunkSize > 0 else {
+                ToastHUDController.shared.show(message: "No system junk found", icon: "checkmark.circle.fill")
+                return
+            }
+            guard DestructiveConfirmation.confirm(
+                    title: "Delete \(cleaner.formatSelectedSize) permanently?",
+                    message: "These cannot be restored:\n\(cleaner.selectionSummary)",
+                    destructiveTitle: "Delete Permanently"
+                  ) else { return }
+
+            let freed = await cleaner.cleanSelected()
+            if freed > 0 {
+                ToastHUDController.shared.show(
+                    message: "Freed \(SystemCleanerService.formatBytes(freed))",
+                    icon: "sparkles"
+                )
+            }
+        }
+    }
+
+    private var shieldBinding: Binding<Bool> {
+        Binding(
+            get: { privacyController.isRunning },
+            set: { wantsOn in
+                if wantsOn != privacyController.isRunning {
+                    privacyController.toggle()
+                }
+            }
+        )
+    }
+
+    private var controlsRow: some View {
+        HStack(spacing: 8) {
+            Toggle(isOn: shieldBinding) {
+                HStack(spacing: 6) {
+                    ZenithIconTile(systemName: "lock.shield.fill", tint: ZenithTint.privacy, size: 20)
+                    Text("Privacy Shield")
+                        .font(.system(size: 12.5))
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .disabled(privacyController.isTransitioning)
+            .help(privacyController.isRunning
+                    ? "On: sites are looked up over encrypted DNS through a local proxy"
+                    : "Off. Turn on to look sites up over encrypted DNS through a local proxy")
+
+            Spacer(minLength: 4)
+
+            Button {
+                runCleaner()
+            } label: {
+                Label(cleanTitle, systemImage: "sparkles")
+                    .labelStyle(.titleAndIcon)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(cleaner.isCleaning || cleaner.isScanning || (!hasNotScannedJunk && cleaner.selectedJunkSize == 0))
+            .help(cleanHelp)
+
+            Button {
+                runBoost()
+            } label: {
+                Label("Boost", systemImage: "bolt.fill")
+                    .labelStyle(.titleAndIcon)
+                    .fixedSize()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Free inactive memory and flush the DNS cache")
+        }
+    }
+
+    // MARK: - Settings / Quit
+
+    private var appRow: some View {
+        HStack(spacing: 0) {
+            menuStyleButton(id: "settings", title: "Settings…", shortcut: "⌘,") {
+                onClose()
+                onOpenPreferences()
+            }
+            Spacer(minLength: 8)
+            menuStyleButton(id: "quit", title: "Quit Zenith", shortcut: "⌘Q") {
+                onQuit()
+            }
+        }
+    }
+
+    private func menuStyleButton(id: String, title: LocalizedStringKey, shortcut: String, action: @escaping () -> Void) -> some View {
+        let isHovered = hubState.hoveredFooterId == id
+        return Button(action: action) {
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 13))
+                    .foregroundStyle(isHovered ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
+                ZenithShortcutText(shortcut, isOnSelection: isHovered)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(isHovered ? ZenithTheme.accent : Color.clear)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .onHover { hovering in
+            if hovering {
+                hubState.setHoveredFooter(id)
+            } else {
+                hubState.clearHoveredFooter(ifCurrent: id)
+            }
+        }
+    }
+}
+
+// MARK: - Meter
+
+/// A small labelled gauge: title, value, and a thin bar.
+struct HubMeterView: View {
+    let title: LocalizedStringKey
+    let value: String
+    let fraction: Double
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text(value)
+                .font(.system(size: 13, weight: .semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.primary.opacity(0.1))
+                    Capsule()
+                        .fill(tint)
+                        .frame(width: max(3, proxy.size.width * min(max(fraction, 0), 1)))
+                }
+            }
+            .frame(height: 3)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(title) + Text(verbatim: " \(value)"))
+    }
+}
+
+// MARK: - Process Icon
+
+/// The icon of a running process: its app's icon when it has one (helpers use their app's), otherwise a symbol tile.
+struct ProcessIconView: View {
+    let process: ProcessTelemetry
+
+    var body: some View {
+        Group {
+            if let icon = ProcessIconProvider.icon(for: process) {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                ZenithIconTile(systemName: ProcessIconProvider.symbol(for: process.name), tint: Color(nsColor: .systemGray), size: 22)
+            }
+        }
+        .frame(width: 24, height: 24)
+    }
+}
+
+/// Looks up app icons for running processes, with a small cache so the 2.5 s refresh does not hit Launch Services.
+@MainActor
+enum ProcessIconProvider {
+    /// The screenshot renderer sets this so its made-up processes never show the icon of a real app that happens to
+    /// have the same PID on the machine drawing them.
+    static var symbolsOnly = false
+
+    private static var cache: [String: NSImage] = [:]
+
+    static func icon(for process: ProcessTelemetry) -> NSImage? {
+        guard !symbolsOnly else { return nil }
+        let key = "\(process.pid):\(process.name)"
+        if let cached = cache[key] { return cached }
+
+        var icon: NSImage?
+        if let app = NSRunningApplication(processIdentifier: pid_t(process.pid)), app.bundleURL != nil {
+            icon = app.icon
+        } else if let bundle = process.appBundlePath, FileManager.default.fileExists(atPath: bundle) {
+            icon = NSWorkspace.shared.icon(forFile: bundle)
+        }
+        guard let icon else { return nil }
+        if cache.count > 64 { cache.removeAll() }
+        cache[key] = icon
+        return icon
+    }
+
+    static func symbol(for name: String) -> String {
         let lower = name.lowercased()
         if lower.contains("chrome") || lower.contains("safari") || lower.contains("firefox") || lower.contains("browser") {
             return "globe"
-        } else if lower.contains("code") || lower.contains("xcode") || lower.contains("rider") || lower.contains("terminal") {
+        }
+        if lower.contains("code") || lower.contains("xcode") || lower.contains("rider") || lower.contains("terminal") {
             return "chevron.left.forwardslash.chevron.right"
-        } else if lower.contains("windowserver") || lower.contains("finder") {
-            return "macwindow"
-        } else {
-            return "gearshape.2"
         }
-    }
-
-    // MARK: - 4. Subtle Status & Control Footer
-
-    private var footerRow: some View {
-        VStack(spacing: 6) {
-            // Top telemetry sub-row: CPU, RAM, Battery (with Maximum Capacity), Storage, and Peripherals
-            HStack(spacing: 7) {
-                // CPU status
-                HStack(spacing: 3) {
-                    Image(systemName: "cpu")
-                        .font(.system(size: 10.5))
-                        .foregroundColor(hubState.hardwareSnapshot.cpu.totalUsagePercent > 75 ? .red : (hubState.hardwareSnapshot.cpu.totalUsagePercent > 40 ? .orange : .secondary))
-                    Text("\(Int(round(hubState.hardwareSnapshot.cpu.totalUsagePercent)))%")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .monospacedDigit()
-                        .foregroundColor(.secondary)
-                }
-                .help("CPU Usage: \(String(format: "%.1f", hubState.hardwareSnapshot.cpu.totalUsagePercent))% across \(hubState.hardwareSnapshot.cpu.coreCount) cores")
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("CPU usage \(Int(round(hubState.hardwareSnapshot.cpu.totalUsagePercent))) percent")
-
-                // RAM status with pressure indicator
-                HStack(spacing: 3) {
-                    Image(systemName: "memorychip")
-                        .font(.system(size: 10.5))
-                        .foregroundColor(hubState.hardwareSnapshot.memory.pressureLevel == .critical ? .red : (hubState.hardwareSnapshot.memory.pressureLevel == .warning ? .orange : .secondary))
-                    Text("\(Int(round(hubState.hardwareSnapshot.memory.usedPercent)))%")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .monospacedDigit()
-                        .foregroundColor(.secondary)
-                }
-                .help("Memory: \(HardwareTelemetryService.formatBytes(hubState.hardwareSnapshot.memory.usedBytes)) used of \(HardwareTelemetryService.formatBytes(hubState.hardwareSnapshot.memory.totalBytes)) (\(hubState.hardwareSnapshot.memory.pressureLevel.rawValue.capitalized) pressure)")
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Memory \(Int(round(hubState.hardwareSnapshot.memory.usedPercent))) percent used")
-
-                // Battery status with charge level & Maximum Capacity
-                if hubState.hardwareSnapshot.battery.hasBattery {
-                    HStack(spacing: 3) {
-                        Image(systemName: hubState.hardwareSnapshot.battery.isCharging ? "battery.100.bolt" : "battery.75")
-                            .font(.system(size: 10.5))
-                            .foregroundColor(hubState.hardwareSnapshot.battery.isCharging ? .green : (hubState.hardwareSnapshot.battery.percentage <= 20 ? .red : .secondary))
-                        Text("\(hubState.hardwareSnapshot.battery.percentage)%")
-                            .font(.system(size: 10.5, weight: .medium))
-                            .monospacedDigit()
-                            .foregroundColor(.secondary)
-
-                        if let maxCap = hubState.hardwareSnapshot.battery.healthPercent {
-                            Text("(\(maxCap)% max)")
-                                .font(.system(size: 9, weight: .medium, design: .monospaced))
-                                .foregroundColor(maxCap < 80 ? .orange : Color.secondary.opacity(0.75))
-                        }
-                    }
-                    .help("Battery: \(hubState.hardwareSnapshot.battery.percentage)%, Maximum Capacity: \(hubState.hardwareSnapshot.battery.healthPercent ?? 100)%, Condition: \(hubState.hardwareSnapshot.battery.condition), Cycles: \(hubState.hardwareSnapshot.battery.cycleCount ?? 0)")
-                }
-
-                // Storage status
-                HStack(spacing: 3) {
-                    Image(systemName: "internaldrive")
-                        .font(.system(size: 10.5))
-                        .foregroundColor(.secondary)
-                    Text("\(hubState.hardwareSnapshot.disk.freeBytes / 1_073_741_824)G free")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .monospacedDigit()
-                        .foregroundColor(.secondary)
-                }
-                .help("\(hubState.hardwareSnapshot.disk.volumeName): \(hubState.hardwareSnapshot.disk.freeBytes / 1_073_741_824) GB free of \(hubState.hardwareSnapshot.disk.totalBytes / 1_073_741_824) GB")
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(hubState.hardwareSnapshot.disk.freeBytes / 1_073_741_824) gigabytes free on \(hubState.hardwareSnapshot.disk.volumeName)")
-
-                // Connected Bluetooth accessories
-                ForEach(hubState.hardwareSnapshot.bluetoothDevices) { dev in
-                    HStack(spacing: 3) {
-                        Image(systemName: dev.icon)
-                            .font(.system(size: 10.5))
-                            .foregroundColor(.secondary)
-                        Text("\(dev.batteryPercent)%")
-                            .font(.system(size: 10.5, weight: .medium))
-                            .monospacedDigit()
-                            .foregroundColor(.secondary)
-                    }
-                    .help("\(dev.name): \(dev.batteryPercent)%")
-                }
-
-                Spacer()
-            }
-
-            // Bottom action tools & application control row (Settings & Quit at bottom right)
-            HStack(spacing: 5) {
-                // DoH Shield Toggle
-                Button {
-                    privacyController.toggle()
-                } label: {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(privacyController.isRunning ? Color(red: 0.18, green: 0.8, blue: 0.44) : Color.secondary.opacity(0.4))
-                            .frame(width: 5.5, height: 5.5)
-
-                        Text("Shield")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(privacyController.isRunning ? .primary : .secondary)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(hubState.hoveredFooterId == "doh" ? 0.08 : 0.04))
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .disabled(privacyController.isTransitioning)
-                .help(privacyController.isRunning ? "Privacy Shield is on: encrypted DNS lookups (click to turn off)" : "Privacy Shield is off (click to turn on)")
-                .accessibilityLabel(privacyController.isRunning ? "Privacy Shield, on" : "Privacy Shield, off")
-                .onHover { isHovered in
-                    if isHovered {
-                        hubState.setHoveredFooter("doh")
-                    } else {
-                        hubState.clearHoveredFooter(ifCurrent: "doh")
-                    }
-                }
-
-                // System Cleaner Badge
-                Button {
-                    Task {
-                        // Nothing has been scanned yet: look first, so there is something to confirm.
-                        if cleaner.categories.isEmpty && !cleaner.isScanning {
-                            await cleaner.scan()
-                        }
-                        guard cleaner.selectedJunkSize > 0 else {
-                            ToastHUDController.shared.show(message: "No system junk found", icon: "checkmark.circle.fill")
-                            return
-                        }
-                        guard DestructiveConfirmation.confirm(
-                                title: "Delete \(cleaner.formatSelectedSize) permanently?",
-                                message: "These cannot be restored:\n\(cleaner.selectionSummary)",
-                                destructiveTitle: "Delete Permanently"
-                              ) else { return }
-
-                        let freed = await cleaner.cleanSelected()
-                        if freed > 0 {
-                            ToastHUDController.shared.show(
-                                message: "Freed \(SystemCleanerService.formatBytes(freed))",
-                                icon: "broom.fill"
-                            )
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 3.5) {
-                        Image(systemName: "broom.fill")
-                            .font(.system(size: 9.5))
-                            .foregroundColor(cleaner.selectedJunkSize > 0 ? Color.orange : Color.secondary)
-
-                        Text(cleaner.isCleaning ? "Cleaning..." : (cleaner.isScanning ? "Scanning..." : (cleaner.selectedJunkSize > 0 ? cleaner.formattedSelectedJunkSize : (hasNotScannedJunk ? "Scan" : "Clean"))))
-                            .font(.system(size: 10, weight: .medium))
-                            .monospacedDigit()
-                            .foregroundColor(cleaner.selectedJunkSize > 0 ? .primary : .secondary)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(hubState.hoveredFooterId == "cleaner" ? 0.08 : 0.04))
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .disabled(cleaner.isCleaning || cleaner.isScanning || (!hasNotScannedJunk && cleaner.selectedJunkSize == 0))
-                .help(hasNotScannedJunk && cleaner.selectedJunkSize == 0
-                        ? "Scan for system junk; you confirm what to delete before anything goes"
-                        : (cleaner.selectedJunkSize > 0 ? "Clean \(cleaner.formattedSelectedJunkSize) system junk" : (historyTracker.totalSessions > 0 ? historyTracker.summaryHeadline : "No system junk found")))
-                .onHover { isHovered in
-                    if isHovered {
-                        hubState.setHoveredFooter("cleaner")
-                    } else {
-                        hubState.clearHoveredFooter(ifCurrent: "cleaner")
-                    }
-                }
-
-                // Boost & Optimizer Button (/boost)
-                Button {
-                    hubState.boostSystem()
-                    ToastHUDController.shared.show(message: "Zenith Boost: Memory Purged & DNS Flushed", icon: "sparkles")
-                } label: {
-                    HStack(spacing: 3.5) {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 9))
-                            .foregroundColor(Color.cyan)
-                        Text("Boost")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.primary)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(hubState.hoveredFooterId == "boost" ? 0.08 : 0.04))
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .help("Boost Zenith: Flush DNS, Purge Defunct Zombies & Free Unused RAM (/boost)")
-                .onHover { isHovered in
-                    if isHovered {
-                        hubState.setHoveredFooter("boost")
-                    } else {
-                        hubState.clearHoveredFooter(ifCurrent: "boost")
-                    }
-                }
-
-                Spacer(minLength: 4)
-
-                // Settings & Quit Buttons (Moved Down to bottom right)
-                HStack(spacing: 3) {
-                    Button {
-                        onClose()
-                        onOpenPreferences()
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 10.5))
-                            Text("⌘,")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(Color.secondary.opacity(0.6))
-                                .lineLimit(1)
-                                .fixedSize()
-                        }
-                        .foregroundColor(hubState.hoveredFooterId == "settings" ? .primary : .secondary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 3.5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(Color.primary.opacity(hubState.hoveredFooterId == "settings" ? 0.08 : 0.0))
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(",", modifiers: .command)
-                    .help("Settings (⌘,)")
-                    .accessibilityLabel("Settings")
-                    .onHover { isHovered in
-                        if isHovered {
-                            hubState.setHoveredFooter("settings")
-                        } else {
-                            hubState.clearHoveredFooter(ifCurrent: "settings")
-                        }
-                    }
-
-                    Button {
-                        onQuit()
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "power")
-                                .font(.system(size: 10.5))
-                            Text("⌘Q")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(Color.secondary.opacity(0.6))
-                                .lineLimit(1)
-                                .fixedSize()
-                        }
-                        .foregroundColor(hubState.hoveredFooterId == "quit" ? .red : .secondary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 3.5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(Color.red.opacity(hubState.hoveredFooterId == "quit" ? 0.12 : 0.0))
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut("q", modifiers: .command)
-                    .help("Quit Zenith (⌘Q)")
-                    .accessibilityLabel("Quit Zenith")
-                    .onHover { isHovered in
-                        if isHovered {
-                            hubState.setHoveredFooter("quit")
-                        } else {
-                            hubState.clearHoveredFooter(ifCurrent: "quit")
-                        }
-                    }
-                }
-            }
+        if lower.contains("video") || lower.contains("movie") {
+            return "film"
         }
-        .padding(.horizontal, 2)
-        .padding(.top, 1)
-    }
-
-    // MARK: - Hairline Divider
-
-    private var hairlineDivider: some View {
-        Rectangle()
-            .fill(Color.primary.opacity(0.05))
-            .frame(height: 0.5)
-            .padding(.horizontal, 4)
+        if lower.contains("design") || lower.contains("photo") {
+            return "paintbrush"
+        }
+        if lower.contains("chat") || lower.contains("message") {
+            return "bubble.left.and.bubble.right"
+        }
+        if lower.contains("note") {
+            return "note.text"
+        }
+        return "gearshape.2"
     }
 }

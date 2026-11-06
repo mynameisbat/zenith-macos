@@ -414,7 +414,7 @@ public final class NowPlayingService: ObservableObject {
             let cleaned = BrowserTabProbe.cleanTitle(tab.title)
             let title: String
             if cleaned.isEmpty || BrowserTabProbe.genericTitles.contains(cleaned.lowercased()) {
-                title = resolved == .xTwitter ? "Video on X" : "\(resolved.displayName) video"
+                title = resolved == .xTwitter ? String(localized: "Video on X") : String(localized: "\(resolved.displayName) video")
             } else {
                 title = cleaned
             }
@@ -423,7 +423,7 @@ public final class NowPlayingService: ObservableObject {
         }
 
         let resolved = NowPlayingApp.resolve(bundleId: playing.bundleIdentifier, title: nil, artist: nil)
-        return NowPlayingTrack(app: resolved, title: playing.name, artist: "Playing audio", duration: 0, position: 0, isPlaying: true)
+        return NowPlayingTrack(app: resolved, title: playing.name, artist: String(localized: "Playing audio"), duration: 0, position: 0, isPlaying: true)
     }
 
     // MARK: - CoreAudio Hardware Output Listener
@@ -680,8 +680,8 @@ public final class NowPlayingService: ObservableObject {
             if !mediaKeys.post(key) {
                 islandState.triggerAlert(
                     icon: "hand.raised.fill",
-                    title: "Allow Accessibility",
-                    subtitle: "Privacy & Security › Accessibility › Zenith",
+                    title: String(localized: "Allow Accessibility"),
+                    subtitle: String(localized: "Privacy & Security › Accessibility › Zenith"),
                     duration: 4,
                     tintColor: .orange
                 )

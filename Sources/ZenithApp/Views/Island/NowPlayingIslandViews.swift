@@ -228,7 +228,7 @@ public struct NowPlayingExpandedView: View {
                 // Controls in the middle, times (or "Playing now") at the sides
                 ZStack {
                     HStack(spacing: 18) {
-                        controlButton("backward.fill", action: onPrevious)
+                        controlButton("backward.fill", label: "Previous track", action: onPrevious)
 
                         Button {
                             onTogglePlayPause()
@@ -245,8 +245,10 @@ public struct NowPlayingExpandedView: View {
                             .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
+                        .help(track.isPlaying ? "Pause" : "Play")
+                        .accessibilityLabel(track.isPlaying ? "Pause" : "Play")
 
-                        controlButton("forward.fill", action: onNext)
+                        controlButton("forward.fill", label: "Next track", action: onNext)
                     }
 
                     HStack {
@@ -256,7 +258,7 @@ public struct NowPlayingExpandedView: View {
                             timeLabel(track.formattedDuration)
                         } else {
                             // Audio detected from a browser has no known length or position.
-                            timeLabel("Playing now")
+                            timeLabel(String(localized: "Playing now"))
                             Spacer()
                         }
                     }
@@ -270,7 +272,7 @@ public struct NowPlayingExpandedView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func controlButton(_ symbol: String, action: @escaping () -> Void) -> some View {
+    private func controlButton(_ symbol: String, label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 12))
@@ -279,6 +281,8 @@ public struct NowPlayingExpandedView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .help(label)
+        .accessibilityLabel(label)
     }
 
     private func timeLabel(_ text: String) -> some View {

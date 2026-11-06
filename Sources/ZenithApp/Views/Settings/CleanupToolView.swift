@@ -201,7 +201,7 @@ struct CleanupToolView: View {
     private func clean() async {
         let freed = await model.cleanSelected { confirmation in
             DestructiveConfirmation.confirm(
-                title: confirmation.title,
+                verbatimTitle: confirmation.title,
                 message: confirmation.message,
                 destructiveTitle: confirmation.actionTitle
             )

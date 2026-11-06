@@ -102,9 +102,12 @@ public final class SystemCleaningHistoryTracker: ObservableObject, @unchecked Se
 
     public var summaryHeadline: String {
         if totalSessions == 0 {
-            return "No cleaning sessions recorded yet"
+            return String(localized: "No cleaning sessions recorded yet")
         }
-        return "Zenith has freed \(formattedTotalFreed) on this Mac across \(totalSessions) session\(totalSessions == 1 ? "" : "s")"
+        if totalSessions == 1 {
+            return String(localized: "Zenith has freed \(formattedTotalFreed) on this Mac across 1 session")
+        }
+        return String(localized: "Zenith has freed \(formattedTotalFreed) on this Mac across \(totalSessions) sessions")
     }
 
     public func formatBytes(_ bytes: Int64) -> String {

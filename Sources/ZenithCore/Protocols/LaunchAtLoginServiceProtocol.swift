@@ -19,15 +19,15 @@ public enum LaunchAtLoginError: Error, LocalizedError, Sendable, Equatable {
     public var errorDescription: String? {
         switch self {
         case .requiresApproval:
-            return "Zenith requires user approval in macOS System Settings > Login Items to launch at login."
+            return String(localized: "Zenith requires user approval in macOS System Settings > Login Items to launch at login.")
         case .notFound:
-            return "Application bundle could not be found for login item registration."
+            return String(localized: "Application bundle could not be found for login item registration.")
         case .systemError(let message):
-            return "Failed to update launch at login status: \(message)"
+            return String(localized: "Failed to update launch at login status: \(message)")
         case .registrationFailed(let message):
-            return "Registration failed: \(message)"
+            return String(localized: "Registration failed: \(message)")
         case .unsupportedOS:
-            return "SMAppService is only supported on macOS 13 or later"
+            return String(localized: "SMAppService is only supported on macOS 13 or later")
         }
     }
 }

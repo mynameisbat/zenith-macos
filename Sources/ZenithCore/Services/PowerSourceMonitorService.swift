@@ -94,7 +94,7 @@ public final class PowerSourceMonitorService: ObservableObject {
             islandState.triggerAlert(
                 icon: device.icon,
                 title: "\(device.name) (\(device.batteryPercent)%)",
-                subtitle: "Connected Accessory",
+                subtitle: String(localized: "Connected Accessory"),
                 duration: 2.5
             )
         }
@@ -174,10 +174,10 @@ public final class PowerSourceMonitorService: ObservableObject {
 
         // 1. MagSafe / USB-C Plugged In Event
         if prevPlugged == false && current.isPluggedIn {
-            let wattStr = (current.wattage != nil && current.wattage! > 0) ? "\(Int(current.wattage!))W Charger" : "Power Connected"
+            let wattStr = (current.wattage != nil && current.wattage! > 0) ? String(localized: "\(Int(current.wattage!))W Charger") : String(localized: "Power Connected")
             islandState.triggerAlert(
                 icon: "bolt.fill",
-                title: "Charging • \(current.percentage)%",
+                title: String(localized: "Charging • \(current.percentage)%"),
                 subtitle: wattStr,
                 duration: 2.8
             )
@@ -188,13 +188,13 @@ public final class PowerSourceMonitorService: ObservableObject {
         if prevPlugged == true && !current.isPluggedIn {
             let timeStr: String
             if let mins = current.timeRemainingMinutes, mins > 0 {
-                timeStr = "\(mins / 60)h \(mins % 60)m Remaining"
+                timeStr = String(localized: "\(mins / 60)h \(mins % 60)m Remaining")
             } else {
-                timeStr = "Running on Battery"
+                timeStr = String(localized: "Running on Battery")
             }
             islandState.triggerAlert(
                 icon: "bolt.slash.fill",
-                title: "On Battery • \(current.percentage)%",
+                title: String(localized: "On Battery • \(current.percentage)%"),
                 subtitle: timeStr,
                 duration: 2.4
             )
@@ -211,8 +211,8 @@ public final class PowerSourceMonitorService: ObservableObject {
                 self.lastLowBatteryAlertTime = Date()
                 islandState.triggerAlert(
                     icon: "battery.25",
-                    title: "Low Battery (\(current.percentage)%)",
-                    subtitle: "Connect charger soon",
+                    title: String(localized: "Low Battery (\(current.percentage)%)"),
+                    subtitle: String(localized: "Connect charger soon"),
                     duration: 3.5
                 )
             }
@@ -228,13 +228,13 @@ public final class PowerSourceMonitorService: ObservableObject {
                 self.lastFullBatteryAlertTime = Date()
                 let subtitle: String
                 if let health = current.maximumCapacityPercent {
-                    subtitle = "Health: \(health)% Maximum Capacity"
+                    subtitle = String(localized: "Health: \(health)% Maximum Capacity")
                 } else {
-                    subtitle = "Optimal charge reached"
+                    subtitle = String(localized: "Optimal charge reached")
                 }
                 islandState.triggerAlert(
                     icon: "battery.100.bolt",
-                    title: "Battery Charged (\(current.percentage)%)",
+                    title: String(localized: "Battery Charged (\(current.percentage)%)"),
                     subtitle: subtitle,
                     duration: 3.0
                 )

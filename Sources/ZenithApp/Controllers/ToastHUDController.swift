@@ -24,16 +24,26 @@ public final class ToastHUDController: NSObject {
     /// Shows the ephemeral HUD with message and SF Symbol icon.
     /// When Dynamic Island is enabled, alerts are routed exclusively through the Dynamic Island capsule
     /// to eliminate duplicate notifications. Otherwise, falls back to the floating toast panel.
-    public func show(message: String, icon: String = "checkmark.circle.fill", subtitle: String? = nil) {
+    /// Shows a message from the string table (a literal, with or without interpolated values); the subtitle is shown
+    /// as it is (usually an error description, already localized by the system).
+    public func show(message: String.LocalizationValue, icon: String = "checkmark.circle.fill", subtitle: String? = nil) {
+        show(verbatim: String(localized: message), icon: icon, subtitle: subtitle)
+    }
+
+    /// Shows text that is already in the user's language.
+    public func show(verbatim message: String, icon: String = "checkmark.circle.fill", subtitle: String? = nil) {
         dismissWorkItem?.cancel()
 
         if ZenithIslandState.shared.isEnabled {
+            // The island alert is read aloud by `triggerAlert`.
             ZenithIslandState.shared.triggerAlert(icon: icon, title: message, subtitle: subtitle)
             if let panel = panel, panel.isVisible {
                 panel.orderOut(nil)
             }
             return
         }
+
+        AccessibilityAnnouncer.announce(subtitle.map { "\(message). \($0)" } ?? message)
 
         if panel == nil {
             let toastPanel = ToastHUDPanel(

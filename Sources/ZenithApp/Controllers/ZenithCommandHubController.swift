@@ -52,6 +52,10 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
                         AnnotationWindowController.shared.present(image: image)
                     }
                 },
+                onScreenOCR: { [weak self] in
+                    self?.close(immediately: true)
+                    ScreenOCRCoordinator.shared.startAreaOCR()
+                },
                 onOpenClipboard: { [weak self] in
                     self?.close()
                     ClipboardPanelController.shared.show()
@@ -216,7 +220,7 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
         let hog = hogs[index]
         // Asks first, like the button does.
         let quitIt = ZenithCommandHubState.shared.terminate(hog) { title, message, action in
-            DestructiveConfirmation.confirm(title: title, message: message, destructiveTitle: action)
+            DestructiveConfirmation.confirm(verbatimTitle: title, message: message, destructiveTitle: action)
         }
         if quitIt {
             ToastHUDController.shared.show(message: "Asked \(hog.name) to quit", icon: "xmark.circle.fill")

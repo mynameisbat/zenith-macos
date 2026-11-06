@@ -78,8 +78,8 @@ public final class ClipboardPanelController: NSObject, NSWindowDelegate {
     public static let shared = ClipboardPanelController()
 
     // Dimensions
-    public static let defaultWidth: CGFloat = 420
-    public static let defaultHeight: CGFloat = 520
+    public static let defaultWidth: CGFloat = ClipboardHistoryView.panelSize.width
+    public static let defaultHeight: CGFloat = ClipboardHistoryView.panelSize.height
     public static let margin: CGFloat = 12
 
     // Internal state

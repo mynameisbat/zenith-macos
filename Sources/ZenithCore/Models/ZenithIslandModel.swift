@@ -104,6 +104,18 @@ public struct ZenithIslandGeometry: Sendable, Equatable {
         hasNotch ? (notchRect.height + 4) : 26
     }
 
+    /// Width of the closed island while a focus timer runs: wider wings, so the time fits beside the notch.
+    public var timerIdleWidth: CGFloat {
+        idleWidth + (hasNotch ? 104 : 96)
+    }
+
+    /// The closed island's frame while something runs next to the notch (a timer, or else playing media).
+    public func compactActivityFrame(showsTimer: Bool) -> CGRect {
+        let w = showsTimer ? timerIdleWidth : nowPlayingIdleWidth
+        let h = nowPlayingIdleHeight
+        return CGRect(x: notchRect.midX - w / 2, y: screenFrame.maxY - h, width: w, height: h)
+    }
+
     /// Computes the window frame for the Idle Now Playing capsule.
     public var nowPlayingIdleFrame: CGRect {
         let w = nowPlayingIdleWidth
@@ -208,9 +220,11 @@ public struct IslandDropItem: Identifiable, Sendable, Equatable {
 }
 
 /// Mode for the expanded Dynamic Island view.
-public enum IslandExpandedTab: String, Sendable, Equatable {
+public enum IslandExpandedTab: String, Sendable, Equatable, CaseIterable {
     case shelf
     case nowPlaying
+    /// The focus timer and the next calendar event.
+    case widgets
 }
 
 /// Represents a transient alert HUD shown inside the notch capsule.
@@ -268,6 +282,18 @@ public final class ZenithIslandState: ObservableObject {
     @Published public var nowPlayingTrack: NowPlayingTrack? = nil
     @Published public var activeTab: IslandExpandedTab = .shelf
 
+    // Widgets (written by `FocusTimerService`, `CalendarWidgetModel` and `IslandWidgetSettings`).
+    @Published public var focusTimer: FocusTimerSnapshot? = nil
+    @Published public var upcomingEvent: UpcomingEvent? = nil
+    @Published public var calendarAccess: CalendarAccessState = .notDetermined
+    @Published public var showsTimerWidget: Bool = false
+    @Published public var showsCalendarWidget: Bool = false
+
+    /// Whether the expanded island has a Widgets tab.
+    public var showsWidgets: Bool {
+        showsTimerWidget || showsCalendarWidget
+    }
+
     private var collapseTimer: Task<Void, Never>?
     private var dragOutTimer: Task<Void, Never>?
     private var rimLightFadeTask: Task<Void, Never>?
@@ -324,6 +350,7 @@ public final class ZenithIslandState: ObservableObject {
         alertDismissWorkItem?.cancel()
         alertDismissTask?.cancel()
         let alert = IslandAlert(icon: icon, title: title, subtitle: subtitle, tintColor: tintColor)
+        AccessibilityAnnouncer.announce(subtitle.map { "\(title). \($0)" } ?? title)
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             self.activeAlert = alert
             self.isRimLightVisible = true

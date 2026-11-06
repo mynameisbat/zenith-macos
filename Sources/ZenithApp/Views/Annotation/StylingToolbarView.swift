@@ -2,7 +2,8 @@ import SwiftUI
 import CoreGraphics
 import ZenithCore
 
-/// Floating styling toolbar for tool selection, colors, stroke widths, and export actions.
+/// The annotation editor's floating toolbar, in the manner of Preview's Markup bar: tools, colors and line widths as
+/// segmented groups, then undo/redo, then Copy and Save. Every control names its keyboard shortcut in its tooltip.
 public struct StylingToolbarView: View {
     @ObservedObject public var viewModel: AnnotationEditorViewModel
 
@@ -10,134 +11,109 @@ public struct StylingToolbarView: View {
         self.viewModel = viewModel
     }
 
-    public var body: some View {
-        HStack(spacing: 12) {
-            // 1. Tool Selection Group
-            HStack(spacing: 4) {
-                toolButton(tool: .pen, icon: "pencil.tip", label: "Pen", shortcut: "P")
-                toolButton(tool: .arrow, icon: "arrow.up.right", label: "Arrow", shortcut: "A")
-                toolButton(tool: .rectangle, icon: "rectangle", label: "Rectangle", shortcut: "R")
-                toolButton(tool: .text, icon: "textformat", label: "Text", shortcut: "T")
-                toolButton(tool: .blur, icon: "checkerboard.rectangle", label: "Blur", shortcut: "B")
-                toolButton(tool: .crop, icon: "crop", label: "Crop", shortcut: "C")
-            }
-
-            divider
-
-            // 2. 8 Preset Color Swatches
-            HStack(spacing: 6) {
-                let colorNames = ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "White", "Black"]
-                ForEach(0..<PresetColors.all.count, id: \.self) { idx in
-                    let color = PresetColors.all[idx]
-                    let name = idx < colorNames.count ? colorNames[idx] : "Color \(idx + 1)"
-                    colorSwatch(color: color, name: name, shortcut: "\(idx + 1)")
-                }
-            }
-
-            divider
-
-            // 3. Stroke Width Selector (2, 4, 8 pt)
-            HStack(spacing: 8) {
-                strokeButton(width: 2.0, label: "Fine", shortcut: "[")
-                strokeButton(width: 4.0, label: "Regular", shortcut: nil)
-                strokeButton(width: 8.0, label: "Bold", shortcut: "]")
-            }
-
-            divider
-
-            // 4. Undo / Redo Actions
-            HStack(spacing: 4) {
-                Button(action: { viewModel.undo() }) {
-                    Image(systemName: "arrow.uturn.backward")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(viewModel.commandStack.canUndo ? .primary : .secondary.opacity(0.4))
-                }
-                .buttonStyle(.plain)
-                .disabled(!viewModel.commandStack.canUndo)
-                .help("Undo (⌘Z)")
-
-                Button(action: { viewModel.redo() }) {
-                    Image(systemName: "arrow.uturn.forward")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(viewModel.commandStack.canRedo ? .primary : .secondary.opacity(0.4))
-                }
-                .buttonStyle(.plain)
-                .disabled(!viewModel.commandStack.canRedo)
-                .help("Redo (⇧⌘Z)")
-            }
-
-            divider
-
-            // 5. Quick Actions: Copy (⌘C) and Save (⌘S)
-            HStack(spacing: 6) {
-                Button(action: { viewModel.copyToClipboard() }) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "doc.on.clipboard")
-                            .font(.system(size: 11, weight: .medium))
-                        Text("Copy")
-                            .font(.system(size: 11.5, weight: .medium))
-                        KeycapBadgeView(text: "⌘C")
-                    }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.accentColor.opacity(0.14))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(Color.accentColor.opacity(0.3), lineWidth: 0.8)
-                    )
-                }
-                .buttonStyle(.plain)
-
-                Button(action: { viewModel.saveToDisk(parentWindow: nil) }) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "square.and.arrow.down")
-                            .font(.system(size: 11, weight: .medium))
-                        Text("Save")
-                            .font(.system(size: 11.5, weight: .medium))
-                        KeycapBadgeView(text: "⌘S")
-                    }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(0.06))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 0.8)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .zenithMaterial(cornerRadius: 10)
+    private static var colorNames: [String] {
+        [
+            String(localized: "Red"), String(localized: "Orange"), String(localized: "Yellow"), String(localized: "Green"),
+            String(localized: "Blue"), String(localized: "Purple"), String(localized: "White"), String(localized: "Black")
+        ]
     }
 
-    private var divider: some View {
-        Divider()
-            .frame(height: 18)
-            .opacity(0.4)
+    public var body: some View {
+        HStack(spacing: 10) {
+            group {
+                toolButton(tool: .pen, icon: "pencil.tip", label: String(localized: "Pen"), shortcut: "P")
+                toolButton(tool: .arrow, icon: "arrow.up.right", label: String(localized: "Arrow"), shortcut: "A")
+                toolButton(tool: .rectangle, icon: "rectangle", label: String(localized: "Rectangle"), shortcut: "R")
+                toolButton(tool: .text, icon: "textformat", label: String(localized: "Text"), shortcut: "T")
+                toolButton(tool: .blur, icon: "checkerboard.rectangle", label: String(localized: "Pixelate"), shortcut: "B")
+                toolButton(tool: .crop, icon: "crop", label: String(localized: "Crop"), shortcut: "C")
+            }
+
+            group {
+                ForEach(0..<PresetColors.all.count, id: \.self) { idx in
+                    let name = idx < Self.colorNames.count ? Self.colorNames[idx] : String(localized: "Color \(idx + 1)")
+                    colorSwatch(color: PresetColors.all[idx], name: name, shortcut: "\(idx + 1)")
+                }
+            }
+
+            group {
+                strokeButton(width: 2.0, label: String(localized: "Thin"), shortcut: "[")
+                strokeButton(width: 4.0, label: String(localized: "Medium"), shortcut: nil)
+                strokeButton(width: 8.0, label: String(localized: "Thick"), shortcut: "]")
+            }
+
+            HStack(spacing: 2) {
+                iconButton("arrow.uturn.backward", label: String(localized: "Undo"), shortcut: "⌘Z", enabled: viewModel.commandStack.canUndo) {
+                    viewModel.undo()
+                }
+                iconButton("arrow.uturn.forward", label: String(localized: "Redo"), shortcut: "⇧⌘Z", enabled: viewModel.commandStack.canRedo) {
+                    viewModel.redo()
+                }
+            }
+
+            Divider().frame(height: 20)
+
+            HStack(spacing: 6) {
+                Button {
+                    viewModel.saveToDisk(parentWindow: nil)
+                } label: {
+                    Text("Save…")
+                }
+                .help("Save as PNG or JPEG (⌘S)")
+
+                Button {
+                    viewModel.copyToClipboard()
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.borderedProminent)
+                .help("Copy the annotated image and close (⌘C)")
+            }
+            .controlSize(.regular)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.regularMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.2), radius: 16, x: 0, y: 6)
+    }
+
+    /// A rounded well holding one group of choices.
+    private func group<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        HStack(spacing: 2) {
+            content()
+        }
+        .padding(2)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.06))
+        )
     }
 
     private func toolButton(tool: AnnotationTool, icon: String, label: String, shortcut: String) -> some View {
         let isSelected = viewModel.selectedTool == tool
         return Button(action: { viewModel.selectedTool = tool }) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(isSelected ? .white : .primary)
-                .frame(width: 28, height: 28)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(isSelected ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
+                .frame(width: 28, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(isSelected ? Color.accentColor : Color.clear)
+                        .fill(isSelected ? ZenithTheme.accent : Color.clear)
                 )
+                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
         .help("\(label) (\(shortcut))")
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
     private func colorSwatch(color: CGColor, name: String, shortcut: String) -> some View {
@@ -146,34 +122,54 @@ public struct StylingToolbarView: View {
             ZStack {
                 Circle()
                     .fill(Color(cgColor: color))
-                    .frame(width: 18, height: 18)
-                    .overlay(Circle().stroke(Color.primary.opacity(0.15), lineWidth: 1))
-
+                    .frame(width: 16, height: 16)
+                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
                 if isSelected {
                     Circle()
-                        .strokeBorder(Color.primary, lineWidth: 2)
+                        .strokeBorder(ZenithTheme.accent, lineWidth: 2)
                         .frame(width: 22, height: 22)
                 }
             }
+            .frame(width: 24, height: 26)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help("\(name) (\(shortcut))")
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
     private func strokeButton(width: CGFloat, label: String, shortcut: String?) -> some View {
         let isSelected = viewModel.selectedStrokeWidth == width
-        let helpText = shortcut != nil ? "\(label) (\(Int(width))pt) [\(shortcut!)]" : "\(label) (\(Int(width))pt)"
+        let helpText = shortcut.map { String(localized: "\(label), \(Int(width)) pt (\($0))") } ?? String(localized: "\(label), \(Int(width)) pt")
         return Button(action: { viewModel.selectedStrokeWidth = width }) {
-            Circle()
-                .fill(isSelected ? Color.primary : Color.secondary.opacity(0.5))
-                .frame(width: width + 4, height: width + 4)
-                .padding(4)
+            Capsule()
+                .fill(isSelected ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
+                .frame(width: 16, height: max(1.5, width * 0.75))
+                .frame(width: 28, height: 26)
                 .background(
-                    Circle()
-                        .fill(isSelected ? Color.primary.opacity(0.12) : Color.clear)
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isSelected ? ZenithTheme.accent : Color.clear)
                 )
+                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
         .help(helpText)
+        .accessibilityLabel("\(label) line")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private func iconButton(_ symbol: String, label: String, shortcut: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .medium))
+                .frame(width: 28, height: 26)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(enabled ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+        .disabled(!enabled)
+        .help("\(label) (\(shortcut))")
+        .accessibilityLabel(label)
     }
 }

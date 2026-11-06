@@ -1,0 +1,160 @@
+import SwiftUI
+import AppKit
+import ZenithCore
+
+/// Settings → Dynamic Island: the focus timer and the next calendar event shown in the notch.
+public struct IslandSettingsTab: View {
+    @ObservedObject private var settings: IslandWidgetSettings = .shared
+    @ObservedObject private var timer: FocusTimerService = .shared
+    @ObservedObject private var calendar: CalendarWidgetModel = .shared
+
+    public init() {}
+
+    public var body: some View {
+        ZenithSettingsPage {
+            ZenithSettingsSection(
+                "Widgets",
+                footer: "Move the pointer to the notch to open the island, then pick the Widgets tab. A running timer stays next to the notch."
+            ) {
+                ZenithSettingsRow(
+                    "Focus Timer",
+                    subtitle: "A Pomodoro-style timer with breaks.",
+                    symbol: "timer",
+                    tint: ZenithTint.timer
+                ) {
+                    Toggle("Focus Timer", isOn: $settings.showTimer)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                }
+
+                if settings.showTimer {
+                    ZenithSettingsDivider(inset: 44)
+                    minutesRow("Focus Length", value: $settings.focusMinutes, range: IslandWidgetSettings.focusRange, step: 5)
+                    ZenithSettingsDivider(inset: 44)
+                    minutesRow("Break Length", value: $settings.breakMinutes, range: IslandWidgetSettings.breakRange, step: 1)
+                }
+
+                ZenithSettingsDivider(inset: 44)
+
+                ZenithSettingsRow(
+                    "Next Calendar Event",
+                    subtitle: "Your next meeting from the Calendar app, with how long until it starts.",
+                    symbol: "calendar",
+                    tint: ZenithTint.calendar
+                ) {
+                    Toggle("Next Calendar Event", isOn: $settings.showCalendar)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                }
+
+                if settings.showCalendar {
+                    ZenithSettingsDivider(inset: 44)
+                    calendarAccessRow
+                }
+            }
+
+            if settings.showTimer {
+                ZenithSettingsSection("Timer") {
+                    timerControlRow
+                }
+            }
+        }
+        .onAppear {
+            calendar.refresh()
+        }
+    }
+
+    private func minutesRow(_ title: LocalizedStringKey, value: Binding<Int>, range: ClosedRange<Int>, step: Int) -> some View {
+        ZenithSettingsRow(title) {
+            HStack(spacing: 6) {
+                Text("\(value.wrappedValue) min")
+                    .font(.system(size: 12.5))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 52, alignment: .trailing)
+                Stepper(title, value: value, in: range, step: step)
+                    .labelsHidden()
+            }
+        }
+        .padding(.leading, 32)
+    }
+
+    @ViewBuilder
+    private var calendarAccessRow: some View {
+        ZenithSettingsRow("Calendar Access") {
+            HStack(spacing: 10) {
+                switch calendar.access {
+                case .granted:
+                    ZenithStatusBadge(text: "Allowed", kind: .ok)
+                case .denied:
+                    ZenithStatusBadge(text: "Not Allowed", kind: .warning)
+                    Button("Open…") {
+                        openCalendarPrivacySettings()
+                    }
+                    .controlSize(.small)
+                    .help("Allow Zenith in System Settings → Privacy & Security → Calendars")
+                case .notDetermined:
+                    ZenithStatusBadge(text: "Not asked yet", kind: .neutral)
+                    Button("Allow…") {
+                        Task { await calendar.requestAccess() }
+                    }
+                    .controlSize(.small)
+                    .help("macOS asks whether Zenith may read your calendars")
+                case .unavailable:
+                    ZenithStatusBadge(text: "Needs Zenith.app", kind: .warning)
+                        .help("Calendar access can only be asked for by the bundled app (scripts/bundle_app.sh), not by `swift run`.")
+                }
+            }
+        }
+        .padding(.leading, 32)
+    }
+
+    private var timerControlRow: some View {
+        let snapshot = timer.snapshot
+        let sessions = timer.focusSessionsToday
+        let subtitle: Text = {
+            if let snapshot {
+                return snapshot.isPaused
+                    ? Text("\(snapshot.mode.title) · \(snapshot.remainingText) left (paused)")
+                    : Text("\(snapshot.mode.title) · \(snapshot.remainingText) left")
+            }
+            switch sessions {
+            case 0: return Text("No focus sessions finished today.")
+            case 1: return Text("1 focus session finished today.")
+            default: return Text("\(sessions) focus sessions finished today.")
+            }
+        }()
+        return ZenithSettingsRow(
+            title: snapshot == nil ? Text("Not Running") : Text("Running"),
+            subtitle: subtitle,
+            symbol: snapshot?.mode.symbolName ?? "timer",
+            tint: ZenithTint.timer
+        ) {
+            HStack(spacing: 6) {
+                if snapshot != nil {
+                    Button(snapshot?.isPaused == true ? "Resume" : "Pause") {
+                        timer.togglePause()
+                    }
+                    Button("Stop") {
+                        timer.stop()
+                    }
+                } else {
+                    Button("Start Break") {
+                        timer.start(.shortBreak, minutes: settings.breakMinutes)
+                    }
+                    Button("Start Focus") {
+                        timer.start(.focus, minutes: settings.focusMinutes)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .controlSize(.small)
+        }
+    }
+
+    private func openCalendarPrivacySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+}

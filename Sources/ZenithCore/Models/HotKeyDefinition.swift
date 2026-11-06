@@ -126,6 +126,19 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
         Self.macOSScreenshotShortcuts.contains { $0.keyCode == keyCode && $0.carbonModifiers == carbonModifiers }
     }
 
+    /// The shortcut as macOS menus write it: modifiers in the order ⌃⌥⇧⌘, then the key (e.g. "⇧⌘2").
+    public var menuStyleKeyEquivalent: String {
+        Self.menuStyle(keyEquivalent)
+    }
+
+    /// Puts the modifier symbols of a shortcut string in the order macOS menus use (⌃⌥⇧⌘), key last.
+    public static func menuStyle(_ shortcut: String) -> String {
+        let order: [Character] = ["⌃", "⌥", "⇧", "⌘"]
+        let modifiers = order.filter { shortcut.contains($0) }
+        let key = shortcut.filter { !order.contains($0) }
+        return String(modifiers) + key
+    }
+
     /// The built-in shortcut of an action, if it has one.
     public static func builtIn(for id: String) -> HotKeyDefinition? {
         defaultDictionary[id] ?? (id == captureOCRId ? defaultOCR : nil)
