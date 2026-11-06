@@ -288,6 +288,11 @@ public final class SettingsStore: ObservableObject, @unchecked Sendable {
         hotkeyMappings[id]
     }
 
+    /// The shortcut an action really has: the one saved in Settings, or its built-in one.
+    public func effectiveHotkey(for id: String) -> HotKeyDefinition? {
+        hotkey(for: id) ?? HotKeyDefinition.builtIn(for: id)
+    }
+
     /// Atomic value snapshot of the current settings.
     public var state: SettingsState {
         get {

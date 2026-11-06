@@ -5,12 +5,10 @@ import Foundation
 @Suite("Zenith Command Hub State & Action Hub Test Suite")
 struct ZenithCommandHubTests {
 
-    @Test("HUB-01: ZenithHubAction has 2 quick actions with correct titles, icons, and shortcuts")
+    @Test("HUB-01: ZenithHubAction has 4 quick actions with correct titles, icons, and shortcuts")
     func testZenithHubActionsExclusivity() {
         let allActions = ZenithHubAction.allCases
-        #expect(allActions.count == 2)
-        #expect(allActions.contains(.area))
-        #expect(allActions.contains(.screen))
+        #expect(allActions == [.area, .screen, .ocr, .clipboard])
 
         // Verify Area action metadata
         let area = ZenithHubAction.area
@@ -18,6 +16,7 @@ struct ZenithCommandHubTests {
         #expect(area.title == "Capture Area")
         #expect(area.icon == "crop")
         #expect(area.shortcut == "⌘⇧2")
+        #expect(area.hotKeyId == HotKeyDefinition.captureAreaId)
 
         // Verify Screen action metadata
         let screen = ZenithHubAction.screen
@@ -25,6 +24,49 @@ struct ZenithCommandHubTests {
         #expect(screen.title == "Capture Screen")
         #expect(screen.icon == "macwindow")
         #expect(screen.shortcut == "⌘⇧1")
+        #expect(screen.hotKeyId == HotKeyDefinition.captureFullscreenId)
+
+        // OCR and clipboard use the same shortcuts as their global hot keys
+        #expect(ZenithHubAction.ocr.shortcut == HotKeyDefinition.defaultOCR.keyEquivalent)
+        #expect(ZenithHubAction.ocr.hotKeyId == HotKeyDefinition.captureOCRId)
+        #expect(ZenithHubAction.clipboard.shortcut == HotKeyDefinition.defaultClipboard.keyEquivalent)
+        #expect(ZenithHubAction.clipboard.hotKeyId == HotKeyDefinition.clipboardToggleId)
+        #expect(ZenithHubAction.ocr.matches(query: "qr"))
+        #expect(ZenithHubAction.clipboard.matches(query: "history"))
+        #expect(!ZenithHubAction.ocr.matches(query: "clipboard"))
+        for action in allActions {
+            #expect(!action.detail.isEmpty)
+        }
+    }
+
+    @Test("HUB-01B: The hub shows the shortcut the user chose, written like a macOS menu")
+    func testEffectiveShortcutAndMenuStyle() {
+        let defaults = TestDefaults.make("ZenithCommandHubTests_\(UUID().uuidString)")!
+        let store = SettingsStore(userDefaults: defaults)
+
+        // Nothing saved for OCR: its built-in shortcut applies
+        #expect(store.effectiveHotkey(for: HotKeyDefinition.captureOCRId) == HotKeyDefinition.defaultOCR)
+        // A saved shortcut wins
+        store.updateHotkey(HotKeyDefinition.alternativeAreaCaptureX)
+        #expect(store.effectiveHotkey(for: HotKeyDefinition.captureAreaId)?.keyEquivalent == "⌘⇧X")
+        #expect(store.effectiveHotkey(for: "no.such.action") == nil)
+
+        #expect(HotKeyDefinition.menuStyle("⌘⇧2") == "⇧⌘2")
+        #expect(HotKeyDefinition.menuStyle("⌘⌥⌃T") == "⌃⌥⌘T")
+        #expect(HotKeyDefinition.defaultOCR.menuStyleKeyEquivalent == "⌃⌥T")
+        #expect(HotKeyDefinition.menuStyle(",") == ",")
+    }
+
+    @Test("HUB-01C: A helper process is shown with the icon of the app it belongs to")
+    func testAppBundlePath() {
+        let helper = ProcessTelemetry(
+            pid: 10, name: "Google Chrome Helper (Renderer)",
+            command: "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer) --type=renderer"
+        )
+        #expect(helper.appBundlePath == "/Applications/Google Chrome.app")
+        #expect(ProcessTelemetry(pid: 11, name: "Notes", command: "/System/Applications/Notes.app").appBundlePath == "/System/Applications/Notes.app")
+        #expect(ProcessTelemetry(pid: 12, name: "node", command: "/usr/local/bin/node server.js").appBundlePath == nil)
+        #expect(ProcessTelemetry(pid: 13, name: "node", command: "node server.app/x").appBundlePath == nil)
     }
 
     @Test("HUB-02: Action query matching filters actions accurately")

@@ -65,7 +65,7 @@ public final class PrivacyShieldController: ObservableObject {
         } catch {
             NSLog("[PrivacyShieldController] Failed to start: \(error)")
             ToastHUDController.shared.show(
-                message: "Privacy Shield can't listen on port \(port)",
+                message: "Privacy Shield can't listen on port \(String(port))",
                 icon: "exclamationmark.triangle",
                 subtitle: error.localizedDescription
             )
@@ -111,7 +111,7 @@ public final class PrivacyShieldController: ObservableObject {
             ToastHUDController.shared.show(
                 message: "Privacy Shield stopped, but proxy settings were not restored",
                 icon: "exclamationmark.triangle",
-                subtitle: "Zenith will retry on next launch"
+                subtitle: String(localized: "Zenith will retry on next launch")
             )
         }
     }
@@ -142,7 +142,7 @@ public final class PrivacyShieldController: ObservableObject {
     public func runDiagnosticTest() async {
         guard !isDiagnosticRunning else { return }
         isDiagnosticRunning = true
-        diagnosticMessage = "Testing encrypted probe..."
+        diagnosticMessage = String(localized: "Testing encrypted probe...")
 
         let startTime = Date()
         do {
@@ -174,13 +174,13 @@ public final class PrivacyShieldController: ObservableObject {
                 }
             }
 
-            diagnosticMessage = "✔ Probe passed: DoH \(resolvedIP) • Proxy Active (\(elapsedMs)ms)"
+            diagnosticMessage = "✔ " + String(localized: "Probe passed: DoH \(resolvedIP) • Proxy Active (\(elapsedMs)ms)")
             ToastHUDController.shared.show(
                 message: "Privacy Shield probe passed (\(elapsedMs)ms)",
                 icon: "checkmark.shield.fill"
             )
         } catch {
-            diagnosticMessage = "❌ Probe failed: \(error.localizedDescription)"
+            diagnosticMessage = "❌ " + String(localized: "Probe failed: \(error.localizedDescription)")
             ToastHUDController.shared.show(
                 message: "Probe failed: \(error.localizedDescription)",
                 icon: "xmark.shield"

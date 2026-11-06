@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Zenith — small Mac utilities in one menu-bar app</title>
-  <meta name="description" content="Zenith is a native, open-source macOS menu-bar app: clipboard history, screen capture and annotation, on-device OCR, a notch Now Playing island, a disk cleaner and a local DNS-over-HTTPS proxy.">
+  <meta name="description" content="Zenith is a native, open-source macOS menu-bar app: clipboard history, screen capture and annotation, on-device OCR, a notch island with Now Playing, a focus timer and your next event, a disk cleaner and a local DNS-over-HTTPS proxy.">
   <meta name="color-scheme" content="light dark">
   <link rel="icon" type="image/png" href="assets/app-icon.png">
   <link rel="stylesheet" href="style.css">
@@ -39,8 +39,9 @@
           <p class="eyebrow">macOS 14+ · Swift 6 · MIT license</p>
           <h1>Small Mac utilities,<br>one menu-bar app.</h1>
           <p class="lead">
-            Clipboard history, screen capture and annotation, on-device OCR, a Now Playing island in your notch,
-            a disk cleaner and a local DNS-over-HTTPS proxy. Native, open source, and no analytics code.
+            Clipboard history, screen capture and annotation, on-device OCR, an island in your notch with Now Playing,
+            a focus timer and your next event, a disk cleaner and a local DNS-over-HTTPS proxy.
+            Native, open source, and no analytics code.
           </p>
           <div class="actions">
             <a class="btn" href="https://github.com/mynameisbat/zenith-macos/releases/latest">
@@ -96,10 +97,10 @@
               <div class="loupe"><div class="loupe-grid"></div><span class="loupe-x"></span></div>
               <div class="arrow"></div>
             </div>
-            <h3>Capture and annotate <kbd>⌘⇧2</kbd></h3>
+            <h3>Capture and annotate <kbd>⇧⌘2</kbd></h3>
             <p>Area or full-screen capture with a 16× pixel loupe and colour readout, then an editor for the markup.</p>
             <ul>
-              <li>Pen, arrows, rectangles, text, blur and crop</li>
+              <li>Pen, arrows, rectangles, text, pixelate and crop</li>
               <li>Exports at the display's native resolution</li>
               <li>Needs the Screen Recording permission</li>
             </ul>
@@ -111,9 +112,10 @@
               <div class="clip-row"><b>⌘2</b><span>Meeting notes, draft 3</span></div>
               <div class="clip-row"><b>⌘3</b><span>#0F62FE</span><em>pinned</em></div>
             </div>
-            <h3>Clipboard history <kbd>⌘⇧V</kbd></h3>
-            <p>A searchable history you can drive from the keyboard, with pinning.</p>
+            <h3>Clipboard history <kbd>⇧⌘V</kbd></h3>
+            <p>A searchable history you can drive from the keyboard, with a preview of each item, filters and pinning.</p>
             <ul>
+              <li>Previews text, images, links and color codes</li>
               <li>Skips items that password managers mark as concealed</li>
               <li>Bounded: 25 MB per item, 256 MB in total</li>
               <li>Global hotkeys need no Accessibility permission</li>
@@ -122,12 +124,14 @@
 
           <article class="card">
             <div class="art art-shelf" aria-hidden="true">
-              <div class="shelf-tabs"><span class="on">Now Playing</span><span>Shelf (2)</span></div>
+              <div class="shelf-tabs"><span>Now Playing</span><span class="on">Widgets</span><span>Shelf (2)</span></div>
               <div class="shelf-tiles"><i>PNG</i><i>TXT</i></div>
             </div>
-            <h3>Notch island and drop shelf</h3>
-            <p>Now Playing for Music, Spotify and browser audio, a charging HUD, and a shelf to park files and snippets at the top of the screen.</p>
+            <h3>Notch island, widgets and drop shelf</h3>
+            <p>Now Playing for Music, Spotify and browser audio, a focus timer and your next calendar event, a charging HUD, and a shelf to park files and snippets at the top of the screen.</p>
             <ul>
+              <li>A running timer stays beside the notch</li>
+              <li>Calendar access is asked only when you turn that widget on</li>
               <li>Chrome-family browsers and Safari are detected from the audio they hold open</li>
               <li>Tab titles for known media sites; other sites show the browser name</li>
               <li>Browser controls need Accessibility</li>
@@ -194,26 +198,64 @@
             <figcaption>Island with browser audio. Without a known length, it says "Playing now".</figcaption>
           </figure>
 
-          <figure class="shot">
-            <div class="stage">
-              <picture>
-                <source srcset="assets/shots/command-hub-dark.png" media="(prefers-color-scheme: dark)">
-                <img src="assets/shots/command-hub-light.png" width="640" height="820" loading="lazy"
-                     alt="Command Hub popover with search, capture actions, the heaviest running apps with a quit button each, and a status footer">
-              </picture>
+          <figure class="shot shot-wide">
+            <div class="stage stage-dark">
+              <img src="assets/shots/island-widgets.png" width="760" height="192" loading="lazy"
+                   alt="Island Widgets tab with a focus timer at 18:42 with pause and stop buttons, and the next event, Design review, in 15 minutes">
             </div>
-            <figcaption>Command Hub: capture actions, the heaviest apps (quit with one click), CPU, memory and disk.</figcaption>
+            <figcaption>Widgets: a focus timer and your next calendar event, with how long until it starts.</figcaption>
+          </figure>
+
+          <figure class="shot shot-wide">
+            <div class="stage stage-dark">
+              <img src="assets/shots/island-timer.png" width="760" height="80" loading="lazy"
+                   alt="Closed island with a progress ring on the left of the notch and 18:42 on the right">
+            </div>
+            <figcaption>While a timer runs, the time left sits beside the notch.</figcaption>
           </figure>
 
           <figure class="shot">
             <div class="stage">
               <picture>
-                <source srcset="assets/shots/clipboard-dark.png" media="(prefers-color-scheme: dark)">
-                <img src="assets/shots/clipboard-light.png" width="840" height="1040" loading="lazy"
-                     alt="Clipboard history panel with a search field, numbered rows, a pinned item and keyboard hints">
+                <source srcset="assets/shots/command-hub-dark.png" media="(prefers-color-scheme: dark)">
+                <img src="assets/shots/command-hub-light.png" width="680" height="1054" loading="lazy"
+                     alt="Command Hub popover with a search field, four quick action tiles, the heaviest running apps with their CPU use, meters for CPU, memory and storage, a Privacy Shield switch, Scan and Boost buttons, and Settings and Quit">
               </picture>
             </div>
-            <figcaption>Clipboard history: search, <kbd>⌘1</kbd>–<kbd>⌘9</kbd> to paste, pinning.</figcaption>
+            <figcaption>Command Hub: quick actions with your shortcuts, the heaviest apps (quit after a confirmation), system meters and switches.</figcaption>
+          </figure>
+
+          <figure class="shot shot-wide">
+            <div class="stage">
+              <picture>
+                <source srcset="assets/shots/settings-island-dark.png" media="(prefers-color-scheme: dark)">
+                <img src="assets/shots/settings-island-light.png" width="1440" height="1080" loading="lazy"
+                     alt="Settings window with a sidebar of colored icons and the Dynamic Island pane: Focus Timer and Next Calendar Event switches, focus and break lengths, and timer controls">
+              </picture>
+            </div>
+            <figcaption>Settings, laid out like System Settings. It follows your accent color and Light or Dark mode.</figcaption>
+          </figure>
+
+          <figure class="shot shot-wide shot-span">
+            <div class="stage">
+              <picture>
+                <source srcset="assets/shots/clipboard-dark.png" media="(prefers-color-scheme: dark)">
+                <img src="assets/shots/clipboard-light.png" width="1400" height="920" loading="lazy"
+                     alt="Clipboard history with a search field, All, Text, Links, Images and Pinned filters, items grouped by day, and a preview of the selected item with its details and Paste, Pin and Delete buttons">
+              </picture>
+            </div>
+            <figcaption>Clipboard history: filters, items grouped by day, a preview of the selected one, <kbd>⌘1</kbd>–<kbd>⌘9</kbd> to paste.</figcaption>
+          </figure>
+
+          <figure class="shot shot-wide shot-span">
+            <div class="stage">
+              <picture>
+                <source srcset="assets/shots/annotation-dark.png" media="(prefers-color-scheme: dark)">
+                <img src="assets/shots/annotation-light.png" width="1640" height="1008" loading="lazy"
+                     alt="Annotation editor with a captured image and a toolbar of tools, colors, line widths, undo and redo, Save and Copy">
+              </picture>
+            </div>
+            <figcaption>The annotation editor after a capture. Every tool has a one-key shortcut.</figcaption>
           </figure>
         </div>
       </div>
@@ -318,7 +360,7 @@ open Zenith.app</code></pre>
 
   <footer class="foot">
     <div class="wrap foot-row">
-      <span class="brand small"><img src="assets/app-icon.png" width="20" height="20" alt=""> Zenith 2.2.0</span>
+      <span class="brand small"><img src="assets/app-icon.png" width="20" height="20" alt=""> Zenith 2.3.0</span>
       <span>MIT licensed · Made for macOS</span>
       <span class="foot-links">
         <a href="https://github.com/mynameisbat/zenith-macos">Source</a>

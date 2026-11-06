@@ -143,7 +143,7 @@ public struct CleanerSettingsTab: View {
                     }
                 }
 
-                Text(cleaner.statusMessage ?? "Scan your Mac to identify safe cleanable files and developer caches.")
+                Text(verbatim: cleaner.statusMessage ?? String(localized: "Scan your Mac to identify safe cleanable files and developer caches."))
                     .font(.system(size: 11.5))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -366,6 +366,8 @@ public struct CleanerSettingsTab: View {
                         .foregroundColor(category.isSelected ? .accentColor : .secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(category.isSelected ? "Deselect \(category.title)" : "Select \(category.title)")
+                .accessibilityAddTraits(category.isSelected ? [.isButton, .isSelected] : .isButton)
 
                 Image(systemName: category.icon)
                     .font(.system(size: 13, weight: .medium))
@@ -406,6 +408,8 @@ public struct CleanerSettingsTab: View {
                         .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)
+                .help(category.isExpanded ? "Hide items" : "Show items")
+                .accessibilityLabel(category.isExpanded ? "Hide items in \(category.title)" : "Show items in \(category.title)")
             }
             .padding(12)
             .background(Color.primary.opacity(0.035))

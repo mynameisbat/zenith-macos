@@ -119,7 +119,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         // 1. Clipboard History (⌘⇧V)
         let clipboardItem = NSMenuItem(
-            title: "Clipboard History",
+            title: String(localized: "Clipboard History"),
             action: #selector(clipboardHistoryAction(_:)),
             keyEquivalent: "v"
         )
@@ -131,7 +131,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         // 2. Capture Area (⌘⇧2)
         let captureAreaItem = NSMenuItem(
-            title: "Capture Area",
+            title: String(localized: "Capture Area"),
             action: #selector(captureAreaAction(_:)),
             keyEquivalent: "2"
         )
@@ -143,7 +143,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         // 3. Capture Fullscreen (⌘⇧1)
         let captureFullscreenItem = NSMenuItem(
-            title: "Capture Fullscreen",
+            title: String(localized: "Capture Fullscreen"),
             action: #selector(captureFullscreenAction(_:)),
             keyEquivalent: "1"
         )
@@ -169,7 +169,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         // 6. Clear History
         let clearHistoryItem = NSMenuItem(
-            title: "Clear History",
+            title: String(localized: "Clear History"),
             action: #selector(clearHistoryAction(_:)),
             keyEquivalent: ""
         )
@@ -184,7 +184,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         // Privacy Shield Toggle
         let privacyShieldItem = NSMenuItem(
-            title: "Privacy Shield: Inactive",
+            title: String(localized: "Privacy Shield: Inactive"),
             action: #selector(privacyShieldToggleAction(_:)),
             keyEquivalent: "p"
         )
@@ -196,7 +196,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         // Privacy Shield Dynamic Telemetry Row
         let privacyStatsItem = NSMenuItem(
-            title: "Privacy Shield: Inactive (Click to enable)",
+            title: String(localized: "Privacy Shield: Inactive (Click to enable)"),
             action: nil,
             keyEquivalent: ""
         )
@@ -210,7 +210,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         // 9. Preferences... (⌘,)
         let preferencesItem = NSMenuItem(
-            title: "Preferences...",
+            title: String(localized: "Preferences..."),
             action: #selector(preferencesAction(_:)),
             keyEquivalent: ","
         )
@@ -222,7 +222,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         // 9. Quit Zenith (⌘Q)
         let quitItem = NSMenuItem(
-            title: "Quit Zenith",
+            title: String(localized: "Quit Zenith"),
             action: #selector(quitAction(_:)),
             keyEquivalent: "q"
         )
@@ -259,14 +259,14 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         let shieldStats = PrivacyShieldStatistics.shared
         if let privacyItem = menu.item(withTag: MenuBarItemTag.privacyShieldToggle.rawValue) {
             privacyItem.state = shieldStats.isActive ? .on : .off
-            privacyItem.title = shieldStats.isActive ? "Privacy Shield: Active" : "Privacy Shield: Inactive"
+            privacyItem.title = shieldStats.isActive ? String(localized: "Privacy Shield: Active") : String(localized: "Privacy Shield: Inactive")
         }
         if let privacyStatsItem = menu.item(withTag: MenuBarItemTag.privacyShieldStats.rawValue) {
             if shieldStats.isActive {
                 let pingStr = shieldStats.dohLatencyMs > 0 ? "\(shieldStats.dohLatencyMs)ms" : "OK"
                 privacyStatsItem.title = "DoH: \(shieldStats.selectedProvider.displayName) • \(pingStr)"
             } else {
-                privacyStatsItem.title = "Privacy Shield: Inactive (Click to enable)"
+                privacyStatsItem.title = String(localized: "Privacy Shield: Inactive (Click to enable)")
             }
             privacyStatsItem.isEnabled = false
         }
@@ -289,24 +289,25 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         var tip = "Zenith\nCPU: \(cpu)% • RAM: \(ram)%"
         if snap.battery.hasBattery {
-            tip += "\nBattery: \(snap.battery.percentage)%"
+            tip += "\n" + String(localized: "Battery: \(snap.battery.percentage)%")
             if let cycles = snap.battery.cycleCount {
-                tip += " (Cycles: \(cycles))"
+                tip += " " + String(localized: "(Cycles: \(cycles))")
             }
         }
         if let topHog = snap.cpu.topHogs.first {
-            tip += "\nTop Hog: \(topHog.name) (\(String(format: "%.1f", topHog.cpuPercent))%)"
+            tip += "\n" + String(localized: "Top Hog: \(topHog.name) (\(String(format: "%.1f", topHog.cpuPercent))%)")
         }
         button.toolTip = tip
     }
 
     public func statisticsTitle(for count: Int) -> String {
         if count == 0 {
-            return "Clipboard: Empty"
+            return String(localized: "Clipboard: Empty")
         } else if count == 1 {
-            return "Clipboard: 1 item"
+            return String(localized: "Clipboard: 1 item")
         } else {
-            return "Clipboard: \(count) items"
+            // String(count): the menu has always shown plain digits, without the locale's grouping.
+            return String(localized: "Clipboard: \(String(count)) items")
         }
     }
 

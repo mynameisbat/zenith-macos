@@ -118,7 +118,7 @@ public final class ZenithIslandHostingView: NSHostingView<ZenithDynamicIslandVie
 
     private var nowPlayingHitRect: NSRect {
         let geom = ZenithIslandWindowController.shared.currentGeometry
-        let w = geom.nowPlayingIdleWidth
+        let w = ZenithIslandState.shared.focusTimer != nil ? geom.timerIdleWidth : geom.nowPlayingIdleWidth
         let h = geom.nowPlayingIdleHeight
         let x = (bounds.width - w) / 2
         let y = isFlipped ? 0 : (bounds.height - h)
@@ -129,7 +129,7 @@ public final class ZenithIslandHostingView: NSHostingView<ZenithDynamicIslandVie
     private var currentHoverHitRect: NSRect {
         if ZenithIslandState.shared.isExpanded || ZenithIslandState.shared.isDropTargeted {
             return bounds
-        } else if ZenithIslandState.shared.nowPlayingTrack?.isPlaying == true {
+        } else if ZenithIslandState.shared.hasCompactActivity {
             return nowPlayingHitRect
         } else {
             return idleHitRect
@@ -340,6 +340,19 @@ public final class ZenithIslandWindowController: NSObject {
             }
             .store(in: &cancellables)
 
+        // A timer starting or ending changes the closed island's size, like a track does.
+        ZenithIslandState.shared.$focusTimer
+            .map { $0 != nil }
+            .removeDuplicates()
+            .sink { [weak self] isRunning in
+                guard let self = self else { return }
+                self.handleMouseMoved(screenPoint: NSEvent.mouseLocation)
+                if isRunning {
+                    self.panel?.orderFrontRegardless()
+                }
+            }
+            .store(in: &cancellables)
+
         // Observe drop shelf preview item state changes
         ZenithIslandState.shared.$previewItem
             .removeDuplicates()
@@ -406,6 +419,7 @@ public final class ZenithIslandWindowController: NSObject {
         // Start system media & battery monitoring for Dynamic Island
         NowPlayingService.shared.startMonitoring()
         PowerSourceMonitorService.shared.startMonitoring()
+        IslandWidgetsCoordinator.shared.start()
     }
 
     /// Evaluates cursor position to toggle mouse click passthrough.
@@ -425,8 +439,8 @@ public final class ZenithIslandWindowController: NSObject {
             activeScreenRect = geometry.expandedFrame
         } else if state.activeAlert != nil {
             activeScreenRect = geometry.alertFrame
-        } else if state.nowPlayingTrack?.isPlaying == true {
-            activeScreenRect = geometry.nowPlayingIdleFrame
+        } else if state.hasCompactActivity {
+            activeScreenRect = geometry.compactActivityFrame(showsTimer: state.focusTimer != nil)
         } else {
             activeScreenRect = geometry.idleFrame
         }

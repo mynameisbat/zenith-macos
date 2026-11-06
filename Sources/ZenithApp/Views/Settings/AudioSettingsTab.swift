@@ -10,181 +10,98 @@ public struct AudioSettingsTab: View {
         self.viewModel = viewModel
     }
 
+    private static var assignments: [(effect: SoundEffect, title: String, description: String)] {
+        [
+            (.clipboardCopy, String(localized: "Copy"), String(localized: "When something is added to the clipboard history.")),
+            (.paste, String(localized: "Paste"), String(localized: "When you paste an item from the history.")),
+            (.capture, String(localized: "Screen Capture"), String(localized: "When a screenshot is taken.")),
+            (.colorSample, String(localized: "Color Sample"), String(localized: "When the loupe picks a color.")),
+            (.pinToggle, String(localized: "Pin"), String(localized: "When an item is pinned or unpinned.")),
+            (.delete, String(localized: "Delete"), String(localized: "When an item is removed from the history.")),
+            (.error, String(localized: "Error"), String(localized: "When something cannot be done."))
+        ]
+    }
+
     public var body: some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(alignment: .leading, spacing: 16) {
-                // 1. Audio Feedback Section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("AUDIO FEEDBACK")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Toggle("Enable Sound Effects", isOn: $viewModel.soundEffectsEnabled)
-                                .toggleStyle(.checkbox)
-
-                            Text("Auditory cues provide tactile acoustic feedback for system events.")
-                                .font(.system(size: 11.5))
-                                .foregroundColor(.secondary)
-                        }
-
-                        if viewModel.soundEffectsEnabled {
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Text("Feedback Volume:")
-                                        .font(.system(size: 12))
-                                    Spacer()
-                                    Text("\(Int(viewModel.soundVolume * 100))%")
-                                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                        .monospacedDigit()
-                                }
-
-                                HStack(spacing: 8) {
-                                    Image(systemName: "speaker.wave.1.fill")
-                                        .foregroundColor(.secondary)
-                                        .font(.system(size: 11))
-
-                                    Slider(
-                                        value: Binding(
-                                            get: { Double(viewModel.soundVolume) },
-                                            set: { viewModel.soundVolume = Float($0) }
-                                        ),
-                                        in: 0.0...1.0
-                                    )
-
-                                    Image(systemName: "speaker.wave.3.fill")
-                                        .foregroundColor(.secondary)
-                                        .font(.system(size: 11))
-                                }
-                            }
-                            .padding(.top, 4)
-                        }
-                    }
-                    .zenithSettingsCard()
+        ZenithSettingsPage {
+            ZenithSettingsSection("Sound Effects") {
+                ZenithSettingsRow(
+                    "Play Sound Effects",
+                    subtitle: "Short sounds for copying, pasting and capturing.",
+                    symbol: "speaker.wave.2.fill",
+                    tint: ZenithTint.audio
+                ) {
+                    Toggle("Play Sound Effects", isOn: $viewModel.soundEffectsEnabled)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
                 }
 
-                // 2. Sound Assignments Section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("SOUND ASSIGNMENTS")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-
-                    VStack(spacing: 10) {
-                        soundPickerRow(
-                            effect: .clipboardCopy,
-                            title: "Clipboard Copy",
-                            description: "Tactile acoustic cue emitted when copying content to clipboard."
-                        )
-
-                        Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 0.5)
-
-                        soundPickerRow(
-                            effect: .paste,
-                            title: "Paste Selection",
-                            description: "Auditory feedback when restoring an item from history."
-                        )
-
-                        Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 0.5)
-
-                        soundPickerRow(
-                            effect: .capture,
-                            title: "Screen Capture",
-                            description: "Shutter cue emitted upon completing a screenshot."
-                        )
-
-                        Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 0.5)
-
-                        soundPickerRow(
-                            effect: .colorSample,
-                            title: "Color Sampler",
-                            description: "Resonant ping when sampling colors with the Loupe magnifier."
-                        )
-
-                        Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 0.5)
-
-                        soundPickerRow(
-                            effect: .pinToggle,
-                            title: "Pin Toggle",
-                            description: "Mechanical latch cue when pinning or unpinning an item."
-                        )
-
-                        Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 0.5)
-
-                        soundPickerRow(
-                            effect: .delete,
-                            title: "Delete Item",
-                            description: "Subtle cue emitted when removing an item from history."
-                        )
-
-                        Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 0.5)
-
-                        soundPickerRow(
-                            effect: .error,
-                            title: "Error Boundary",
-                            description: "Alert sound emitted when an invalid action occurs."
-                        )
-                    }
-                    .zenithSettingsCard()
-                }
-
-                // 3. Audio Library Section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("AUDIO LIBRARY")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Custom Sound Files")
-                                    .font(.system(size: 12.5, weight: .medium))
-                                Text("Import .wav, .aiff, .m4a, or .mp3 files into ~/Library/Application Support/Zenith/Sounds/")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                            }
-
-                            Spacer()
-
-                            Button {
-                                importSoundFile()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "plus.circle.fill")
-                                    Text("Import Sound...")
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                        }
-
-                        if !viewModel.customSounds.isEmpty {
-                            Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 0.5)
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Available Custom Sounds:")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-
-                                ForEach(viewModel.customSounds, id: \.self) { choice in
-                                    HStack {
-                                        Image(systemName: "waveform")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(.accentColor)
-                                        Text(choice.displayName)
-                                            .font(.system(size: 11.5, design: .monospaced))
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, 1)
-                                }
-                            }
+                if viewModel.soundEffectsEnabled {
+                    ZenithSettingsDivider(inset: 44)
+                    ZenithSettingsRow("Volume", symbol: "dial.medium.fill", tint: ZenithTint.audio) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "speaker.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                            Slider(
+                                value: Binding(
+                                    get: { Double(viewModel.soundVolume) },
+                                    set: { viewModel.soundVolume = Float($0) }
+                                ),
+                                in: 0.0...1.0
+                            )
+                            .frame(width: 160)
+                            .accessibilityLabel("Volume")
+                            .accessibilityValue("\(Int(viewModel.soundVolume * 100)) percent")
+                            Image(systemName: "speaker.wave.3.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
                         }
                     }
-                    .zenithSettingsCard()
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
+
+            ZenithSettingsSection("Sounds") {
+                ForEach(Array(Self.assignments.enumerated()), id: \.offset) { index, entry in
+                    if index > 0 {
+                        ZenithSettingsDivider()
+                    }
+                    soundPickerRow(effect: entry.effect, title: entry.title, description: entry.description)
+                }
+            }
+            .disabled(!viewModel.soundEffectsEnabled)
+            .opacity(viewModel.soundEffectsEnabled ? 1 : 0.5)
+
+            ZenithSettingsSection(
+                "Your Sounds",
+                footer: "Imported files are copied to ~/Library/Application Support/Zenith/Sounds and appear in every menu above."
+            ) {
+                ZenithSettingsRow(
+                    "Import a Sound",
+                    subtitle: "WAV, AIFF, M4A or MP3.",
+                    symbol: "waveform",
+                    tint: Color(nsColor: .systemPink)
+                ) {
+                    Button("Import…") {
+                        importSoundFile()
+                    }
+                }
+
+                ForEach(viewModel.customSounds, id: \.self) { choice in
+                    ZenithSettingsDivider(inset: 44)
+                    HStack(spacing: 8) {
+                        Image(systemName: "music.note")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 22)
+                        Text(choice.displayName)
+                            .font(.system(size: 12.5))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                }
+            }
         }
         .onAppear {
             refreshCustomSounds()
@@ -192,57 +109,47 @@ public struct AudioSettingsTab: View {
     }
 
     private func soundPickerRow(effect: SoundEffect, title: String, description: String) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 12.5, weight: .medium))
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            Picker("", selection: Binding(
-                get: { viewModel.soundChoice(for: effect) },
-                set: { newChoice in
-                    viewModel.setSoundChoice(newChoice, for: effect)
-                }
-            )) {
-                Section("System Sounds") {
-                    ForEach(SoundChoice.standardSystemSounds, id: \.self) { name in
-                        Text(name).tag(SoundChoice.system(name: name))
+        ZenithSettingsRow(title: Text(verbatim: title), subtitle: Text(verbatim: description)) {
+            HStack(spacing: 6) {
+                Picker(title, selection: Binding(
+                    get: { viewModel.soundChoice(for: effect) },
+                    set: { newChoice in
+                        viewModel.setSoundChoice(newChoice, for: effect)
                     }
-                }
-
-                if !viewModel.customSounds.isEmpty {
-                    Section("Custom Sounds") {
-                        ForEach(viewModel.customSounds, id: \.self) { choice in
-                            Text(choice.displayName).tag(choice)
+                )) {
+                    Section("System Sounds") {
+                        ForEach(SoundChoice.standardSystemSounds, id: \.self) { name in
+                            Text(name).tag(SoundChoice.system(name: name))
                         }
                     }
-                }
 
-                Section {
-                    Text("Muted").tag(SoundChoice.muted)
-                }
-            }
-            .pickerStyle(.menu)
-            .frame(minWidth: 130, maxWidth: 160)
+                    if !viewModel.customSounds.isEmpty {
+                        Section("Your Sounds") {
+                            ForEach(viewModel.customSounds, id: \.self) { choice in
+                                Text(choice.displayName).tag(choice)
+                            }
+                        }
+                    }
 
-            Button {
-                viewModel.playTestSound(effect: effect)
-            } label: {
-                HStack(spacing: 4) {
+                    Section {
+                        Text("None").tag(SoundChoice.muted)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 130)
+
+                Button {
+                    viewModel.playTestSound(effect: effect)
+                } label: {
                     Image(systemName: "play.fill")
-                        .font(.system(size: 9))
-                    Text("Test")
-                        .font(.system(size: 11))
+                        .font(.system(size: 10))
                 }
+                .controlSize(.small)
+                .disabled(!viewModel.soundEffectsEnabled || viewModel.soundChoice(for: effect) == .muted)
+                .help("Play")
+                .accessibilityLabel("Play \(title) sound")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(!viewModel.soundEffectsEnabled || viewModel.soundChoice(for: effect) == .muted)
         }
     }
 

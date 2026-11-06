@@ -2,48 +2,6 @@ import SwiftUI
 import AppKit
 import ZenithCore
 
-// MARK: - Type Badge View
-
-public struct TypeBadgeView: View {
-    public let type: ClipboardItemType
-
-    public init(type: ClipboardItemType) {
-        self.type = type
-    }
-
-    public var body: some View {
-        HStack(spacing: 3.5) {
-            Image(systemName: iconName)
-                .font(.system(size: 10, weight: .medium))
-            Text(badgeLabel)
-                .font(.system(size: 10, weight: .medium))
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2.5)
-        .foregroundColor(.secondary)
-        .background(
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(Color.primary.opacity(0.05))
-        )
-    }
-
-    private var iconName: String {
-        switch type {
-        case .plainText: return "doc.text"
-        case .richText: return "text.quote"
-        case .image: return "photo"
-        }
-    }
-
-    private var badgeLabel: String {
-        switch type {
-        case .plainText: return "TXT"
-        case .richText: return "RTF"
-        case .image: return "IMG"
-        }
-    }
-}
-
 @MainActor
 final class ThumbnailLoader: ObservableObject {
     @Published var image: CGImage?
@@ -152,100 +110,8 @@ public struct ThumbnailSkeletonView: View {
     }
 }
 
-// MARK: - QuickLook Preview Card
-
-public struct QuickLookPreviewCard: View {
-    public let item: ClipboardItem
-    public var onCopy: () -> Void
-    public var onClose: () -> Void
-
-    public init(item: ClipboardItem, onCopy: @escaping () -> Void = {}, onClose: @escaping () -> Void = {}) {
-        self.item = item
-        self.onCopy = onCopy
-        self.onClose = onClose
-    }
-
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Header
-            HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "photo")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.accentColor)
-                    Text("Image Preview")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-
-                Spacer()
-
-                Button {
-                    onClose()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-
-            // Image Preview Container
-            if case .image(let data, let w, let h) = item.payload,
-               let nsImage = NSImage(data: data) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.primary.opacity(0.03))
-
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: 280, maxHeight: 180)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.8)
-                )
-
-                // Meta Info
-                HStack {
-                    Text("\(w) × \(h) px")
-                        .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    Text(SystemCleanerService.formatBytes(Int64(item.byteSize)))
-                        .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            // Copy Action Button
-            Button {
-                onCopy()
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "doc.on.clipboard")
-                        .font(.system(size: 11))
-                    Text("Copy to Clipboard")
-                        .font(.system(size: 11.5, weight: .medium))
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-        }
-        .padding(12)
-        .frame(width: 300)
-    }
-}
-
 final class RowHoverState: ObservableObject {
     @Published var isHovered: Bool = false
-    @Published var showQuickLook: Bool = false
 }
 
 final class RowTapDebouncer: ObservableObject {
@@ -259,13 +125,49 @@ final class RowTapDebouncer: ObservableObject {
     }
 }
 
+// MARK: - Leading Icon
+
+/// What sits at the start of a clipboard row: the image itself, a color swatch, or a symbol for the kind of text.
+struct ClipboardItemGlyph: View {
+    let item: ClipboardItem
+    let isSelected: Bool
+    var size: CGFloat = 26
+
+    var body: some View {
+        Group {
+            switch item.contentKind {
+            case .image:
+                ThumbnailPreviewView(item: item, size: size, cornerRadius: 5)
+            case .color:
+                if let rgba = item.colorComponents {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color(.sRGB, red: rgba.red, green: rgba.green, blue: rgba.blue, opacity: rgba.alpha))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5)
+                        )
+                        .frame(width: size - 6, height: size - 6)
+                }
+            default:
+                Image(systemName: item.contentKind.symbolName)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(isSelected ? AnyShapeStyle(Color.white) : AnyShapeStyle(.secondary))
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Clipboard Row View
 
+/// One line of the clipboard list: glyph, a single line of text, pin mark and its ⌘-number, like a menu item.
 public struct ClipboardRowView: View {
     public let item: ClipboardItem
     public let isSelected: Bool
     public let quickIndex: Int? // 1...9
     public let onSelect: () -> Void
+    public let onActivate: () -> Void
     public let onTogglePin: () -> Void
     public let onDelete: () -> Void
 
@@ -277,6 +179,7 @@ public struct ClipboardRowView: View {
         isSelected: Bool,
         quickIndex: Int?,
         onSelect: @escaping () -> Void,
+        onActivate: @escaping () -> Void,
         onTogglePin: @escaping () -> Void,
         onDelete: @escaping () -> Void = {}
     ) {
@@ -284,142 +187,68 @@ public struct ClipboardRowView: View {
         self.isSelected = isSelected
         self.quickIndex = quickIndex
         self.onSelect = onSelect
+        self.onActivate = onActivate
         self.onTogglePin = onTogglePin
         self.onDelete = onDelete
     }
 
+    private var title: String {
+        if case .image(_, let width, let height) = item.payload {
+            return String(localized: "Image \(String(width)) × \(String(height))")
+        }
+        // One line: newlines and tabs in a preview read as spaces.
+        return item.previewText
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\t", with: " ")
+    }
+
     public var body: some View {
-        HStack(spacing: 10) {
-            // 1. Quick Shortcut Badge (⌘1...⌘9)
+        HStack(spacing: 8) {
+            ClipboardItemGlyph(item: item, isSelected: isSelected)
+
+            Text(title)
+                .font(.system(size: 13))
+                .foregroundStyle(isSelected ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer(minLength: 6)
+
+            if item.isPinned {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(isSelected ? AnyShapeStyle(Color.white.opacity(0.85)) : AnyShapeStyle(ZenithTheme.accent))
+                    .accessibilityLabel("Pinned")
+            }
+
             if let index = quickIndex {
-                KeycapBadgeView(text: "⌘\(index)")
-            } else {
-                Spacer().frame(width: 26) // Align with numbered rows
-            }
-
-            // 2. Type Badge Pill
-            TypeBadgeView(type: item.itemType)
-
-            // 3. Content Preview (Text or Image Thumbnail)
-            HStack(spacing: 8) {
-                if item.itemType == .image {
-                    ThumbnailPreviewView(item: item, size: 32, cornerRadius: 5)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    if item.itemType == .image {
-                        Text("Image")
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundColor(.primary)
-                    } else {
-                        Text(item.previewText)
-                            .font(.system(size: 12, weight: .regular))
-                            .lineLimit(2)
-                            .foregroundColor(.primary)
-                    }
-
-                    HStack(spacing: 6) {
-                        if item.itemType == .image, case .image(_, let w, let h) = item.payload {
-                            Text("\(w) × \(h)")
-                                .font(.system(size: 10))
-                                .monospacedDigit()
-                                .foregroundColor(.secondary)
-
-                            Text("•")
-                                .font(.system(size: 10))
-                                .foregroundColor(.secondary.opacity(0.4))
-                        }
-
-                        Text(relativeTimeString(from: item.timestamp))
-                            .font(.system(size: 10))
-                            .monospacedDigit()
-                            .foregroundColor(.secondary)
-
-                        Text("•")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary.opacity(0.4))
-
-                        Text(SystemCleanerService.formatBytes(Int64(item.byteSize)))
-                            .font(.system(size: 10))
-                            .monospacedDigit()
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-
-            Spacer(minLength: 4)
-
-            // 4. Action Buttons (Pin, Quick Preview & Delete on hover)
-            HStack(spacing: 6) {
-                if item.itemType == .image {
-                    Button(action: { hoverState.showQuickLook = true }) {
-                        Image(systemName: "eye")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary.opacity(hoverState.isHovered ? 0.7 : 0.0))
-                    }
-                    .buttonStyle(.plain)
-                    .help("Quick Preview")
-                    .popover(isPresented: $hoverState.showQuickLook, arrowEdge: .trailing) {
-                        QuickLookPreviewCard(
-                            item: item,
-                            onCopy: onSelect,
-                            onClose: { hoverState.showQuickLook = false }
-                        )
-                    }
-                }
-
-                Button(action: onTogglePin) {
-                    Image(systemName: item.isPinned ? "pin.fill" : "pin")
-                        .font(.system(size: 11))
-                        .foregroundColor(item.isPinned ? Color.accentColor : .secondary.opacity(hoverState.isHovered ? 0.6 : 0.0))
-                }
-                .buttonStyle(.plain)
-                .help(item.isPinned ? "Unpin item" : "Pin item to prevent deletion")
-
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary.opacity(hoverState.isHovered ? 0.7 : 0.0))
-                }
-                .buttonStyle(.plain)
-                .help("Delete item (⌘⌫)")
+                ZenithShortcutText("⌘\(index)", isOnSelection: isSelected)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(rowBackgroundColor)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(isSelected ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 1)
-        )
-        .contentShape(Rectangle())
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .zenithRowBackground(isSelected: isSelected, isHovered: hoverState.isHovered, cornerRadius: 6)
         .onHover { hovering in
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.75)) {
-                hoverState.isHovered = hovering
-            }
+            hoverState.isHovered = hovering
         }
-        .onTapGesture {
+        .onTapGesture(count: 2) {
+            onActivate()
+        }
+        .simultaneousGesture(TapGesture().onEnded {
             guard tapDebouncer.shouldProcessTap() else { return }
             onSelect()
+        })
+        .contextMenu {
+            Button("Paste") { onActivate() }
+            Button(item.isPinned ? "Unpin" : "Pin") { onTogglePin() }
+            Divider()
+            Button("Delete", role: .destructive) { onDelete() }
         }
-    }
-
-    private var rowBackgroundColor: Color {
-        if isSelected {
-            return Color.accentColor.opacity(0.18)
-        } else if hoverState.isHovered {
-            return Color.primary.opacity(0.06)
-        } else {
-            return Color.clear
-        }
-    }
-
-    private func relativeTimeString(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(item.isPinned
+            ? Text("\(item.contentKind.title): \(title), pinned")
+            : Text("\(item.contentKind.title): \(title)"))
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { onActivate() }
     }
 }

@@ -20,19 +20,19 @@ public enum VisionEngineError: Error, Sendable, Equatable, LocalizedError, Custo
     public var errorDescription: String? {
         switch self {
         case .invalidImage(let reason):
-            return "Invalid image: \(reason)"
+            return String(localized: "Invalid image: \(reason)")
         case .corruptData:
-            return "Image data is corrupted or unreadable"
+            return String(localized: "Image data is corrupted or unreadable")
         case .recognitionFailed(let reason):
-            return "Vision recognition failed: \(reason)"
+            return String(localized: "Vision recognition failed: \(reason)")
         case .processingFailed(let reason):
-            return "Vision processing failed: \(reason)"
+            return String(localized: "Vision processing failed: \(reason)")
         case .cancelled:
-            return "Vision operation was cancelled"
+            return String(localized: "Vision operation was cancelled")
         case .concurrencyLimitExceeded:
-            return "Vision concurrency limit exceeded"
+            return String(localized: "Vision concurrency limit exceeded")
         case .unsupportedLanguage(let languages):
-            return "Unsupported recognition languages: \(languages.joined(separator: ", "))"
+            return String(localized: "Unsupported recognition languages: \(languages.joined(separator: ", "))")
         }
     }
 

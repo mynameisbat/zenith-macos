@@ -43,6 +43,11 @@ if [ -f "$PROJECT_ROOT/AppIcon.icns" ]; then
     cp "$PROJECT_ROOT/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 fi
 
+echo "==> Copying localizations (Localization/*.lproj)..."
+for lproj in "$PROJECT_ROOT"/Localization/*.lproj; do
+    [ -d "$lproj" ] && cp -R "$lproj" "$RESOURCES_DIR/"
+done
+
 echo "==> Generating Info.plist for Zenith..."
 cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -51,6 +56,13 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
 <dict>
     <key>CFBundleExecutable</key>
     <string>Zenith</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>vi</string>
+    </array>
     <key>CFBundleIdentifier</key>
     <string>com.zenith.workspace</string>
     <key>CFBundleName</key>
@@ -77,6 +89,10 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <true/>
     <key>NSAppleEventsUsageDescription</key>
     <string>Zenith uses Apple Events to see what Music, Spotify and your browser are playing, to control playback from the Dynamic Island, and to ask Finder to move to the Trash a leftover folder that macOS does not let other apps move.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Zenith shows your next calendar event in the Dynamic Island when you turn on the Calendar widget. Events are only read on this Mac.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Zenith shows your next calendar event in the Dynamic Island when you turn on the Calendar widget. Events are only read on this Mac.</string>
 </dict>
 </plist>
 EOF

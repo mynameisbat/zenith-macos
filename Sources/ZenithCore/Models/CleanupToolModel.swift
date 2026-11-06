@@ -88,24 +88,27 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
     public func selectionSummary(limit: Int = 6) -> String {
         let chosen = selectedCandidates.sorted { $0.bytes > $1.bytes }
         var lines = chosen.prefix(limit).map { "• \($0.title) — \(Self.format($0.bytes))" }
-        if chosen.count > limit { lines.append("…and \(chosen.count - limit) more") }
+        if chosen.count > limit { lines.append(String(localized: "…and \(chosen.count - limit) more")) }
         return lines.joined(separator: "\n")
     }
 
     public func confirmation() -> CleanupConfirmation {
         let count = selectedCandidates.count
-        let noun = count == 1 ? "item" : "items"
         if movesToTrash {
             return CleanupConfirmation(
-                title: "Move \(count) \(noun) to the Trash?",
-                message: "\(Self.format(selectedBytes)) will go to the Trash, where you can still restore it:\n\(selectionSummary())",
-                actionTitle: "Move to Trash"
+                title: count == 1
+                    ? String(localized: "Move 1 item to the Trash?")
+                    : String(localized: "Move \(count) items to the Trash?"),
+                message: String(localized: "\(Self.format(selectedBytes)) will go to the Trash, where you can still restore it:\n\(selectionSummary())"),
+                actionTitle: String(localized: "Move to Trash")
             )
         }
         return CleanupConfirmation(
-            title: "Delete the junk files on \(count) \(count == 1 ? "drive" : "drives")?",
-            message: "These are deleted for good and cannot be restored:\n\(selectionSummary())",
-            actionTitle: "Delete"
+            title: count == 1
+                ? String(localized: "Delete the junk files on 1 drive?")
+                : String(localized: "Delete the junk files on \(count) drives?"),
+            message: String(localized: "These are deleted for good and cannot be restored:\n\(selectionSummary())"),
+            actionTitle: String(localized: "Delete")
         )
     }
 
@@ -119,7 +122,9 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
         candidates = found
         hasScanned = true
         isScanning = false
-        status = found.isEmpty ? "Nothing to clean here." : "\(found.count) found, \(Self.format(totalBytes)) in all."
+        status = found.isEmpty
+            ? String(localized: "Nothing to clean here.")
+            : String(localized: "\(found.count) found, \(Self.format(totalBytes)) in all.")
     }
 
     /// Removes the selected candidates after `confirm` agrees. Returns the bytes freed (0 when declined or on failure).
@@ -144,7 +149,7 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
         if let failure {
             status = failure
         } else {
-            status = "Freed \(Self.format(freed))."
+            status = String(localized: "Freed \(Self.format(freed)).")
         }
         return freed
     }
@@ -176,9 +181,9 @@ extension CleanupToolModel {
         let store = ItemStore<ProjectArtifactItem>()
         return CleanupToolModel(
             kind: .projects,
-            title: "Project build folders",
-            explanation: "Folders a project rebuilds by itself, such as node_modules, Cargo target and .build. Only projects Zenith recognises are listed, and folders named build, dist, bin or obj only if Git ignores them. Projects touched in the last week are not ticked for you.",
-            actionTitle: "Move to Trash",
+            title: String(localized: "Project build folders"),
+            explanation: String(localized: "Folders a project rebuilds by itself, such as node_modules, Cargo target and .build. Only projects Zenith recognises are listed, and folders named build, dist, bin or obj only if Git ignores them. Projects touched in the last week are not ticked for you."),
+            actionTitle: String(localized: "Move to Trash"),
             movesToTrash: true,
             scan: {
                 let summary = await Task.detached { service.scan(customSearchRoots: roots(), minAgeDays: 0) }.value
@@ -187,7 +192,7 @@ extension CleanupToolModel {
                     CleanupCandidate(
                         id: $0.id,
                         title: "\($0.projectName) / \($0.artifactName)",
-                        detail: "\(tilde($0.artifactPath)) · untouched \($0.daysSinceModified) days",
+                        detail: String(localized: "\(tilde($0.artifactPath)) · untouched \($0.daysSinceModified) days"),
                         bytes: $0.sizeBytes,
                         // A project worked on this week is probably open in an editor or being built right now.
                         isSelected: $0.daysSinceModified >= 7
@@ -206,9 +211,9 @@ extension CleanupToolModel {
         let store = ItemStore<StaleInstallerItem>()
         return CleanupToolModel(
             kind: .installers,
-            title: "Old installers",
-            explanation: "Disk images and packages in Downloads and Desktop that nothing has touched for three days. A disk image that is mounted right now is left out.",
-            actionTitle: "Move to Trash",
+            title: String(localized: "Old installers"),
+            explanation: String(localized: "Disk images and packages in Downloads and Desktop that nothing has touched for three days. A disk image that is mounted right now is left out."),
+            actionTitle: String(localized: "Move to Trash"),
             movesToTrash: true,
             scan: {
                 let found = await service.scan(directories: directories).filter { !$0.isMounted }
@@ -229,9 +234,9 @@ extension CleanupToolModel {
         let store = ItemStore<OrphanedAppItem>()
         return CleanupToolModel(
             kind: .leftovers,
-            title: "Leftovers of deleted apps",
-            explanation: "Folders in your Library named after an app that is no longer installed and that nothing has touched for 30 days. They can hold documents or settings you would want if you reinstall the app, so nothing is ticked for you.",
-            actionTitle: "Move to Trash",
+            title: String(localized: "Leftovers of deleted apps"),
+            explanation: String(localized: "Folders in your Library named after an app that is no longer installed and that nothing has touched for 30 days. They can hold documents or settings you would want if you reinstall the app, so nothing is ticked for you."),
+            actionTitle: String(localized: "Move to Trash"),
             movesToTrash: true,
             scan: {
                 let found = await service.scan()
@@ -240,7 +245,7 @@ extension CleanupToolModel {
                     CleanupCandidate(
                         id: $0.id,
                         title: $0.appName,
-                        detail: "\($0.category) · \(tilde($0.path))" + ($0.category == "Containers" ? " · holds that app's own data, such as saved games" : ""),
+                        detail: "\($0.category) · \(tilde($0.path))" + ($0.category == "Containers" ? String(localized: " · holds that app's own data, such as saved games") : ""),
                         bytes: $0.byteSize,
                         isSelected: false
                     )
@@ -261,16 +266,16 @@ extension CleanupToolModel {
         let store = ItemStore<ExternalVolumeItem>()
         return CleanupToolModel(
             kind: .drives,
-            title: "External drive junk",
-            explanation: "Hidden metadata files that macOS and Windows scatter on external drives. Your own files are not touched. These files are deleted, not moved to the Trash.",
-            actionTitle: "Delete",
+            title: String(localized: "External drive junk"),
+            explanation: String(localized: "Hidden metadata files that macOS and Windows scatter on external drives. Your own files are not touched. These files are deleted, not moved to the Trash."),
+            actionTitle: String(localized: "Delete"),
             movesToTrash: false,
             scan: {
                 let volumes = await Task.detached { discover?() ?? service.discoverExternalVolumes() }.value
                 let withJunk = volumes.filter { $0.phantomFileCount > 0 }
                 store.replace(Dictionary(withJunk.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }))
                 return withJunk.map {
-                    CleanupCandidate(id: $0.id, title: $0.name, detail: "\($0.phantomFileCount) junk files", bytes: $0.phantomBytes, isSelected: true)
+                    CleanupCandidate(id: $0.id, title: $0.name, detail: String(localized: "\($0.phantomFileCount) junk files"), bytes: $0.phantomBytes, isSelected: true)
                 }
             },
             clean: { chosen in

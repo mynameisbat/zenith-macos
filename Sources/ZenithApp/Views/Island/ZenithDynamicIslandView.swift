@@ -18,8 +18,9 @@ public struct ZenithDynamicIslandView: View {
         islandState.activeAlert != nil
     }
 
+    /// Something shows beside the notch while the island is closed: a running timer, or else playing media.
     private var isNowPlayingActive: Bool {
-        islandState.nowPlayingTrack?.isPlaying == true
+        islandState.hasCompactActivity
     }
 
     private var currentWidth: CGFloat {
@@ -27,6 +28,8 @@ public struct ZenithDynamicIslandView: View {
             return geometry.alertWidth
         } else if islandState.isExpanded {
             return geometry.expandedWidth
+        } else if islandState.focusTimer != nil {
+            return geometry.timerIdleWidth
         } else if isNowPlayingActive {
             return geometry.nowPlayingIdleWidth
         } else {
@@ -120,6 +123,16 @@ public struct ZenithDynamicIslandView: View {
             } else if islandState.isExpanded {
                 expandedIslandContent
                     .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            } else if let timer = islandState.focusTimer {
+                IslandTimerCompactWings(snapshot: timer, geometry: geometry)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        islandState.activeTab = .widgets
+                        islandState.onMouseEnter()
+                    }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityHint("Opens the timer")
+                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
             } else if isNowPlayingActive, let track = islandState.nowPlayingTrack {
                 nowPlayingIdleCapsule(track)
                     .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
@@ -133,6 +146,7 @@ public struct ZenithDynamicIslandView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.isExpanded)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.activeAlert)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isNowPlayingActive)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.focusTimer == nil)
         .animation(.spring(response: 0.32, dampingFraction: 0.8), value: islandState.isDropTargeted)
         .onChange(of: islandState.isDropTargeted) { _, targeted in
             if targeted {
@@ -159,6 +173,10 @@ public struct ZenithDynamicIslandView: View {
         .onTapGesture {
             islandState.onMouseEnter()
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Now playing: \(track.title), \(track.artist)")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Opens the player")
     }
 
     // MARK: - Alert Capsule HUD
@@ -199,73 +217,118 @@ public struct ZenithDynamicIslandView: View {
     /// The panel is a fixed 96 pt. On a notched display the hardware notch hides the first `notchRect.height` pt of it,
     /// so the content starts below that, once, here. (Each piece used to add its own notch inset, which pushed the
     /// tab switcher up behind the notch and the rest off the bottom whenever both Now Playing and the shelf existed.)
+    private var availableTabs: [IslandExpandedTab] {
+        ZenithIslandState.availableTabs(
+            hasTrack: islandState.nowPlayingTrack != nil,
+            hasShelfItems: !islandState.droppedItems.isEmpty,
+            showsWidgets: islandState.showsWidgets
+        )
+    }
+
+    private var currentTab: IslandExpandedTab {
+        ZenithIslandState.resolvedTab(
+            active: islandState.activeTab,
+            hasTrack: islandState.nowPlayingTrack != nil,
+            hasShelfItems: !islandState.droppedItems.isEmpty,
+            showsWidgets: islandState.showsWidgets,
+            isDropTargeted: islandState.isDropTargeted
+        )
+    }
+
     private var expandedIslandContent: some View {
-        let hasTabs = islandState.nowPlayingTrack != nil && !islandState.droppedItems.isEmpty
-        let showsNowPlaying = islandState.nowPlayingTrack != nil
-            && (islandState.activeTab == .nowPlaying || islandState.droppedItems.isEmpty)
+        let tabs = availableTabs
+        let current = currentTab
+        let hasTabs = tabs.count > 1 && !islandState.isDropTargeted
 
         return ZStack(alignment: .top) {
             VStack(spacing: 0) {
                 // Without a notch the tab switcher takes its own row; with one it sits in the free strips either
                 // side of the notch (below).
                 if hasTabs && !geometry.hasNotch {
-                    tabSwitcherHeader
+                    tabSwitcherHeader(tabs: tabs, current: current)
                         .padding(.top, 4)
                 }
 
-                if showsNowPlaying, let track = islandState.nowPlayingTrack {
-                    NowPlayingExpandedView(
-                        track: track,
-                        onPrevious: { NowPlayingService.shared.previousTrack() },
-                        onTogglePlayPause: { NowPlayingService.shared.togglePlayPause() },
-                        onNext: { NowPlayingService.shared.nextTrack() }
-                    )
-                } else {
+                switch current {
+                case .nowPlaying:
+                    if let track = islandState.nowPlayingTrack {
+                        NowPlayingExpandedView(
+                            track: track,
+                            onPrevious: { NowPlayingService.shared.previousTrack() },
+                            onTogglePlayPause: { NowPlayingService.shared.togglePlayPause() },
+                            onNext: { NowPlayingService.shared.nextTrack() }
+                        )
+                    } else {
+                        shelfContent
+                    }
+                case .widgets:
+                    IslandWidgetsPanel(islandState: islandState)
+                case .shelf:
                     shelfContent
                 }
             }
             .padding(.top, geometry.hasNotch ? geometry.notchRect.height + 2 : (hasTabs ? 0 : 6))
 
             if hasTabs && geometry.hasNotch {
-                tabSwitcherHeader
+                tabSwitcherHeader(tabs: tabs, current: current)
                     .frame(height: geometry.notchRect.height)
             }
         }
         .frame(width: geometry.expandedWidth, height: geometry.expandedHeight, alignment: .top)
     }
 
-    /// With a notch the two tabs sit either side of it; without one they sit together at the left.
-    private var tabSwitcherHeader: some View {
-        HStack(spacing: 4) {
-            nowPlayingTabButton
+    /// With a notch the tabs sit either side of it (icons only when three must share the space); without one they
+    /// sit together at the left.
+    private func tabSwitcherHeader(tabs: [IslandExpandedTab], current: IslandExpandedTab) -> some View {
+        let compact = geometry.hasNotch && tabs.count > 2
+        let leftCount = geometry.hasNotch ? (tabs.count + 1) / 2 : tabs.count
+        return HStack(spacing: 4) {
+            ForEach(Array(tabs.prefix(leftCount)), id: \.self) { tab in
+                tabButton(for: tab, isSelected: tab == current, compact: compact)
+            }
             if geometry.hasNotch {
                 Spacer(minLength: geometry.notchRect.width + 8)
-                shelfTabButton
+                ForEach(Array(tabs.dropFirst(leftCount)), id: \.self) { tab in
+                    tabButton(for: tab, isSelected: tab == current, compact: compact)
+                }
             } else {
-                shelfTabButton
                 Spacer()
             }
         }
         .padding(.horizontal, 8)
     }
 
-    private func tabButton(
-        symbol: String,
-        title: String,
-        isSelected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button {
+    private func tabButton(for tab: IslandExpandedTab, isSelected: Bool, compact: Bool) -> some View {
+        let symbol: String
+        let title: String
+        switch tab {
+        case .nowPlaying:
+            symbol = "music.note"
+            title = String(localized: "Now Playing")
+        case .widgets:
+            symbol = islandState.focusTimer != nil ? "timer" : "square.grid.2x2.fill"
+            title = String(localized: "Widgets")
+        case .shelf:
+            symbol = "tray.and.arrow.down.fill"
+            title = String(localized: "Shelf (\(islandState.droppedItems.count))")
+        }
+        return Button {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                action()
+                islandState.activeTab = tab
             }
         } label: {
             HStack(spacing: 3) {
                 Image(systemName: symbol)
-                    .font(.system(size: 8.5))
-                Text(title)
-                    .font(.system(size: 10, weight: .semibold))
-                    .lineLimit(1)
+                    .font(.system(size: compact ? 10 : 8.5))
+                if !compact {
+                    Text(title)
+                        .font(.system(size: 10, weight: .semibold))
+                        .lineLimit(1)
+                } else if tab == .shelf {
+                    Text("\(islandState.droppedItems.count)")
+                        .font(.system(size: 10, weight: .semibold))
+                        .monospacedDigit()
+                }
             }
             .fixedSize()
             .foregroundColor(isSelected ? .white : .white.opacity(0.72))
@@ -273,29 +336,14 @@ public struct ZenithDynamicIslandView: View {
             .padding(.vertical, 3)
             .background(
                 Capsule()
-                    .fill(isSelected ? Color.white.opacity(0.12) : Color.clear)
+                    .fill(isSelected ? Color.white.opacity(0.14) : Color.clear)
             )
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .help(title)
         .accessibilityLabel(title)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private var nowPlayingTabButton: some View {
-        tabButton(symbol: "music.note", title: "Now Playing", isSelected: islandState.activeTab == .nowPlaying) {
-            islandState.activeTab = .nowPlaying
-        }
-    }
-
-    private var shelfTabButton: some View {
-        tabButton(
-            symbol: "tray.and.arrow.down.fill",
-            title: "Shelf (\(islandState.droppedItems.count))",
-            isSelected: islandState.activeTab == .shelf
-        ) {
-            islandState.activeTab = .shelf
-        }
     }
 
     // MARK: - Shelf Content
@@ -337,9 +385,8 @@ public struct ZenithDynamicIslandView: View {
         let count = islandState.droppedItems.count
         let hasText = islandState.droppedItems.contains { $0.textContent != nil }
         if count > 1 || hasText {
-            let noun = count == 1 ? "item" : "items"
             guard DestructiveConfirmation.confirm(
-                title: "Remove \(count) \(noun) from the shelf?",
+                title: count == 1 ? "Remove 1 item from the shelf?" : "Remove \(count) items from the shelf?",
                 message: "Files stay where they are; only their place on the shelf goes. Text snippets are lost.",
                 destructiveTitle: "Remove"
             ) else { return }
@@ -489,6 +536,8 @@ public struct IslandDropItemCardView: View {
                 }
                 .buttonStyle(.plain)
                 .offset(x: 5, y: -4)
+                .help("Remove from Shelf")
+                .accessibilityLabel("Remove \(item.name) from the shelf")
 
                 // Quick preview eye button on hover or active preview
                 if hoverState.isHovered || isCurrentlyPreviewed {
@@ -506,6 +555,8 @@ public struct IslandDropItemCardView: View {
                     }
                     .buttonStyle(.plain)
                     .offset(x: -16, y: 16)
+                    .help("Quick Preview")
+                    .accessibilityLabel(isCurrentlyPreviewed ? "Close preview" : "Preview \(item.name)")
                     .transition(.opacity.combined(with: .scale(scale: 0.85)))
                 }
             }
@@ -538,6 +589,11 @@ public struct IslandDropItemCardView: View {
         .onTapGesture(count: 1) {
             onCopy()
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(item.name)
+        .accessibilityHint("Click to copy, double-click to preview, or drag it out")
+        .accessibilityAction(named: "Copy") { onCopy() }
+        .accessibilityAction(named: "Preview") { islandState.togglePreview(for: item) }
         .onDrag {
             islandState.beginDragOut()
             return makeItemProvider()

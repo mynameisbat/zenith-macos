@@ -229,6 +229,8 @@ kbd {
 }
 .stage img { height: auto; max-width: 100%; }
 .shot:not(.shot-wide) .stage img { width: min(100%, 22rem); }
+.shot-span { grid-column: 1 / -1; }
+.shot-span .stage img { width: min(100%, 50rem); }
 code { font: 0.88em var(--mono); padding: 0.1em 0.35em; border-radius: 5px; background: color-mix(in srgb, var(--ink) 8%, transparent); }
 
 /* ---------- Rules / limits / permissions ---------- */

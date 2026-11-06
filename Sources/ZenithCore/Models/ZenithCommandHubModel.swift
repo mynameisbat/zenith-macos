@@ -6,11 +6,25 @@ import Darwin
 public enum ZenithHubAction: String, CaseIterable, Sendable {
     case area = "area"
     case screen = "screen"
+    case ocr = "ocr"
+    case clipboard = "clipboard"
 
     public var title: String {
         switch self {
-        case .area: return "Capture Area"
-        case .screen: return "Capture Screen"
+        case .area: return String(localized: "Capture Area")
+        case .screen: return String(localized: "Capture Screen")
+        case .ocr: return String(localized: "Copy Text")
+        case .clipboard: return String(localized: "Clipboard")
+        }
+    }
+
+    /// What the action does, for tooltips and VoiceOver.
+    public var detail: String {
+        switch self {
+        case .area: return String(localized: "Capture part of the screen and annotate it")
+        case .screen: return String(localized: "Capture the whole screen and annotate it")
+        case .ocr: return String(localized: "Select an area and copy its text, QR code or barcode")
+        case .clipboard: return String(localized: "Open clipboard history")
         }
     }
 
@@ -18,13 +32,29 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
         switch self {
         case .area: return "crop"
         case .screen: return "macwindow"
+        case .ocr: return "text.viewfinder"
+        case .clipboard: return "list.clipboard"
         }
     }
 
+    /// The built-in shortcut. The one to show is `SettingsStore.effectiveHotkey(for: hotKeyId)`, which the user may
+    /// have changed in Settings → Shortcuts.
     public var shortcut: String {
         switch self {
         case .area: return "⌘⇧2"
         case .screen: return "⌘⇧1"
+        case .ocr: return HotKeyDefinition.defaultOCR.keyEquivalent
+        case .clipboard: return HotKeyDefinition.defaultClipboard.keyEquivalent
+        }
+    }
+
+    /// The identifier of the global shortcut that runs the same action.
+    public var hotKeyId: String {
+        switch self {
+        case .area: return HotKeyDefinition.captureAreaId
+        case .screen: return HotKeyDefinition.captureFullscreenId
+        case .ocr: return HotKeyDefinition.captureOCRId
+        case .clipboard: return HotKeyDefinition.clipboardToggleId
         }
     }
 
@@ -34,6 +64,10 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
             return ["area", "capture", "snip", "snipping", "crop", "selection", "region", "box", "partial"]
         case .screen:
             return ["screen", "capture", "fullscreen", "full", "window", "display", "monitor", "screenshot", "desktop", "whole"]
+        case .ocr:
+            return ["ocr", "text", "recognize", "recognise", "read", "extract", "qr", "barcode", "vision"]
+        case .clipboard:
+            return ["clipboard", "history", "paste", "clips", "pasteboard"]
         }
     }
 
@@ -129,9 +163,9 @@ public final class ZenithCommandHubState: ObservableObject {
     /// What the confirmation says before a process is asked to quit.
     public func terminationConfirmation(for process: ProcessTelemetry) -> (title: String, message: String, actionTitle: String) {
         (
-            title: "Quit \(process.name)?",
-            message: "Zenith will ask \(process.name) (PID \(process.pid)) to quit. Anything in it that is not saved may be lost.",
-            actionTitle: "Quit"
+            title: String(localized: "Quit \(process.name)?"),
+            message: String(localized: "Zenith will ask \(process.name) (PID \(String(process.pid))) to quit. Anything in it that is not saved may be lost."),
+            actionTitle: String(localized: "Quit")
         )
     }
 

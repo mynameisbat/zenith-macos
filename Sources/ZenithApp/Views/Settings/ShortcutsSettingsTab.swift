@@ -9,125 +9,101 @@ public struct ShortcutsSettingsTab: View {
     }
 
     public var body: some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(alignment: .leading, spacing: 16) {
-                if let error = viewModel.shortcutConflictError {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
-                        Text(error)
-                            .font(.system(size: 11.5))
-                            .foregroundColor(.secondary)
-                    }
-                    .zenithSettingsCard()
-                }
-
-                // 1. Clipboard Shortcut
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("CLIPBOARD SHORTCUT")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-
-                    shortcutRow(
-                        id: HotKeyDefinition.clipboardToggleId,
-                        title: "Toggle Clipboard History",
-                        defaultPreset: HotKeyDefinition.defaultClipboard,
-                        altPreset: HotKeyDefinition.alternativeClipboardOptionV
-                    )
-                    .zenithSettingsCard()
-                }
-
-                // 2. Area Screenshot Shortcut
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("AREA SCREENSHOT SHORTCUT")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-
-                    shortcutRow(
-                        id: HotKeyDefinition.captureAreaId,
-                        title: "Area Screen Capture",
-                        defaultPreset: HotKeyDefinition.defaultAreaCapture,
-                        altPreset: HotKeyDefinition.alternativeAreaCaptureX
-                    )
-                    .zenithSettingsCard()
-                }
-
-                // 3. Fullscreen Screenshot Shortcut
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("FULLSCREEN SCREENSHOT SHORTCUT")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-
-                    shortcutRow(
-                        id: HotKeyDefinition.captureFullscreenId,
-                        title: "Fullscreen Capture",
-                        defaultPreset: HotKeyDefinition.defaultFullscreenCapture,
-                        altPreset: nil
-                    )
-                    .zenithSettingsCard()
-                }
-
-                // 4. Screen OCR Shortcut
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("SCREEN OCR SHORTCUT")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-
-                    shortcutRow(
-                        id: HotKeyDefinition.captureOCRId,
-                        title: "Screen OCR & QR Reader",
-                        defaultPreset: HotKeyDefinition.defaultOCR,
-                        altPreset: nil
-                    )
-                    .zenithSettingsCard()
+        ZenithSettingsPage {
+            if let error = viewModel.shortcutConflictError {
+                ZenithSettingsSection {
+                    ZenithSettingsNotice(text: error)
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
+
+            ZenithSettingsSection(
+                "Global Shortcuts",
+                footer: "Click a shortcut, then press the new keys (Escape cancels). They work in every app. Avoid ⇧⌘3 to ⇧⌘6: those are macOS's own screenshot shortcuts, and both would run."
+            ) {
+                shortcutRow(
+                    id: HotKeyDefinition.clipboardToggleId,
+                    title: String(localized: "Clipboard History"),
+                    symbol: "list.clipboard.fill",
+                    tint: ZenithTint.clipboard,
+                    defaultPreset: HotKeyDefinition.defaultClipboard,
+                    altPreset: HotKeyDefinition.alternativeClipboardOptionV
+                )
+                ZenithSettingsDivider(inset: 44)
+                shortcutRow(
+                    id: HotKeyDefinition.captureAreaId,
+                    title: String(localized: "Capture Area"),
+                    symbol: "crop",
+                    tint: ZenithTint.capture,
+                    defaultPreset: HotKeyDefinition.defaultAreaCapture,
+                    altPreset: HotKeyDefinition.alternativeAreaCaptureX
+                )
+                ZenithSettingsDivider(inset: 44)
+                shortcutRow(
+                    id: HotKeyDefinition.captureFullscreenId,
+                    title: String(localized: "Capture Screen"),
+                    symbol: "macwindow",
+                    tint: ZenithTint.screen,
+                    defaultPreset: HotKeyDefinition.defaultFullscreenCapture,
+                    altPreset: nil
+                )
+                ZenithSettingsDivider(inset: 44)
+                shortcutRow(
+                    id: HotKeyDefinition.captureOCRId,
+                    title: String(localized: "Copy Text from Screen"),
+                    symbol: "text.viewfinder",
+                    tint: ZenithTint.ocr,
+                    defaultPreset: HotKeyDefinition.defaultOCR,
+                    altPreset: nil
+                )
+            }
         }
     }
 
     private func shortcutRow(
         id: String,
         title: String,
+        symbol: String,
+        tint: Color,
         defaultPreset: HotKeyDefinition,
         altPreset: HotKeyDefinition?
     ) -> some View {
         let current = viewModel.hotkey(for: id) ?? defaultPreset
         let isDefault = current.keyCode == defaultPreset.keyCode && current.carbonModifiers == defaultPreset.carbonModifiers
-        return HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                Text(isDefault ? "Click the shortcut to record another one." : "Changed from \(defaultPreset.keyEquivalent). Click the shortcut to record another one.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-
-            InteractiveShortcutRecorderView(
-                id: id,
-                title: title,
-                currentDefinition: current,
-                onUpdate: { newDef in
-                    viewModel.updateHotkey(newDef)
+        let offersAlternative = altPreset.map { current.keyCode != $0.keyCode || current.carbonModifiers != $0.carbonModifiers } ?? false
+        return ZenithSettingsRow(
+            title: Text(verbatim: title),
+            subtitle: isDefault ? nil : Text("Default: \(defaultPreset.menuStyleKeyEquivalent)"),
+            symbol: symbol,
+            tint: tint
+        ) {
+            HStack(spacing: 6) {
+                // A ready-made alternative, offered only while it is not the one in use.
+                if offersAlternative, let alt = altPreset {
+                    Button("Use \(alt.menuStyleKeyEquivalent)") {
+                        _ = viewModel.updateHotkey(alt)
+                    }
+                    .controlSize(.small)
                 }
-            )
 
-            // A ready-made alternative, offered only while it is not the one in use.
-            if let alt = altPreset, current.keyCode != alt.keyCode || current.carbonModifiers != alt.carbonModifiers {
-                Button("Use \(alt.keyEquivalent)") {
-                    _ = viewModel.updateHotkey(alt)
+                if !isDefault {
+                    Button {
+                        viewModel.resetHotkeyToDefault(id: id)
+                    } label: {
+                        Image(systemName: "arrow.uturn.backward")
+                    }
+                    .controlSize(.small)
+                    .help("Reset to \(defaultPreset.menuStyleKeyEquivalent)")
+                    .accessibilityLabel("Reset to default shortcut")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
 
-            if !isDefault {
-                Button("Reset to \(defaultPreset.keyEquivalent)") {
-                    viewModel.resetHotkeyToDefault(id: id)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                InteractiveShortcutRecorderView(
+                    id: id,
+                    title: title,
+                    currentDefinition: current,
+                    onUpdate: { newDef in
+                        viewModel.updateHotkey(newDef)
+                    }
+                )
             }
         }
     }
@@ -162,31 +138,27 @@ public struct InteractiveShortcutRecorderView: View {
                 model.startRecording(id: id, title: title, onUpdate: onUpdate)
             }
         } label: {
-            if model.isRecording {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 6, height: 6)
-                    Text("Type shortcut...")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.accentColor)
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
+            Text(model.isRecording ? "Type Shortcut" : currentDefinition.menuStyleKeyEquivalent)
+                .font(.system(size: 12.5, weight: model.isRecording ? .regular : .medium))
+                .foregroundStyle(model.isRecording ? AnyShapeStyle(ZenithTheme.accent) : AnyShapeStyle(.primary))
+                .lineLimit(1)
+                .frame(minWidth: 86)
+                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
                 .background(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(Color.accentColor.opacity(0.12))
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(model.isRecording ? ZenithTheme.accent.opacity(0.1) : Color(nsColor: .controlBackgroundColor))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .stroke(Color.accentColor, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(model.isRecording ? ZenithTheme.accent : Color.primary.opacity(0.15), lineWidth: model.isRecording ? 1.5 : 0.5)
                 )
-            } else {
-                KeycapBadgeView(text: currentDefinition.keyEquivalent)
-            }
+                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
-        .help(model.isRecording ? "Press Escape to cancel" : "Click to record a custom shortcut")
+        .help(model.isRecording ? "Press the new keys, or Escape to cancel" : "Click to record a new shortcut")
+        .accessibilityLabel("\(title) shortcut, \(currentDefinition.menuStyleKeyEquivalent)")
+        .accessibilityHint(model.isRecording ? "Press the new keys, or Escape to cancel" : "Records a new shortcut")
         .onDisappear {
             model.stopRecording()
         }

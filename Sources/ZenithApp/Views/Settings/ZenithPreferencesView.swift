@@ -1,7 +1,42 @@
 import SwiftUI
+import AppKit
 import ZenithCore
 
-/// Redesigned macOS Sequoia / Apple Design Award Preferences window with Sidebar navigation.
+/// An AppKit visual-effect view, for the translucent sidebar material SwiftUI's `Material` cannot pick.
+struct ZenithVisualEffect: NSViewRepresentable {
+    var material: NSVisualEffectView.Material
+    var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = blendingMode
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.material = material
+        view.blendingMode = blendingMode
+    }
+}
+
+extension SettingsTab {
+    var tint: Color {
+        switch self {
+        case .general: return ZenithTint.general
+        case .shortcuts: return ZenithTint.shortcuts
+        case .audio: return ZenithTint.audio
+        case .island: return ZenithTint.island
+        case .privacy: return ZenithTint.privacy
+        case .cleaner: return ZenithTint.cleaner
+        case .permissions: return ZenithTint.permissions
+        }
+    }
+}
+
+/// The Settings window, laid out like System Settings: a translucent sidebar of tinted icons on the left and the
+/// chosen pane, with its title on top, on the right.
 public struct ZenithPreferencesView: View {
     @ObservedObject public var viewModel: SettingsViewModel
 
@@ -9,140 +44,126 @@ public struct ZenithPreferencesView: View {
         self.viewModel = viewModel
     }
 
+    private static let sidebarWidth: CGFloat = 210
+
     public var body: some View {
         HStack(spacing: 0) {
-            // 1. Left Sidebar (Navigation Pane)
             sidebarView
-                .frame(width: 200)
+                .frame(width: Self.sidebarWidth)
+                .background(ZenithVisualEffect(material: .sidebar))
 
-            Rectangle()
-                .fill(Color.primary.opacity(0.08))
-                .frame(width: 0.5)
+            Divider()
 
-            // 2. Right Detail Pane (Tab Content)
             detailPaneView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.primary.opacity(0.015))
+                .background(Color(nsColor: .windowBackgroundColor))
         }
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
-                .allowsHitTesting(false)
-        )
-        .frame(minWidth: 680, maxWidth: .infinity, minHeight: 540, maxHeight: .infinity)
+        .frame(minWidth: SettingsWindowController.defaultWidth, maxWidth: .infinity, minHeight: SettingsWindowController.defaultHeight, maxHeight: .infinity)
         .ignoresSafeArea()
     }
 
-
-    // MARK: - Sidebar View
+    // MARK: - Sidebar
 
     private var sidebarView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // App Brand Header with macOS native traffic-light inset
-            HStack(spacing: 12) {
-                if let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage {
-                    Image(nsImage: appIcon)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 34, height: 34)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .shadow(color: Color.black.opacity(0.18), radius: 3, x: 0, y: 1.5)
-                }
+            // Room for the window's traffic lights.
+            Color.clear.frame(height: 44)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(ZenithTheme.appName)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.primary)
+            searchField
+                .padding(.horizontal, 10)
+                .padding(.bottom, 10)
 
-                    Text("Settings Studio")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 40)
-            .padding(.bottom, 14)
-
-            // Search Filter
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                TextField("Search settings...", text: $viewModel.searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12))
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.primary.opacity(0.045))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
-            )
-            .padding(.horizontal, 14)
-            .padding(.bottom, 12)
-
-            // Navigation Sections
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 14) {
-                    sidebarSection(
-                        title: "Workspace",
-                        tabs: filteredTabs.filter { $0.sectionTitle == "WORKSPACE" }
-                    )
+                    if viewModel.searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                        identityRow
+                    }
 
-                    sidebarSection(
-                        title: "System & Security",
-                        tabs: filteredTabs.filter { $0.sectionTitle == "SYSTEM & SECURITY" }
-                    )
+                    sidebarGroup(filteredTabs.filter { $0.sectionTitle == "WORKSPACE" })
+                    sidebarGroup(filteredTabs.filter { $0.sectionTitle == "SYSTEM & SECURITY" })
+
+                    if filteredTabs.isEmpty {
+                        Text("No Results")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 20)
+                    }
                 }
                 .padding(.horizontal, 10)
+                .padding(.bottom, 12)
             }
-
-            Spacer()
-
-            // Footer Version Info
-            HStack {
-                Text("Zenith v\(ZenithTheme.appVersion)")
-                    .font(.system(size: 10.5))
-                    .monospacedDigit()
-                    .foregroundColor(.secondary.opacity(0.7))
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
         }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+            TextField("Search", text: $viewModel.searchText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12.5))
+            if !viewModel.searchText.isEmpty {
+                Button {
+                    viewModel.searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 7)
+        .frame(height: 26)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color.primary.opacity(0.07))
+        )
+    }
+
+    /// The app's own row at the top, where System Settings shows the Apple Account.
+    private var identityRow: some View {
+        HStack(spacing: 10) {
+            Image(nsImage: NSApp.applicationIconImage ?? NSImage())
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 34, height: 34)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(ZenithTheme.appName)
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Version \(ZenithTheme.appVersion)")
+                    .font(.system(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
     }
 
     private var filteredTabs: [SettingsTab] {
-        if viewModel.searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+        let query = viewModel.searchText.trimmingCharacters(in: .whitespaces)
+        if query.isEmpty {
             return SettingsTab.allCases
         }
         return SettingsTab.allCases.filter {
-            $0.rawValue.localizedCaseInsensitiveContains(viewModel.searchText) ||
-            $0.subtitle.localizedCaseInsensitiveContains(viewModel.searchText)
+            $0.rawValue.localizedCaseInsensitiveContains(query) ||
+            $0.subtitle.localizedCaseInsensitiveContains(query) ||
+            $0.searchKeywords.contains { $0.localizedCaseInsensitiveContains(query) }
         }
     }
 
-    private func sidebarSection(title: String, tabs: [SettingsTab]) -> some View {
-        Group {
-            if !tabs.isEmpty {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 2)
-
-                    ForEach(tabs) { tab in
-                        sidebarRow(tab)
-                    }
+    @ViewBuilder
+    private func sidebarGroup(_ tabs: [SettingsTab]) -> some View {
+        if !tabs.isEmpty {
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach(tabs) { tab in
+                    sidebarRow(tab)
                 }
             }
         }
@@ -153,54 +174,27 @@ public struct ZenithPreferencesView: View {
         let isHovered = viewModel.hoveredTab == tab
 
         return Button {
-            withAnimation(.zenithSpring) {
-                viewModel.selectedTab = tab
-            }
+            viewModel.selectedTab = tab
         } label: {
-            HStack(spacing: 9) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(isSelected ? ZenithTheme.accent.opacity(0.12) : Color.primary.opacity(0.04))
-                        .frame(width: 26, height: 26)
-
-                    Image(systemName: tab.iconName)
-                        .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                        .foregroundColor(isSelected ? ZenithTheme.accent : .primary.opacity(0.75))
-                }
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(tab.rawValue)
-                        .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
-                        .foregroundColor(isSelected ? .primary : .primary.opacity(0.85))
-
-                    Text(tab.subtitle)
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
+            HStack(spacing: 8) {
+                ZenithIconTile(systemName: tab.iconName, tint: tab.tint, size: 20)
+                Text(tab.title)
+                    .font(.system(size: 13))
+                    .foregroundStyle(isSelected ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(
-                        isSelected
-                            ? ZenithTheme.accent.opacity(0.12)
-                            : (isHovered ? Color.primary.opacity(0.045) : Color.clear)
-                    )
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(isSelected ? ZenithTheme.selection : (isHovered ? Color.primary.opacity(0.06) : Color.clear))
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(
-                        isSelected
-                            ? ZenithTheme.accent.opacity(0.20)
-                            : (isHovered ? Color.primary.opacity(0.04) : Color.clear),
-                        lineWidth: 0.5
-                    )
-            )
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(tab.title)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .onHover { hovering in
             if hovering {
                 viewModel.hoveredTab = tab
@@ -208,36 +202,21 @@ public struct ZenithPreferencesView: View {
                 viewModel.hoveredTab = nil
             }
         }
-        .animation(.easeInOut(duration: 0.12), value: isHovered || isSelected)
     }
 
-    // MARK: - Detail Pane View
+    // MARK: - Detail Pane
 
     private var detailPaneView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header Bar
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(viewModel.selectedTab.rawValue)
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundColor(.primary)
+            Text(viewModel.selectedTab.title)
+                .font(.system(size: 15, weight: .semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 52)
+                .padding(.horizontal, 20)
+                .accessibilityAddTraits(.isHeader)
 
-                    Text(tabDescription(for: viewModel.selectedTab))
-                        .font(.system(size: 11.5))
-                        .foregroundColor(.secondary)
-                }
+            Divider()
 
-                Spacer()
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 38)
-            .padding(.bottom, 14)
-
-            Rectangle()
-                .fill(Color.primary.opacity(0.08))
-                .frame(height: 0.5)
-
-            // Active Tab Content
             Group {
                 switch viewModel.selectedTab {
                 case .general:
@@ -246,6 +225,8 @@ public struct ZenithPreferencesView: View {
                     ShortcutsSettingsTab(viewModel: viewModel)
                 case .audio:
                     AudioSettingsTab(viewModel: viewModel)
+                case .island:
+                    IslandSettingsTab()
                 case .privacy:
                     PrivacySettingsTab()
                 case .cleaner:
@@ -255,23 +236,6 @@ public struct ZenithPreferencesView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    private func tabDescription(for tab: SettingsTab) -> String {
-        switch tab {
-        case .general:
-            return "Configure login launch behavior and clipboard retention limits."
-        case .shortcuts:
-            return "Customize global keyboard shortcuts for clipboard and screenshot capture."
-        case .audio:
-            return "Enable or disable audio feedback and sound effects."
-        case .privacy:
-            return "Look up the sites you visit over encrypted DNS (DoH) through a local proxy."
-        case .cleaner:
-            return "Scan and safely purge developer caches, logs, and build artifacts."
-        case .permissions:
-            return "Review Screen Recording and Accessibility permissions status."
         }
     }
 }

@@ -7,6 +7,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case general = "General"
     case shortcuts = "Shortcuts"
     case audio = "Audio"
+    case island = "Dynamic Island"
     case privacy = "Privacy"
     case cleaner = "Cleaner"
     case permissions = "Permissions"
@@ -18,9 +19,10 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .general: return "gearshape.fill"
         case .shortcuts: return "command"
         case .audio: return "speaker.wave.2.fill"
-        case .privacy: return "shield.checkered"
-        case .cleaner: return "trash.circle.fill"
-        case .permissions: return "lock.shield.fill"
+        case .island: return "capsule.fill"
+        case .privacy: return "lock.shield.fill"
+        case .cleaner: return "sparkles"
+        case .permissions: return "hand.raised.fill"
         }
     }
 
@@ -29,15 +31,42 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .general: return "Startup & History"
         case .shortcuts: return "Global Hotkeys"
         case .audio: return "Sound Feedback"
+        case .island: return "Widgets & Timer"
         case .privacy: return "Encrypted DNS"
         case .cleaner: return "Caches & Junk"
         case .permissions: return "Screen & Access"
         }
     }
 
+    /// The name shown in the sidebar and as the pane title.
+    public var title: String {
+        switch self {
+        case .general: return String(localized: "General")
+        case .shortcuts: return String(localized: "Shortcuts")
+        case .audio: return String(localized: "Audio")
+        case .island: return String(localized: "Dynamic Island")
+        case .privacy: return String(localized: "Privacy Shield")
+        case .cleaner: return String(localized: "Cleaner")
+        case .permissions: return String(localized: "Permissions")
+        }
+    }
+
+    /// Extra words the sidebar search finds the tab by.
+    public var searchKeywords: [String] {
+        switch self {
+        case .general: return ["login", "startup", "clipboard", "history", "reset"]
+        case .shortcuts: return ["hotkey", "keyboard", "keys"]
+        case .audio: return ["sound", "volume"]
+        case .island: return ["notch", "timer", "pomodoro", "focus", "calendar", "event", "widget"]
+        case .privacy: return ["dns", "doh", "proxy", "shield"]
+        case .cleaner: return ["junk", "cache", "disk", "storage", "uninstall"]
+        case .permissions: return ["accessibility", "screen recording", "automation", "calendar"]
+        }
+    }
+
     public var sectionTitle: String {
         switch self {
-        case .general, .shortcuts, .audio:
+        case .general, .shortcuts, .audio, .island:
             return "WORKSPACE"
         case .privacy, .cleaner, .permissions:
             return "SYSTEM & SECURITY"

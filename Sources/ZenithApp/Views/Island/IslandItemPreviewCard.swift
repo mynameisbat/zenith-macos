@@ -98,6 +98,7 @@ public struct IslandItemPreviewCard: View {
             }
             .buttonStyle(.plain)
             .help("Close Preview (Esc)")
+            .accessibilityLabel("Close preview")
         }
     }
 
@@ -168,7 +169,7 @@ public struct IslandItemPreviewCard: View {
 
     private var textSnippetBox: some View {
         ScrollView(.vertical, showsIndicators: true) {
-            Text(item.textSnippet ?? "No content preview available")
+            Text(verbatim: item.textSnippet ?? String(localized: "No content preview available"))
                 .font(.system(size: 10.5, weight: .regular, design: .monospaced))
                 .foregroundColor(.primary.opacity(0.85))
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -236,7 +237,7 @@ public struct IslandItemPreviewCard: View {
                 HStack(spacing: 3) {
                     Image(systemName: "aspectratio")
                         .font(.system(size: 9))
-                    Text("\(Int(dims.width)) × \(Int(dims.height)) px")
+                    Text(verbatim: "\(Int(dims.width)) × \(Int(dims.height)) px")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                 }
                 .foregroundColor(.secondary)
@@ -281,6 +282,7 @@ public struct IslandItemPreviewCard: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .help("Reveal in Finder")
+                .accessibilityLabel("Reveal in Finder")
             }
 
             // Copy to Clipboard
@@ -293,6 +295,7 @@ public struct IslandItemPreviewCard: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .help("Copy to Clipboard")
+            .accessibilityLabel("Copy to Clipboard")
 
             // Remove from shelf
             Button {
@@ -305,6 +308,7 @@ public struct IslandItemPreviewCard: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .help("Remove from Drop Shelf")
+            .accessibilityLabel("Remove from shelf")
         }
     }
 }

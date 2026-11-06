@@ -21,6 +21,20 @@ public final class ClipboardHistoryViewModel: ObservableObject {
     @Published public private(set) var filteredItems: [ClipboardItem] = []
     @Published public var selectedIndex: Int = 0
 
+    /// The kind chip chosen above the list (All, Text, Links, Images, Pinned).
+    @Published public var kindFilter: ClipboardKindFilter = .all {
+        didSet {
+            guard kindFilter != oldValue else { return }
+            selectedIndex = 0
+            filterItems()
+        }
+    }
+
+    /// The highlighted item, shown in the preview pane.
+    public var selectedItem: ClipboardItem? {
+        filteredItems.indices.contains(selectedIndex) ? filteredItems[selectedIndex] : nil
+    }
+
     public var totalCount: Int {
         items.count
     }
@@ -222,10 +236,11 @@ public final class ClipboardHistoryViewModel: ObservableObject {
 
     public func filterItems() {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidates = kindFilter == .all ? items : items.filter { kindFilter.includes($0) }
         if trimmed.isEmpty {
-            filteredItems = items
+            filteredItems = candidates
         } else {
-            filteredItems = FuzzySearchEngine().search(query: trimmed, in: items)
+            filteredItems = FuzzySearchEngine().search(query: trimmed, in: candidates)
         }
 
         if filteredItems.isEmpty {

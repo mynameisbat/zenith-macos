@@ -4,6 +4,19 @@ import IOKit.ps
 import Darwin
 
 /// Individual process resource footprint.
+public extension ProcessTelemetry {
+    /// The outermost app bundle the process runs from, e.g. "/Applications/Google Chrome.app" for one of Chrome's
+    /// helpers, so a helper can be shown with its app's icon. Nil when the command is not inside an `.app`.
+    var appBundlePath: String? {
+        guard command.hasPrefix("/") else { return nil }
+        if let range = command.range(of: ".app/") {
+            return String(command[..<range.lowerBound]) + ".app"
+        }
+        if command.hasSuffix(".app") { return command }
+        return nil
+    }
+}
+
 public struct ProcessTelemetry: Identifiable, Sendable, Equatable {
     public let id: Int // pid
     public let pid: Int

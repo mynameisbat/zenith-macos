@@ -9,134 +9,88 @@ public struct PermissionsGuideView: View {
     }
 
     public var body: some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(alignment: .leading, spacing: 16) {
-                // 1. Required Permissions
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("REQUIRED PERMISSIONS")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-
-                    permissionRow(
-                        title: "Screen Recording",
-                        description: "Needed to capture the screen and to read text from it (OCR). Without it, capture and OCR cannot see anything but the desktop picture.",
-                        isGranted: viewModel.screenRecordingGranted,
-                        actionTitle: "Open Screen Recording Settings...",
-                        action: { viewModel.openScreenRecordingSettings() }
-                    )
-                    .zenithSettingsCard()
-                }
-
-                // 2. Optional Enhancements
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("OPTIONAL ENHANCEMENTS")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-
-                    permissionRow(
-                        title: "Accessibility (Optional)",
-                        description: "Global shortcuts do not need it. Accessibility lets Zenith press ⌘V to paste for you and send the media keys that control a browser tab. Without it, items are only copied and the island says how to allow it.",
-                        isGranted: viewModel.accessibilityGranted,
-                        actionTitle: "Open Accessibility Settings...",
-                        action: { viewModel.openAccessibilitySettings() }
-                    )
-                    .zenithSettingsCard()
-
-                    permissionRow(
-                        title: "Automation (Optional)",
-                        description: "Lets Zenith control Music and Spotify and read the front tab of Safari and Chromium browsers for the Now Playing title. macOS asks the first time, once for each app. Without it the island still shows that a browser is playing, but not what. Cleaner → Leftovers also asks Finder to move folders that macOS protects (such as those in ~/Library/Containers) to the Trash.",
-                        isGranted: nil,
-                        actionTitle: "Open Automation Settings...",
-                        action: { viewModel.openAutomationSettings() }
-                    )
-                    .zenithSettingsCard()
-                }
-
-                // 3. Refresh Action
-                HStack {
-                    Spacer()
-                    Button("Refresh Status") {
-                        withAnimation(.zenithSpring) {
-                            viewModel.refreshPermissions()
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-                .padding(.top, 4)
+        ZenithSettingsPage {
+            ZenithSettingsSection(
+                "Required",
+                footer: "Without Screen Recording, capture and text recognition only see the desktop picture."
+            ) {
+                permissionRow(
+                    title: String(localized: "Screen Recording"),
+                    description: "To capture the screen and read text from it.",
+                    symbol: "rectangle.dashed.badge.record",
+                    tint: Color(nsColor: .systemRed),
+                    status: viewModel.screenRecordingGranted ? .allowed : .notAllowed,
+                    action: { viewModel.openScreenRecordingSettings() }
+                )
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
+
+            ZenithSettingsSection(
+                "Optional",
+                footer: "Global shortcuts need neither. Automation is asked once for each app the first time Zenith talks to it; Cleaner → Leftovers also asks Finder to move protected folders (such as those in ~/Library/Containers) to the Trash."
+            ) {
+                permissionRow(
+                    title: String(localized: "Accessibility"),
+                    description: "To paste for you (⌘V) and to send media keys to a browser tab. Without it, items are only copied.",
+                    symbol: "accessibility",
+                    tint: Color(nsColor: .systemBlue),
+                    status: viewModel.accessibilityGranted ? .allowed : .notAllowed,
+                    action: { viewModel.openAccessibilitySettings() }
+                )
+                ZenithSettingsDivider(inset: 44)
+                permissionRow(
+                    title: String(localized: "Automation"),
+                    description: "To control Music and Spotify, and to read the front browser tab\u{2019}s title for Now Playing.",
+                    symbol: "gearshape.2.fill",
+                    tint: Color(nsColor: .systemGray),
+                    status: .perApp,
+                    action: { viewModel.openAutomationSettings() }
+                )
+            }
+
+            HStack {
+                Spacer()
+                Button("Check Again") {
+                    withAnimation(.zenithSpring) {
+                        viewModel.refreshPermissions()
+                    }
+                }
+                .help("Read the permissions again, e.g. after changing them in System Settings")
+            }
         }
         .onAppear {
             viewModel.refreshPermissions()
         }
     }
 
+    private enum Status {
+        case allowed, notAllowed, perApp
+    }
+
     private func permissionRow(
         title: String,
-        description: String,
-        isGranted: Bool?,
-        actionTitle: String,
+        description: LocalizedStringKey,
+        symbol: String,
+        tint: Color,
+        status: Status,
         action: @escaping () -> Void
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer()
-                statusBadge(isGranted: isGranted)
+        ZenithSettingsRow(title: Text(verbatim: title), subtitle: Text(description), symbol: symbol, tint: tint) {
+            HStack(spacing: 10) {
+                switch status {
+                case .allowed:
+                    ZenithStatusBadge(text: "Allowed", kind: .ok)
+                case .notAllowed:
+                    ZenithStatusBadge(text: "Not Allowed", kind: .warning)
+                case .perApp:
+                    ZenithStatusBadge(text: "Asked per app", kind: .neutral)
+                }
+                Button("Open…") {
+                    action()
+                }
+                .controlSize(.small)
+                .help("Open \(title) in System Settings → Privacy & Security")
+                .accessibilityLabel("Open \(title) settings")
             }
-
-            Text(description)
-                .font(.system(size: 11.5))
-                .foregroundColor(.secondary)
-
-            Button(actionTitle) {
-                action()
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .padding(.top, 2)
         }
-    }
-
-    private func statusBadge(isGranted: Bool?) -> some View {
-        guard let isGranted else {
-            // Automation is asked per app, so there is no single answer to show.
-            return AnyView(
-                Text("Asked per app")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Color.primary.opacity(0.04))
-                    )
-            )
-        }
-        return AnyView(grantedBadge(isGranted: isGranted))
-    }
-
-    private func grantedBadge(isGranted: Bool) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: isGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 10))
-                .foregroundColor(isGranted ? .accentColor : .secondary)
-            Text(isGranted ? "Granted" : "Not Granted")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(isGranted ? .accentColor : .secondary)
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(isGranted ? Color.accentColor.opacity(0.1) : Color.primary.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .stroke(isGranted ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.08), lineWidth: 0.8)
-        )
     }
 }

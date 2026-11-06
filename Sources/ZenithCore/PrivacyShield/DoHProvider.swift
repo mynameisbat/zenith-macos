@@ -34,32 +34,32 @@ public enum DoHProvider: Identifiable, Sendable, Codable, Equatable, Hashable, C
     public var displayName: String {
         switch self {
         case .cloudflare:
-            return "Cloudflare (1.1.1.1)"
+            return String(localized: "Cloudflare (1.1.1.1)")
         case .adguard:
-            return "AdGuard DNS (Ad & Tracker Blocking)"
+            return String(localized: "AdGuard DNS (Ad & Tracker Blocking)")
         case .google:
-            return "Google DNS (8.8.8.8)"
+            return String(localized: "Google DNS (8.8.8.8)")
         case .quad9:
-            return "Quad9 (Malware Blocking)"
+            return String(localized: "Quad9 (Malware Blocking)")
         case .nextdns(let profileID):
-            return profileID.isEmpty ? "NextDNS" : "NextDNS (\(profileID))"
+            return profileID.isEmpty ? String(localized: "NextDNS") : String(localized: "NextDNS (\(profileID))")
         case .custom:
-            return "Custom DoH"
+            return String(localized: "Custom DoH")
         }
     }
 
     public var subtitle: String {
         switch self {
         case .cloudflare:
-            return "Fast Anycast resolver with strict privacy"
+            return String(localized: "Fast Anycast resolver with strict privacy")
         case .adguard:
-            return "Blocks ads, trackers, and malicious domains"
+            return String(localized: "Blocks ads, trackers, and malicious domains")
         case .google:
-            return "High availability, globally distributed infrastructure"
+            return String(localized: "High availability, globally distributed infrastructure")
         case .quad9:
-            return "Protects against malware and phishing websites"
+            return String(localized: "Protects against malware and phishing websites")
         case .nextdns(let profileID):
-            return profileID.isEmpty ? "Cloud-based personal firewall and filtering" : "NextDNS profile ID: \(profileID)"
+            return profileID.isEmpty ? String(localized: "Cloud-based personal firewall and filtering") : String(localized: "NextDNS profile ID: \(profileID)")
         case .custom(let url, _):
             return url.absoluteString
         }
