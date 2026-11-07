@@ -279,6 +279,16 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
     private var _capacityOverride: Int?
 
     @ObservationIgnored
+    private var _soundService: SoundServiceProtocol?
+
+    /// Plays the copy sound when something new is copied (the app sets `AudioFeedbackManager.shared`; tests leave it
+    /// nil, so they stay silent). Zenith's own pasteboard writes never reach `ingest`, so pasting does not also "copy".
+    public var soundService: SoundServiceProtocol? {
+        get { lock.withLock { _soundService } }
+        set { lock.withLock { _soundService = newValue } }
+    }
+
+    @ObservationIgnored
     private let maxTotalBytes: Int
 
     @ObservationIgnored
@@ -451,9 +461,10 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
         }
     }
 
-    /// Semantic alias for `add(_:)`.
+    /// Takes in what the user just copied (the pasteboard monitor calls this): adds it and plays the copy sound.
     public func ingest(_ item: ClipboardItem) {
         add(item)
+        soundService?.playNewCopySound()
     }
 
     /// Restores a historical item to the system pasteboard.
