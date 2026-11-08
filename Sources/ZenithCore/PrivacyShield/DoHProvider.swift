@@ -145,6 +145,31 @@ public enum DoHProvider: Identifiable, Sendable, Codable, Equatable, Hashable, C
         }
     }
 
+    // MARK: - Provider from what the user typed
+
+    /// A custom provider from typed text, or nil when it cannot work: the address must be an `https` URL with a host
+    /// (plain `http` would send the questions in the clear, which is what this feature exists to prevent), and a
+    /// bootstrap address, when given, must be an IP address.
+    public static func custom(urlString: String, bootstrapIP: String) -> DoHProvider? {
+        guard let url = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines)),
+              url.scheme?.lowercased() == "https",
+              let host = url.host, !host.isEmpty else { return nil }
+        let bootstrap = bootstrapIP.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !bootstrap.isEmpty {
+            var v4 = in_addr(), v6 = in6_addr()
+            guard inet_pton(AF_INET, bootstrap, &v4) == 1 || inet_pton(AF_INET6, bootstrap, &v6) == 1 else { return nil }
+        }
+        return .custom(url: url, bootstrapIP: bootstrap.isEmpty ? nil : bootstrap)
+    }
+
+    /// A NextDNS provider from a typed profile ID, or nil when the ID has characters a profile ID never has (it goes
+    /// into the URL path). An empty ID means NextDNS's generic endpoint.
+    public static func nextDNS(profileID: String) -> DoHProvider? {
+        let trimmed = profileID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) else { return nil }
+        return .nextdns(profileID: trimmed)
+    }
+
     // MARK: - Codable Conformance with Legacy Fallback
 
     private enum CodingKeys: String, CodingKey {

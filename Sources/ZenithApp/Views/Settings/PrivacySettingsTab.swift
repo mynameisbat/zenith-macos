@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import ZenithCore
 
 @MainActor
@@ -25,6 +26,12 @@ public final class PrivacyTabViewModel: ObservableObject {
     @Published public var nextDNSProfileID: String = ""
     @Published public var customURLString: String = "https://dns.quad9.net/dns-query"
     @Published public var customBootstrapIP: String = ""
+    @Published public var newBlockedDomain: String = ""
+    @Published public var newAllowedDomain: String = ""
+    /// The last thing the tracker-blocking card has to say about what the user did (a rejected name, an import result).
+    @Published public var trackerMessage: String? = nil
+    /// Why the typed resolver was not applied, when it was not.
+    @Published public var providerMessage: String? = nil
 
     public init() {}
 }
@@ -35,8 +42,11 @@ public struct PrivacySettingsTab: View {
     @ObservedObject public var controller: PrivacyShieldController = .shared
     @ObservedObject public var stats: PrivacyShieldStatistics = .shared
     @ObservedObject public var tabModel: PrivacyTabViewModel = .shared
+    @ObservedObject private var blocking: TrackerBlockingSettings
 
-    public init() {}
+    public init(blocking: TrackerBlockingSettings = .shared) {
+        self.blocking = blocking
+    }
 
     public var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
@@ -44,7 +54,10 @@ public struct PrivacySettingsTab: View {
                 // 1. Master Activation Card
                 activationCard
 
-                // 2. Real-time Telemetry & Live Monitor
+                // 2. Tracker blocking
+                trackerCard
+
+                // 3. Real-time Telemetry & Live Monitor
                 telemetryCard
 
                 // 3. Live Traffic Inspector Card
@@ -61,6 +74,206 @@ public struct PrivacySettingsTab: View {
         }
         .onAppear {
             syncFromCurrentProvider()
+        }
+    }
+
+    // MARK: - Tracker blocking
+
+    private var trackerCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZenithSettingsHeader("Tracker Blocking")
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Block Ads and Trackers")
+                            .font(.system(size: 12, weight: .medium))
+                        Text("Refuses connections to known advertising and tracking domains before any lookup is made for them. It applies to apps that use the system proxy, and only while Privacy Shield is on.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Toggle("Block Ads and Trackers", isOn: $blocking.isEnabled)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                }
+
+                if blocking.isEnabled {
+                    divider
+
+                    HStack {
+                        Text(domainCountText(blocking.activeDomainCount))
+                            .font(.system(size: 11.5, weight: .medium))
+                            .monospacedDigit()
+                        Spacer()
+                        Text(stats.totalRequestsBlocked == 1
+                             ? String(localized: "1 request refused")
+                             : String(localized: "\(stats.totalRequestsBlocked) requests refused"))
+                            .font(.system(size: 11))
+                            .monospacedDigit()
+                            .foregroundColor(.secondary)
+                    }
+
+                    if !controller.isRunning {
+                        Label("Turn on Privacy Shield above for blocking to take effect.", systemImage: "exclamationmark.triangle")
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                    }
+
+                    divider
+
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Domain List")
+                                .font(.system(size: 12, weight: .medium))
+                            if let name = blocking.importedListName {
+                                Text(importedListText(name: name, count: blocking.importedDomainCount))
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            } else {
+                                Text("Built-in list only. Import a hosts file for more.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        Spacer()
+                        if blocking.importedListName != nil {
+                            Button("Remove") {
+                                blocking.removeImportedList()
+                                tabModel.trackerMessage = nil
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                        Button("Import List…") { chooseListFile() }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                    }
+
+                    domainListEditor(
+                        title: "Always Block",
+                        placeholder: "ads.example.com",
+                        text: $tabModel.newBlockedDomain,
+                        domains: blocking.customDomains,
+                        add: { addDomain(tabModel.newBlockedDomain, allow: false) },
+                        remove: { blocking.removeCustomDomain($0) }
+                    )
+
+                    domainListEditor(
+                        title: "Never Block",
+                        placeholder: "example.com",
+                        text: $tabModel.newAllowedDomain,
+                        domains: blocking.allowedDomains,
+                        add: { addDomain(tabModel.newAllowedDomain, allow: true) },
+                        remove: { blocking.removeAllowedDomain($0) }
+                    )
+
+                    if let message = tabModel.trackerMessage {
+                        Text(verbatim: message)
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .zenithSettingsCard(cornerRadius: 10, padding: 12)
+        }
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.08))
+            .frame(height: 0.5)
+    }
+
+    private func domainListEditor(
+        title: LocalizedStringKey,
+        placeholder: String,
+        text: Binding<String>,
+        domains: [String],
+        add: @escaping () -> Void,
+        remove: @escaping (String) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+            HStack(spacing: 6) {
+                TextField(placeholder, text: text, onCommit: add)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 11.5, design: .monospaced))
+                Button("Add", action: add)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            ForEach(domains, id: \.self) { domain in
+                HStack(spacing: 6) {
+                    Text(verbatim: domain)
+                        .font(.system(size: 11, design: .monospaced))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Button {
+                        remove(domain)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Remove")
+                    .accessibilityLabel(Text("Remove \(domain)"))
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(Color.primary.opacity(0.04))
+                )
+            }
+        }
+    }
+
+    private func domainCountText(_ count: Int) -> String {
+        count == 1 ? String(localized: "1 domain blocked") : String(localized: "\(count) domains blocked")
+    }
+
+    private func importedListText(name: String, count: Int) -> String {
+        count == 1
+            ? String(localized: "\(name): 1 domain")
+            : String(localized: "\(name): \(count) domains")
+    }
+
+    private func addDomain(_ text: String, allow: Bool) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let result = allow ? blocking.addAllowedDomain(trimmed) : blocking.addCustomDomain(trimmed)
+        switch result {
+        case .added:
+            tabModel.trackerMessage = nil
+            if allow { tabModel.newAllowedDomain = "" } else { tabModel.newBlockedDomain = "" }
+        case .alreadyListed(let domain):
+            tabModel.trackerMessage = String(localized: "\(domain) is already in the list.")
+        case .invalid:
+            tabModel.trackerMessage = String(localized: "That is not a domain name Zenith can block. Use a name such as ads.example.com.")
+        }
+    }
+
+    private func chooseListFile() {
+        let panel = NSOpenPanel()
+        panel.message = String(localized: "Choose a hosts file or a list of domains")
+        panel.prompt = String(localized: "Import")
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let count = try blocking.importList(from: url)
+            tabModel.trackerMessage = count == 1
+                ? String(localized: "Imported 1 domain.")
+                : String(localized: "Imported \(count) domains.")
+        } catch {
+            tabModel.trackerMessage = error.localizedDescription
         }
     }
 
@@ -125,6 +338,19 @@ public struct PrivacySettingsTab: View {
                 Rectangle()
                     .fill(Color.primary.opacity(0.08))
                     .frame(height: 0.5)
+
+                if blocking.isEnabled || stats.totalRequestsBlocked > 0 {
+                    telemetryRow(
+                        label: "Blocked Requests",
+                        value: stats.totalRequestsBlocked == 1
+                            ? String(localized: "1 request")
+                            : String(localized: "\(stats.totalRequestsBlocked) requests"),
+                        icon: "hand.raised"
+                    )
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.08))
+                        .frame(height: 0.5)
+                }
 
                 telemetryRow(
                     label: "DoH Resolver Latency",
@@ -314,6 +540,13 @@ public struct PrivacySettingsTab: View {
                     Color.primary.opacity(0.1),
                     req.protocolType
                 )
+            case .blocked:
+                return (
+                    Color.orange.opacity(0.14),
+                    Color.orange,
+                    Color.orange.opacity(0.3),
+                    String(localized: "BLOCKED")
+                )
             case .failed:
                 return (
                     Color.red.opacity(0.12),
@@ -362,13 +595,9 @@ public struct PrivacySettingsTab: View {
                         Text("Profile ID:")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.secondary)
-                        TextField("e.g. 2b489c", text: Binding(
-                            get: { tabModel.nextDNSProfileID },
-                            set: { val in
-                                tabModel.nextDNSProfileID = val
-                                applyProviderChange()
-                            }
-                        ))
+                        // Applied when editing ends (Return, Tab, or clicking away), not on every key: a half-typed ID
+                        // would otherwise become the live resolver and break browsing until the typing was done.
+                        TextField("e.g. 2b489c", text: $tabModel.nextDNSProfileID, onCommit: applyProviderChange)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 11.5, design: .monospaced))
                     }
@@ -381,13 +610,7 @@ public struct PrivacySettingsTab: View {
                             Text("DoH URL:")
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.secondary)
-                            TextField("https://example.com/dns-query", text: Binding(
-                                get: { tabModel.customURLString },
-                                set: { val in
-                                    tabModel.customURLString = val
-                                    applyProviderChange()
-                                }
-                            ))
+                            TextField("https://example.com/dns-query", text: $tabModel.customURLString, onCommit: applyProviderChange)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 11.5, design: .monospaced))
                         }
@@ -396,13 +619,7 @@ public struct PrivacySettingsTab: View {
                             Text("Bootstrap IP (Optional):")
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.secondary)
-                            TextField("e.g. 9.9.9.9", text: Binding(
-                                get: { tabModel.customBootstrapIP },
-                                set: { val in
-                                    tabModel.customBootstrapIP = val
-                                    applyProviderChange()
-                                }
-                            ))
+                            TextField("e.g. 9.9.9.9", text: $tabModel.customBootstrapIP, onCommit: applyProviderChange)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 11.5, design: .monospaced))
                         }
@@ -414,6 +631,17 @@ public struct PrivacySettingsTab: View {
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                     .padding(.leading, 2)
+
+                if let message = tabModel.providerMessage {
+                    Label {
+                        Text(verbatim: message)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle")
+                    }
+                    .font(.system(size: 11))
+                    .foregroundColor(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
 
                 Rectangle()
                     .fill(Color.primary.opacity(0.08))
@@ -562,13 +790,19 @@ public struct PrivacySettingsTab: View {
         case .quad9:
             newProvider = .quad9
         case .nextdns:
-            newProvider = .nextdns(profileID: tabModel.nextDNSProfileID.trimmingCharacters(in: .whitespacesAndNewlines))
+            guard let provider = DoHProvider.nextDNS(profileID: tabModel.nextDNSProfileID) else {
+                tabModel.providerMessage = String(localized: "A NextDNS profile ID has only letters and numbers. The resolver was not changed.")
+                return
+            }
+            newProvider = provider
         case .custom:
-            let trimmed = tabModel.customURLString.trimmingCharacters(in: .whitespacesAndNewlines)
-            let url = URL(string: trimmed) ?? URL(string: "https://dns.quad9.net/dns-query")!
-            let boot = tabModel.customBootstrapIP.trimmingCharacters(in: .whitespacesAndNewlines)
-            newProvider = .custom(url: url, bootstrapIP: boot.isEmpty ? nil : boot)
+            guard let provider = DoHProvider.custom(urlString: tabModel.customURLString, bootstrapIP: tabModel.customBootstrapIP) else {
+                tabModel.providerMessage = String(localized: "The custom resolver needs an https:// address (and an IP address if you fill in the bootstrap field). The resolver was not changed.")
+                return
+            }
+            newProvider = provider
         }
+        tabModel.providerMessage = nil
         controller.updateProvider(newProvider)
     }
 }

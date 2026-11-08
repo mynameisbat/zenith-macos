@@ -94,15 +94,15 @@ struct CleanerDataSafetyTests {
         }
         let fm = FileManager.default
 
-        // ~/.cache/sneaky -> a folder that is not a cache
-        try fm.createDirectory(at: home.appendingPathComponent(".cache"), withIntermediateDirectories: true)
+        // ~/.cache/uv/sneaky -> a folder that is not a cache
+        try fm.createDirectory(at: home.appendingPathComponent(".cache/uv"), withIntermediateDirectories: true)
         try write(outside.appendingPathComponent("precious/thesis.docx"))
-        try fm.createSymbolicLink(at: home.appendingPathComponent(".cache/sneaky"), withDestinationURL: outside.appendingPathComponent("precious"))
-        #expect(SystemCleanerService.isPathSafeForDeletion(home.path + "/.cache/sneaky/thesis.docx", home: home.path) == false)
+        try fm.createSymbolicLink(at: home.appendingPathComponent(".cache/uv/sneaky"), withDestinationURL: outside.appendingPathComponent("precious"))
+        #expect(SystemCleanerService.isPathSafeForDeletion(home.path + "/.cache/uv/sneaky/thesis.docx", home: home.path) == false)
 
         // An ordinary subfolder of the same root is fine.
-        try write(home.appendingPathComponent(".cache/real/blob"))
-        #expect(SystemCleanerService.isPathSafeForDeletion(home.path + "/.cache/real/blob", home: home.path) == true)
+        try write(home.appendingPathComponent(".cache/uv/real/blob"))
+        #expect(SystemCleanerService.isPathSafeForDeletion(home.path + "/.cache/uv/real/blob", home: home.path) == true)
 
         // The root itself being a symlink (a cache moved to another drive) is a legitimate setup.
         try write(outside.appendingPathComponent("npm/_cacache/index"))

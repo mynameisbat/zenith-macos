@@ -81,7 +81,7 @@ open Zenith.app
   - **Copy Text** (`⌃⌥T`): OCR, QR codes and barcodes.
   - **Clipboard** (`⇧⌘V`).
 - **Running apps**: the heaviest user processes with their app icons, memory and CPU; quit one (after a confirmation) with its ✕ or `⌘1`–`⌘4` (`SIGTERM`, then `SIGKILL` if needed).
-- **Meters**: CPU, memory, free storage and battery, plus Bluetooth accessories' battery.
+- **Meters**: CPU, memory, free storage and battery, plus Bluetooth accessories' battery, and the download and upload speed of your Wi-Fi or Ethernet connection. The speed is measured only while the hub is open.
 - **Switches**: Privacy Shield on/off, Scan/Clean system junk (asks first) and Boost; **Settings…** and **Quit Zenith** at the bottom, as in a menu.
 
 ### 2. 🔍 Native Screen OCR & Barcode/QR Extractor (`⌃⌥T`)
@@ -128,6 +128,7 @@ open Zenith.app
 - **Widgets** (Settings → Dynamic Island):
   - **Focus timer**: a Pomodoro-style timer (25-minute focus, 5-minute break by default, both adjustable). While it runs, a progress ring and the time left sit either side of the notch; pause, resume or stop it from the island or from Settings. When it ends the island says so (with a sound if sound effects are on) and offers the break, or the next focus session.
   - **Next calendar event**: your next timed event in the next 12 hours (or the one going on now) with how long until it starts, in its calendar's color. Off until you turn it on; macOS then asks for Calendar access. Events are read on your Mac only, through EventKit.
+  - **Network speed**: download and upload speed, next to the timer and the event. Off until you turn it on. It counts Wi-Fi, Ethernet and cellular tethering only (not VPN tunnels, which would count the same bytes twice), and measures only while the Widgets tab is showing. With all three widgets on, the event's title is shortened to fit.
 - **MagSafe & USB-C Charging HUD**:
   - Driven by an IOKit run-loop notification (`IOPSNotificationCreateRunLoopSource`), not polling.
   - A green rim-light capsule shows the battery charge and the charger wattage (e.g. `Charging • 85% (67W Charger)`).
@@ -145,7 +146,7 @@ Nothing here deletes without asking: each action shows what will go (the largest
 - **Projects**: build folders (`node_modules`, Cargo `target`, `.build`, `venv`/`__pycache__`, `DerivedData`, `Pods`, …) of projects under `~/Projects`, `~/Code`, `~/Documents` and a few other usual folders, plus any folder you add. Offered only for a project type that rebuilds the folder, and `bin`/`obj`/`build`/`dist` only if Git ignores them. Moved to the Trash.
 - **Installers**: `.dmg`, `.pkg`, `.iso`, `.xip` and large installer `.zip` files in Downloads and Desktop that nothing has touched for three days. A mounted disk image is left out. Moved to the Trash.
 - **Leftovers**: `com.vendor.app` folders in `~/Library` whose app is gone and that nothing has touched for 30 days. **Nothing is ticked for you**: they can hold data you would want back. Moved to the Trash.
-- **Drives**: Finder and Windows junk (`.DS_Store`, `._*` files, `Thumbs.db`, …) on mounted external drives. These are deleted, not trashed, and the confirmation says so.
+- **Drives**: Finder and Windows junk (`.DS_Store`, `._*` files, `Thumbs.db`, …) on mounted external drives (network shares are skipped). These are deleted, not trashed, and the confirmation says so.
 
 **Elsewhere in the app**
 - **Boost** in the Command Hub purges inactive memory and flushes the DNS cache, and tells you honestly which step failed.
@@ -155,8 +156,9 @@ Nothing here deletes without asking: each action shows what will go (the largest
 ### 7. 🛡 Privacy Shield (DoH + Anti-DPI Local Proxy)
 - **How it works**: Zenith listens on `127.0.0.1` (port 8080 by default, loopback only) and points the macOS system proxy of your primary network service at it. It looks up the name of each site you visit over **DNS-over-HTTPS** and connects to the address it gets. Your previous proxy settings are saved and put back when you switch it off, and are repaired at the next launch if Zenith was killed while it was on.
 - **DoH providers**: Cloudflare, Google, Quad9, AdGuard, NextDNS, or your own endpoint. The DoH server itself is reached by its IP address (so its name is not looked up in plain DNS) and its certificate is checked against its real name.
+- **Tracker blocking** (Settings → Privacy Shield, off until you turn it on): refuses connections to advertising and tracking domains with a `403`, before any DoH lookup is made for them. It starts from a small built-in list (ad networks, ad exchanges and analytics endpoints; nothing sites need to work, such as CDNs, sign-in or tag managers) and you can **import a hosts file** or a list of domains (`0.0.0.0 ads.example.com`, one domain per line, or `||ads.example.com^` rules; up to 50 MB), add domains to **Always Block**, and list domains under **Never Block** when a site breaks. A listed domain covers its subdomains; a name with no dot (`com`) or a public suffix (`co.uk`) is refused so one bad line cannot block a whole country. Blocked requests show in the connection log and the Activity counter. Zenith never downloads a list itself: for a larger list, download a hosts file you trust (for example Steven Black's unified hosts) and import it. If Zenith is killed or crashes while the shield is on, a small separate watchdog process switches the proxy off so your internet keeps working, and the next launch restores your own earlier settings. Run from a disk image or an external drive, Zenith warns before turning the shield on, because ejecting that volume ends the app.
 - **TLS ClientHello chunker**: splits the first TLS handshake packet of a connection into two pieces (after the first 2 bytes), with a 5 ms pause between them, which can defeat simple Deep Packet Inspection.
-- **Limits**: it is not a VPN and does not hide your IP address or the addresses you connect to. It only covers traffic from apps that honour the system proxy, and only the primary network service. SOCKS and PAC proxy settings are ignored, and the local proxy has no authentication. The anti-DPI split has not been verified against a real filtering network.
+- **Limits**: it is not a VPN and does not hide your IP address or the addresses you connect to. It only covers traffic from apps that honour the system proxy, and only the primary network service. Tracker blocking works at the domain level only: it cannot remove an ad that is served from the same domain as the page, and it does not look inside HTTPS. SOCKS and PAC proxy settings are ignored, and the local proxy has no authentication. The anti-DPI split has not been verified against a real filtering network.
 
 ### 8. 🔊 Native Audio Feedback
 - 14 customizable native macOS sound cues (Pop, Tink, Hero, Bottle, Funk, Ping, Purr, Submarine, etc.) with custom sound file import (`.wav`, `.aiff`, `.m4a`).

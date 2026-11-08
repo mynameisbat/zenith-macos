@@ -72,6 +72,7 @@ public final class ExternalDriveSanitizerService: @unchecked Sendable {
             .volumeNameKey,
             .volumeIsRemovableKey,
             .volumeIsInternalKey,
+            .volumeIsLocalKey,
             .volumeTotalCapacityKey,
             .volumeAvailableCapacityKey,
             .volumeIsReadOnlyKey
@@ -96,6 +97,11 @@ public final class ExternalDriveSanitizerService: @unchecked Sendable {
 
             // Skip read-only volumes (e.g. installer DMGs, Time Machine backups)
             if vals.volumeIsReadOnly == true {
+                continue
+            }
+            // A network share is somebody else's storage, possibly with millions of files; this tool is for drives
+            // plugged into this Mac.
+            if vals.volumeIsLocal == false {
                 continue
             }
 

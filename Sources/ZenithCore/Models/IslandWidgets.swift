@@ -199,6 +199,7 @@ public final class IslandWidgetSettings: ObservableObject {
     public enum Keys {
         public static let showTimer = "zenith_island_show_timer"
         public static let showCalendar = "zenith_island_show_calendar"
+        public static let showNetwork = "zenith_island_show_network"
         public static let focusMinutes = "zenith_island_focus_minutes"
         public static let breakMinutes = "zenith_island_break_minutes"
     }
@@ -214,6 +215,10 @@ public final class IslandWidgetSettings: ObservableObject {
 
     @Published public var showCalendar: Bool {
         didSet { save(showCalendar, Keys.showCalendar); syncIsland() }
+    }
+
+    @Published public var showNetwork: Bool {
+        didSet { save(showNetwork, Keys.showNetwork); syncIsland() }
     }
 
     @Published public var focusMinutes: Int {
@@ -240,6 +245,7 @@ public final class IslandWidgetSettings: ObservableObject {
         self.island = island
         self.showTimer = userDefaults.object(forKey: Keys.showTimer) as? Bool ?? true
         self.showCalendar = userDefaults.object(forKey: Keys.showCalendar) as? Bool ?? false
+        self.showNetwork = userDefaults.object(forKey: Keys.showNetwork) as? Bool ?? false
         let focus = userDefaults.object(forKey: Keys.focusMinutes) as? Int ?? Self.defaultFocusMinutes
         self.focusMinutes = min(max(focus, Self.focusRange.lowerBound), Self.focusRange.upperBound)
         let pause = userDefaults.object(forKey: Keys.breakMinutes) as? Int ?? Self.defaultBreakMinutes
@@ -249,12 +255,13 @@ public final class IslandWidgetSettings: ObservableObject {
 
     /// Whether the island has a Widgets tab at all.
     public var showsAnyWidget: Bool {
-        showTimer || showCalendar
+        showTimer || showCalendar || showNetwork
     }
 
     public func resetToDefaults() {
         showTimer = true
         showCalendar = false
+        showNetwork = false
         focusMinutes = Self.defaultFocusMinutes
         breakMinutes = Self.defaultBreakMinutes
     }
@@ -266,5 +273,6 @@ public final class IslandWidgetSettings: ObservableObject {
     private func syncIsland() {
         island?.showsTimerWidget = showTimer
         island?.showsCalendarWidget = showCalendar
+        island?.showsNetworkWidget = showNetwork
     }
 }

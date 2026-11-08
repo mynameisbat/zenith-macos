@@ -439,6 +439,8 @@ public struct ZenithCommandHubView: View {
                 }
             }
 
+            HubNetworkSpeedView()
+
             if !snapshot.bluetoothDevices.isEmpty {
                 HStack(spacing: 10) {
                     ForEach(snapshot.bluetoothDevices) { device in
@@ -502,7 +504,18 @@ public struct ZenithCommandHubView: View {
                     icon: "sparkles"
                 )
             }
+            if let message = Self.failureMessage(for: cleaner.lastFailedItemNames) {
+                ToastHUDController.shared.show(verbatim: message, icon: "exclamationmark.triangle.fill")
+            }
         }
+    }
+
+    /// What to tell the user when a clean could not remove everything, or nil when it removed all it was asked to.
+    static func failureMessage(for names: [String]) -> String? {
+        guard let first = names.first else { return nil }
+        return names.count == 1
+            ? String(localized: "Could not remove \(first). macOS may be protecting it, or an app is using it.")
+            : String(localized: "Could not remove \(names.count) items, such as \(first). macOS may be protecting them, or an app is using them.")
     }
 
     private var shieldBinding: Binding<Bool> {
@@ -640,6 +653,38 @@ struct HubMeterView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(title) + Text(verbatim: " \(value)"))
+    }
+}
+
+// MARK: - Network speed
+
+/// Download and upload speed on one line under the meters. It only shows the number; the popover's controller
+/// starts and stops the measuring while the hub is open.
+struct HubNetworkSpeedView: View {
+    @ObservedObject private var monitor: NetworkSpeedMonitor = .shared
+
+    var body: some View {
+        HStack(spacing: 14) {
+            item(symbol: "arrow.down", text: monitor.speed.formattedDownload)
+            item(symbol: "arrow.up", text: monitor.speed.formattedUpload)
+            Spacer(minLength: 0)
+        }
+        // Measuring starts and stops with the popover (ZenithCommandHubController), not with this view.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Network speed"))
+        .accessibilityValue(Text("Download \(monitor.speed.formattedDownload), upload \(monitor.speed.formattedUpload)"))
+        .help("Network speed: download and upload")
+    }
+
+    private func item(symbol: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .bold))
+            Text(verbatim: text)
+                .font(.system(size: 11.5))
+                .monospacedDigit()
+        }
+        .foregroundStyle(.secondary)
     }
 }
 

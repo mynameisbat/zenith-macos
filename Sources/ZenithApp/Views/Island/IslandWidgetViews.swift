@@ -110,6 +110,9 @@ struct IslandWidgetsPanel: View {
             if islandState.showsCalendarWidget {
                 IslandCalendarCard(event: islandState.upcomingEvent, access: islandState.calendarAccess)
             }
+            if islandState.showsNetworkWidget {
+                IslandNetworkCard()
+            }
         }
         .padding(.horizontal, 10)
         .padding(.bottom, 8)
@@ -206,6 +209,44 @@ struct IslandTimerCard: View {
         return sessions == 0
             ? String(localized: "\(length) min")
             : String(localized: "\(length) min · \(sessions) done today")
+    }
+}
+
+/// Download and upload speed. It measures only while this card is on screen.
+struct IslandNetworkCard: View {
+    @ObservedObject private var monitor: NetworkSpeedMonitor = .shared
+    @StateObject private var lease = NetworkSpeedLease()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            row(symbol: "arrow.down", text: monitor.speed.formattedDownload, label: "Download")
+            row(symbol: "arrow.up", text: monitor.speed.formattedUpload, label: "Upload")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(IslandCardBackground())
+        // Narrower than the other cards, so a timer and an event still fit beside it.
+        .frame(width: 86)
+        .onAppear { lease.begin() }
+        .onDisappear { lease.end() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Network speed"))
+        .accessibilityValue(Text("Download \(monitor.speed.formattedDownload), upload \(monitor.speed.formattedUpload)"))
+    }
+
+    private func row(symbol: String, text: String, label: LocalizedStringKey) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(ZenithTheme.Island.textSecondary)
+                .frame(width: 10)
+            Text(verbatim: text)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ZenithTheme.Island.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .help(label)
     }
 }
 

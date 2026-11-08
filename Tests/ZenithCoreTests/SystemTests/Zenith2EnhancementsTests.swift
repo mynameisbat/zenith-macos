@@ -178,13 +178,24 @@ struct Zenith2EnhancementsTests {
 
         #expect(roots.contains("\(home)/Library/Developer/CoreSimulator/Caches"))
         #expect(roots.contains("\(home)/.gradle/caches"))
-        #expect(roots.contains("\(home)/.gradle"))
-        #expect(roots.contains("\(home)/Library/Developer/CoreSimulator"))
+        // The roots are the cache folders themselves, not the tool folders around them.
+        #expect(!roots.contains("\(home)/.gradle"))
+        #expect(!roots.contains("\(home)/Library/Developer/CoreSimulator"))
+        #expect(!roots.contains("\(home)/.cargo"))
+        #expect(!roots.contains("\(home)/.android"))
+        #expect(!roots.contains("\(home)/.cache"))
 
         // Simulator & Gradle cache subpaths
         #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Library/Developer/CoreSimulator/Caches/sample.cache", home: home) == true)
         #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/.gradle/caches/modules-2/files-2.1/data", home: home) == true)
         #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/Library/Caches/Google/Chrome/Default/Cache", home: home) == true)
+
+        // What sits beside a cache in the same tool folder is not cache.
+        for notCache in [".gradle/wrapper/dists/gradle-8.5", ".gradle/gradle.properties", ".cargo/bin/cargo", ".cargo/registry/src/x",
+                         ".android/avd/Pixel.avd", ".android/adbkey", ".cache/huggingface/hub/models", ".bun/bin/bun",
+                         ".npm/_logs/2026.log", "Library/Developer/CoreSimulator/Devices/ABC/data", "Library/Developer/Xcode/Archives/App.xcarchive"] {
+            #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/\(notCache)", home: home) == false, "\(notCache)")
+        }
 
         // Cache base directories themselves are safe to delete
         #expect(SystemCleanerService.isPathSafeForDeletion("\(home)/.gradle/caches", home: home) == true)

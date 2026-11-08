@@ -47,7 +47,12 @@ enum Sock {
         return fd
     }
 
+    /// Writing to a socket the other side has closed must fail with EPIPE, not kill the test process with SIGPIPE
+    /// (`SO_NOSIGPIPE` is no use here: macOS refuses to set it on a connection that was already reset).
+    static let ignoreSigPipe: Void = { signal(SIGPIPE, SIG_IGN) }()
+
     static func send(_ fd: Int32, _ data: Data) {
+        _ = ignoreSigPipe
         data.withUnsafeBytes { buffer in
             var offset = 0
             while offset < buffer.count {
