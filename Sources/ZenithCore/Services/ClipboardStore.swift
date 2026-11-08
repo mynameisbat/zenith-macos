@@ -1,7 +1,6 @@
 import Foundation
 import AppKit
 import CoreGraphics
-import Observation
 import Combine
 
 // MARK: - Memory Limits
@@ -261,24 +260,18 @@ public struct FuzzySearchEngine: Sendable {
 // MARK: - Clipboard Store
 
 /// Concurrency-safe history store managing historical clipboard items.
-/// Conforms to @Observable (macOS 14+ SwiftUI) and ObservableObject (AppKit/Combine).
-@Observable
+/// An `ObservableObject`: view models subscribe to `objectWillChange`.
 public final class ClipboardStore: ObservableObject, @unchecked Sendable {
     public static let shared = ClipboardStore()
 
-    @ObservationIgnored
     private let lock = NSLock()
 
-    @ObservationIgnored
     private let pasteboardService: PasteboardServiceProtocol
 
-    @ObservationIgnored
     private let settingsStore: SettingsStore
 
-    @ObservationIgnored
     private var _capacityOverride: Int?
 
-    @ObservationIgnored
     private var _soundService: SoundServiceProtocol?
 
     /// Plays the copy sound when something new is copied (the app sets `AudioFeedbackManager.shared`; tests leave it
@@ -288,16 +281,12 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
         set { lock.withLock { _soundService = newValue } }
     }
 
-    @ObservationIgnored
     private let maxTotalBytes: Int
 
-    @ObservationIgnored
     private var _items: [ClipboardItem] = []
 
-    @ObservationIgnored
     private var _searchQuery: String = ""
 
-    @ObservationIgnored
     private let searchEngine = FuzzySearchEngine()
 
     // MARK: - Initializers
@@ -333,43 +322,35 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
     /// Ordered historical items (newest at index 0).
     public var items: [ClipboardItem] {
         get {
-            access(keyPath: \.items)
             lock.lock()
             defer { lock.unlock() }
             return _items
         }
         set {
-            withMutation(keyPath: \.items) {
-                lock.lock()
-                _items = newValue
-                lock.unlock()
-                notifyChange()
-            }
+            lock.lock()
+            _items = newValue
+            lock.unlock()
+            notifyChange()
         }
     }
 
     /// Current search query string.
     public var searchQuery: String {
         get {
-            access(keyPath: \.searchQuery)
             lock.lock()
             defer { lock.unlock() }
             return _searchQuery
         }
         set {
-            withMutation(keyPath: \.searchQuery) {
-                lock.lock()
-                _searchQuery = newValue
-                lock.unlock()
-                notifyChange()
-            }
+            lock.lock()
+            _searchQuery = newValue
+            lock.unlock()
+            notifyChange()
         }
     }
 
     /// Filtered items matching current search query.
     public var filteredItems: [ClipboardItem] {
-        access(keyPath: \.searchQuery)
-        access(keyPath: \.items)
         lock.lock()
         let query = _searchQuery
         let currentItems = _items
@@ -609,11 +590,9 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
 
     private func notifyChange() {
         if Thread.isMainThread {
-            withMutation(keyPath: \.items) {}
             objectWillChange.send()
         } else {
             DispatchQueue.main.async { [weak self] in
-                self?.withMutation(keyPath: \.items) {}
                 self?.objectWillChange.send()
             }
         }

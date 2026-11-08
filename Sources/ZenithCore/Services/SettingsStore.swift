@@ -1,16 +1,13 @@
 import Foundation
-import Observation
 import Combine
 
 /// High-performance, thread-safe user configuration store backed by UserDefaults.
-/// Conforms to both `@Observable` (modern macOS 14+ SwiftUI) and `ObservableObject` (Combine / AppKit).
-@Observable
+/// An `ObservableObject`: SwiftUI views hold it with `@ObservedObject`, AppKit code subscribes to `objectWillChange`.
+/// (It is not `@Observable`: that macro needs macOS 14, and Zenith runs on macOS 13.)
 public final class SettingsStore: ObservableObject, @unchecked Sendable {
     public static let shared = SettingsStore()
 
-    @ObservationIgnored
     private let lock = NSLock()
-    @ObservationIgnored
     private let userDefaults: UserDefaults
 
     // MARK: - UserDefaults Keys
@@ -33,19 +30,12 @@ public final class SettingsStore: ObservableObject, @unchecked Sendable {
     public static let defaultLaunchAtLoginEnabled: Bool = false
 
     // MARK: - Backing Storage (Protected by NSLock)
-    @ObservationIgnored
     private var _historyLimit: Int
-    @ObservationIgnored
     private var _soundEffectsEnabled: Bool
-    @ObservationIgnored
     private var _soundVolume: Float
-    @ObservationIgnored
     private var _launchAtLoginEnabled: Bool
-    @ObservationIgnored
     private var _hotkeyMappings: [String: HotKeyDefinition]
-    @ObservationIgnored
     private var _soundEffectAssignments: [String: SoundChoice]
-    @ObservationIgnored
     private var _dohProvider: DoHProvider
 
     // MARK: - Observable Properties
@@ -54,20 +44,17 @@ public final class SettingsStore: ObservableObject, @unchecked Sendable {
     /// Strictly clamped to the range [5, 500]. Defaults to 20.
     public var historyLimit: Int {
         get {
-            access(keyPath: \.historyLimit)
             lock.lock()
             defer { lock.unlock() }
             return _historyLimit
         }
         set {
-            withMutation(keyPath: \.historyLimit) {
-                let clamped = min(max(newValue, Self.minHistoryLimit), Self.maxHistoryLimit)
-                lock.lock()
-                _historyLimit = clamped
-                userDefaults.set(clamped, forKey: Keys.historyLimit)
-                lock.unlock()
-                notifyChange()
-            }
+            let clamped = min(max(newValue, Self.minHistoryLimit), Self.maxHistoryLimit)
+            lock.lock()
+            _historyLimit = clamped
+            userDefaults.set(clamped, forKey: Keys.historyLimit)
+            lock.unlock()
+            notifyChange()
         }
     }
 
@@ -75,39 +62,33 @@ public final class SettingsStore: ObservableObject, @unchecked Sendable {
     /// Defaults to true.
     public var soundEffectsEnabled: Bool {
         get {
-            access(keyPath: \.soundEffectsEnabled)
             lock.lock()
             defer { lock.unlock() }
             return _soundEffectsEnabled
         }
         set {
-            withMutation(keyPath: \.soundEffectsEnabled) {
-                lock.lock()
-                _soundEffectsEnabled = newValue
-                userDefaults.set(newValue, forKey: Keys.soundEffectsEnabled)
-                lock.unlock()
-                notifyChange()
-            }
+            lock.lock()
+            _soundEffectsEnabled = newValue
+            userDefaults.set(newValue, forKey: Keys.soundEffectsEnabled)
+            lock.unlock()
+            notifyChange()
         }
     }
 
     /// Master volume level for audio feedback [0.0, 1.0]. Defaults to 0.8.
     public var soundVolume: Float {
         get {
-            access(keyPath: \.soundVolume)
             lock.lock()
             defer { lock.unlock() }
             return _soundVolume
         }
         set {
-            withMutation(keyPath: \.soundVolume) {
-                let clamped = min(max(newValue, 0.0), 1.0)
-                lock.lock()
-                _soundVolume = clamped
-                userDefaults.set(clamped, forKey: Keys.soundVolume)
-                lock.unlock()
-                notifyChange()
-            }
+            let clamped = min(max(newValue, 0.0), 1.0)
+            lock.lock()
+            _soundVolume = clamped
+            userDefaults.set(clamped, forKey: Keys.soundVolume)
+            lock.unlock()
+            notifyChange()
         }
     }
 
@@ -115,19 +96,16 @@ public final class SettingsStore: ObservableObject, @unchecked Sendable {
     /// Defaults to false.
     public var launchAtLoginEnabled: Bool {
         get {
-            access(keyPath: \.launchAtLoginEnabled)
             lock.lock()
             defer { lock.unlock() }
             return _launchAtLoginEnabled
         }
         set {
-            withMutation(keyPath: \.launchAtLoginEnabled) {
-                lock.lock()
-                _launchAtLoginEnabled = newValue
-                userDefaults.set(newValue, forKey: Keys.launchAtLoginEnabled)
-                lock.unlock()
-                notifyChange()
-            }
+            lock.lock()
+            _launchAtLoginEnabled = newValue
+            userDefaults.set(newValue, forKey: Keys.launchAtLoginEnabled)
+            lock.unlock()
+            notifyChange()
         }
     }
 
@@ -140,57 +118,48 @@ public final class SettingsStore: ObservableObject, @unchecked Sendable {
     /// Dictionary mapping shortcut action IDs to their configured HotKeyDefinition.
     public var hotkeyMappings: [String: HotKeyDefinition] {
         get {
-            access(keyPath: \.hotkeyMappings)
             lock.lock()
             defer { lock.unlock() }
             return _hotkeyMappings
         }
         set {
-            withMutation(keyPath: \.hotkeyMappings) {
-                lock.lock()
-                _hotkeyMappings = newValue
-                Self.saveHotkeys(newValue, to: userDefaults)
-                lock.unlock()
-                notifyChange()
-            }
+            lock.lock()
+            _hotkeyMappings = newValue
+            Self.saveHotkeys(newValue, to: userDefaults)
+            lock.unlock()
+            notifyChange()
         }
     }
 
     /// Dictionary mapping semantic sound effect actions to their configured SoundChoice.
     public var soundEffectAssignments: [String: SoundChoice] {
         get {
-            access(keyPath: \.soundEffectAssignments)
             lock.lock()
             defer { lock.unlock() }
             return _soundEffectAssignments
         }
         set {
-            withMutation(keyPath: \.soundEffectAssignments) {
-                lock.lock()
-                _soundEffectAssignments = newValue
-                Self.saveSoundAssignments(newValue, to: userDefaults)
-                lock.unlock()
-                notifyChange()
-            }
+            lock.lock()
+            _soundEffectAssignments = newValue
+            Self.saveSoundAssignments(newValue, to: userDefaults)
+            lock.unlock()
+            notifyChange()
         }
     }
 
     /// DNS-over-HTTPS encrypted provider preference.
     public var dohProvider: DoHProvider {
         get {
-            access(keyPath: \.dohProvider)
             lock.lock()
             defer { lock.unlock() }
             return _dohProvider
         }
         set {
-            withMutation(keyPath: \.dohProvider) {
-                lock.lock()
-                _dohProvider = newValue
-                Self.saveDoHProvider(newValue, to: userDefaults)
-                lock.unlock()
-                notifyChange()
-            }
+            lock.lock()
+            _dohProvider = newValue
+            Self.saveDoHProvider(newValue, to: userDefaults)
+            lock.unlock()
+            notifyChange()
         }
     }
 
@@ -238,39 +207,25 @@ public final class SettingsStore: ObservableObject, @unchecked Sendable {
 
     /// Resets all preferences back to out-of-the-box defaults and clears persisted overrides.
     public func resetToDefaults() {
-        withMutation(keyPath: \.historyLimit) {
-            withMutation(keyPath: \.soundEffectsEnabled) {
-                withMutation(keyPath: \.soundVolume) {
-                    withMutation(keyPath: \.launchAtLoginEnabled) {
-                        withMutation(keyPath: \.hotkeyMappings) {
-                            withMutation(keyPath: \.soundEffectAssignments) {
-                                withMutation(keyPath: \.dohProvider) {
-                                    lock.lock()
-                                    _historyLimit = Self.defaultHistoryLimit
-                                    _soundEffectsEnabled = Self.defaultSoundEffectsEnabled
-                                    _soundVolume = Self.defaultSoundVolume
-                                    _launchAtLoginEnabled = Self.defaultLaunchAtLoginEnabled
-                                    _hotkeyMappings = HotKeyDefinition.defaultDictionary
-                                    _soundEffectAssignments = SoundChoice.defaultAssignments
-                                    _dohProvider = .cloudflare
+        lock.lock()
+        _historyLimit = Self.defaultHistoryLimit
+        _soundEffectsEnabled = Self.defaultSoundEffectsEnabled
+        _soundVolume = Self.defaultSoundVolume
+        _launchAtLoginEnabled = Self.defaultLaunchAtLoginEnabled
+        _hotkeyMappings = HotKeyDefinition.defaultDictionary
+        _soundEffectAssignments = SoundChoice.defaultAssignments
+        _dohProvider = .cloudflare
 
-                                    userDefaults.removeObject(forKey: Keys.historyLimit)
-                                    userDefaults.removeObject(forKey: Keys.soundEffectsEnabled)
-                                    userDefaults.removeObject(forKey: Keys.soundVolume)
-                                    userDefaults.removeObject(forKey: Keys.launchAtLoginEnabled)
-                                    userDefaults.removeObject(forKey: Keys.hotkeyMappings)
-                                    userDefaults.removeObject(forKey: Keys.soundEffectAssignments)
-                                    userDefaults.removeObject(forKey: Keys.dohProvider)
-                                    lock.unlock()
+        userDefaults.removeObject(forKey: Keys.historyLimit)
+        userDefaults.removeObject(forKey: Keys.soundEffectsEnabled)
+        userDefaults.removeObject(forKey: Keys.soundVolume)
+        userDefaults.removeObject(forKey: Keys.launchAtLoginEnabled)
+        userDefaults.removeObject(forKey: Keys.hotkeyMappings)
+        userDefaults.removeObject(forKey: Keys.soundEffectAssignments)
+        userDefaults.removeObject(forKey: Keys.dohProvider)
+        lock.unlock()
 
-                                    notifyChange()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        notifyChange()
     }
 
     /// Updates or replaces the definition for a specific shortcut action.

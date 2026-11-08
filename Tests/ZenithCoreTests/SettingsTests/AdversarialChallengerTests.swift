@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-import Observation
 import Combine
 import CoreGraphics
 @testable import ZenithCore
@@ -135,8 +134,8 @@ struct AdversarialChallengerTests {
         #expect(store5.hotkeyMappings.count >= 0)
     }
 
-    // MARK: - 4. Rapid Concurrent Observation and Combine Flooding
-    @Test("SettingsStore handles 500 rapid background mutations without crashing Combine or Observation")
+    // MARK: - 4. Rapid Concurrent Combine Flooding
+    @Test("SettingsStore handles 500 rapid background mutations without crashing Combine")
     func testRapidBackgroundMutationFlooding() async {
         let (defaults, suiteName) = makeIsolatedDefaults()
         defer { cleanupDefaults(suiteName: suiteName) }

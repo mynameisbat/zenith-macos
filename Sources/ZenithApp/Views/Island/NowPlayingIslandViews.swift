@@ -59,7 +59,7 @@ public struct NowPlayingVisualizerView: View {
                 animState.startAnimating()
             }
         }
-        .onChange(of: isPlaying) { _, playing in
+        .onValueChange(of: isPlaying) { playing in
             if playing {
                 animState.startAnimating()
             } else {
@@ -140,7 +140,7 @@ public struct NowPlayingCompactDiscView: View {
                 rotationState.startRotating()
             }
         }
-        .onChange(of: track.isPlaying) { _, playing in
+        .onValueChange(of: track.isPlaying) { playing in
             if playing {
                 rotationState.startRotating()
             } else {

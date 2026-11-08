@@ -4,7 +4,7 @@ import AppKit
 import ScreenCaptureKit
 
 /// Production macOS screen capture backend using CoreGraphics Quartz Display Services (CGDisplayCreateImage)
-/// and ScreenCaptureKit (SCScreenshotManager) for modern macOS 14+ Retina display capture.
+/// and, as a fallback on macOS 14+, ScreenCaptureKit (SCScreenshotManager) for Retina display capture.
 public final class NativeScreenCaptureBackend: ScreenCaptureBackendProtocol, Sendable {
     public init() {}
 
@@ -105,6 +105,9 @@ public final class NativeScreenCaptureBackend: ScreenCaptureBackendProtocol, Sen
     /// Captures a display with ScreenCaptureKit alone. This is the fallback of `captureDisplay`; it is public so the
     /// `--check-screen-capture` diagnostic can exercise it directly.
     public func captureViaScreenCaptureKit(displayID: CGDirectDisplayID) async throws -> CGImage? {
+        // `SCScreenshotManager` and `SCContentFilter.pointPixelScale` arrive with macOS 14. On macOS 13 the
+        // CoreGraphics capture is the only path (and it is the one that normally succeeds), so this has nothing to add.
+        guard #available(macOS 14, *) else { return nil }
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         guard let display = content.displays.first(where: { $0.displayID == displayID }) ?? content.displays.first else {
             return nil

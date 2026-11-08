@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-import Observation
 import Combine
 import ApplicationServices
 @testable import ZenithCore
@@ -203,8 +202,8 @@ struct AdversarialStressTests {
         #expect(store.historyLimit <= 500)
     }
 
-    @Test("50 concurrent tasks mutating store while Combine and Observation listeners are active")
-    func testConcurrentObservationAndCombineListeners() async {
+    @Test("50 concurrent tasks mutating store while a Combine listener is active")
+    func testConcurrentCombineListener() async {
         let (defaults, suiteName) = makeIsolatedDefaults()
         defer { cleanupDefaults(suiteName: suiteName) }
 

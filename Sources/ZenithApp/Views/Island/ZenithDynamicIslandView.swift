@@ -148,7 +148,7 @@ public struct ZenithDynamicIslandView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isNowPlayingActive)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.focusTimer == nil)
         .animation(.spring(response: 0.32, dampingFraction: 0.8), value: islandState.isDropTargeted)
-        .onChange(of: islandState.isDropTargeted) { _, targeted in
+        .onValueChange(of: islandState.isDropTargeted) { targeted in
             if targeted {
                 NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
             }

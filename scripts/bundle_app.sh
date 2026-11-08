@@ -78,7 +78,7 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <key>CFBundleVersion</key>
     <string>3</string>
     <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
+    <string>13.0</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSSupportsAutomaticTermination</key>
