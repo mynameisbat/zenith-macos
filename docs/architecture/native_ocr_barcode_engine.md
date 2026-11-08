@@ -1,7 +1,7 @@
 # Native Screen OCR & Barcode/QR Code Recognition Engine Architecture
 
 **Status**: Production Architecture Specification  
-**Platform**: macOS 14.0+ (Sonoma, Sequoia, and later)  
+**Platform**: macOS 13.0+ (Ventura, Sonoma, Sequoia, and later)  
 **Module**: `ZenithCore` (Headless Engine) & `ZenithApp` (Workstation Integration)  
 **Concurrency Standard**: Swift 6 Strict Concurrency (`Sendable`, structured concurrency, actors)  
 

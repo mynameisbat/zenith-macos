@@ -121,7 +121,7 @@ public final class ClipboardPanelController: NSObject, NSWindowDelegate {
         let viewModel = ClipboardHistoryViewModel(
             store: store,
             pasteboardService: PasteboardMonitor.shared,
-            soundService: nil
+            soundService: AudioFeedbackManager.shared
         )
         self.currentViewModel = viewModel
         KeyboardNavigationEngine.shared.activeViewModel = viewModel

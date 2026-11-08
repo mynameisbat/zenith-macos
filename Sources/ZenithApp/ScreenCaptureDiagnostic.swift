@@ -26,10 +26,18 @@ enum ScreenCaptureDiagnostic {
         }
 
         var failed = false
-        if let image = CGDisplayCreateImage(displayID) {
+        let coreGraphicsImage = CGDisplayCreateImage(displayID)
+        if let image = coreGraphicsImage {
             print("CGDisplayCreateImage:  \(image.width) x \(image.height) pixels")
         } else {
             print("CGDisplayCreateImage:  returned nothing (the fallback would be used)")
+        }
+
+        guard #available(macOS 14, *) else {
+            // ScreenCaptureKit's screenshot call arrives with macOS 14, so on macOS 13 there is no fallback to compare.
+            print("ScreenCaptureKit:      not available before macOS 14; CGDisplayCreateImage is the only capture path")
+            print(coreGraphicsImage == nil ? "RESULT: the display could not be captured" : "RESULT: the display is captured")
+            return coreGraphicsImage == nil ? 1 : 0
         }
 
         do {

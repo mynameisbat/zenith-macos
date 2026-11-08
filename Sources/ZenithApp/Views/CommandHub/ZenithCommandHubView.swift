@@ -86,7 +86,7 @@ public struct ZenithCommandHubView: View {
             isSearchFocused = true
             hubState.refreshHardwareSnapshot()
         }
-        .onChange(of: hubState.presentationID) { _, _ in
+        .onValueChange(of: hubState.presentationID) { _ in
             isSearchFocused = true
         }
     }

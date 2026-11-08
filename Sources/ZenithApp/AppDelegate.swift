@@ -27,6 +27,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         MenuBarController.shared.setup()
 
         // 5. Start background clipboard monitoring (F01)
+        ClipboardStore.shared.soundService = AudioFeedbackManager.shared
         ClipboardStore.shared.startMonitoring()
 
         // 6. Register global hotkeys (F06, F13, F14)

@@ -1,6 +1,6 @@
 # Zenith 🌌
 
-[![macOS](https://img.shields.io/badge/macOS-14.0%2B%20%7C%20Sonoma%20%7C%20Sequoia-000000.svg?style=flat&logo=apple&logoColor=white)](https://www.apple.com/macos/)
+[![macOS](https://img.shields.io/badge/macOS-13.0%2B%20%7C%20Ventura%20%7C%20Sonoma%20%7C%20Sequoia-000000.svg?style=flat&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Swift 6](https://img.shields.io/badge/Swift-6.0%20Native-F05138.svg?style=flat&logo=swift&logoColor=white)](https://swift.org)
 [![Tests](https://img.shields.io/badge/Tests-Swift%20Testing-1FC16B.svg?style=flat)](https://github.com/mynameisbat/zenith-macos/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -27,7 +27,7 @@ Zenith lives in your Menu Bar as a lightweight accessory app (no Dock icon), bri
 ### Option 1: Download Pre-built DMG Installer (Recommended)
 Download the latest disk image from [GitHub Releases](https://github.com/mynameisbat/zenith-macos/releases):
 
-1. Download **`Zenith-2.3.0.dmg`** (or latest release).
+1. Download **`Zenith-2.3.1.dmg`** (or latest release).
 2. Double-click the DMG file to mount it.
 3. Drag **Zenith.app** into your **Applications** folder.
 4. Launch Zenith from Spotlight or Applications.
@@ -35,7 +35,7 @@ Download the latest disk image from [GitHub Releases](https://github.com/mynamei
 #### Terminal / CLI Installation
 ```bash
 # Mount DMG and copy to /Applications
-hdiutil attach Zenith-2.3.0.dmg
+hdiutil attach Zenith-2.3.1.dmg
 cp -R "/Volumes/Zenith/Zenith.app" /Applications/
 hdiutil detach "/Volumes/Zenith"
 
@@ -47,7 +47,7 @@ open /Applications/Zenith.app
 > **Note for macOS Gatekeeper:** Zenith is signed ad hoc and is **not notarized** (that needs an Apple Developer ID), so macOS will warn about an unidentified developer. Right-click (or Control-click) `Zenith.app` in `/Applications`, select **Open**, then click **Open** in the prompt.
 
 ### Option 2: Build from Source
-**Prerequisites:** macOS 14.0 (Sonoma) or higher, Xcode 16+ or Command Line Tools with Swift 6.0 toolchain.
+**Prerequisites:** macOS 13.0 (Ventura) or higher, Xcode 16+ or Command Line Tools with Swift 6.0 toolchain.
 
 ```bash
 # Clone the repository

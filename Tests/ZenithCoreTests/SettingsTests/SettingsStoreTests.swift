@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-import Observation
 import Combine
 @testable import ZenithCore
 
@@ -230,24 +229,38 @@ struct SettingsStoreTests {
         #expect(store.soundEffectsEnabled == true)
     }
 
-    // MARK: - Test 9: Swift Observation Tracking
-    @Test("Swift Observation tracks property access and changes")
-    func testObservationTracking() {
+    // MARK: - Test 9: Every setting publishes a change
+    // The store is an ObservableObject, not @Observable (that macro needs macOS 14), so `objectWillChange` is the only
+    // way SwiftUI and the view models learn that a setting changed. Each setter has to publish it.
+    @Test("Every setting publishes objectWillChange")
+    @MainActor
+    func testEverySettingPublishesChange() {
         let (defaults, suiteName) = makeEphemeralDefaults()
         defer { cleanupDefaults(suiteName: suiteName) }
 
         let store = SettingsStore(userDefaults: defaults)
-        let observedLimitChanged = AtomicBool(false)
-
-        withObservationTracking {
-            _ = store.historyLimit
-        } onChange: {
-            observedLimitChanged.value = true
+        let changeCount = AtomicInt(0)
+        let cancellable = store.objectWillChange.sink {
+            changeCount.increment()
         }
 
-        store.historyLimit = 45
-        #expect(observedLimitChanged.value == true)
-        #expect(store.historyLimit == 45)
+        let mutations: [(name: String, apply: () -> Void)] = [
+            ("historyLimit", { store.historyLimit = 45 }),
+            ("soundEffectsEnabled", { store.soundEffectsEnabled.toggle() }),
+            ("soundVolume", { store.soundVolume = 0.3 }),
+            ("launchAtLoginEnabled", { store.launchAtLoginEnabled.toggle() }),
+            ("hotkeyMappings", { store.hotkeyMappings = [:] }),
+            ("soundEffectAssignments", { store.soundEffectAssignments = [:] }),
+            ("dohProvider", { store.dohProvider = .quad9 }),
+            ("resetToDefaults", { store.resetToDefaults() })
+        ]
+        for mutation in mutations {
+            let before = changeCount.value
+            mutation.apply()
+            #expect(changeCount.value > before, "\(mutation.name) did not publish a change")
+        }
+        #expect(store.historyLimit == SettingsStore.defaultHistoryLimit)
+        _ = cancellable // retain cancellable
     }
 
     // MARK: - Test 10: ObservableObject objectWillChange Publisher

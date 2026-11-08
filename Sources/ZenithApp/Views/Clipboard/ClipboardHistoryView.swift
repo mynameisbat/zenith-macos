@@ -165,7 +165,7 @@ public struct ClipboardHistoryView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
                 }
-                .onChange(of: viewModel.selectedIndex) { _, newIndex in
+                .onValueChange(of: viewModel.selectedIndex) { newIndex in
                     if newIndex >= 0 && newIndex < viewModel.filteredItems.count {
                         let selectedID = viewModel.filteredItems[newIndex].id
                         withAnimation(.easeOut(duration: 0.12)) {
