@@ -64,11 +64,12 @@ extension PurgeArtifactType {
         }
     }
 
-    /// Names that projects also use for files they commit: scripts in `bin`, hand-written assets in `build`/`dist`.
+    /// Names that projects also use for files they commit: scripts in `bin`, hand-written assets in `build`/`dist`, and
+    /// `Pods`, which many iOS teams commit on purpose so a checkout builds without running `pod install`.
     /// These are only offered when git says the folder is ignored (so it holds no committed content).
     var isAmbiguous: Bool {
         switch self {
-        case .build, .dist, .bin, .obj: return true
+        case .build, .dist, .bin, .obj, .pods: return true
         default: return false
         }
     }
@@ -277,6 +278,8 @@ public final class ProjectPurgeService: @unchecked Sendable {
             projectPathsSeen.insert(currentPath)
             let projectName = baseName
 
+            let projectActivity = lastActivity(inProjectAt: currentPath, contents: contents)
+
             // Check for known artifact folders inside this project
             for artifactType in PurgeArtifactType.allCases {
                 let artifactFolder = artifactType.rawValue
@@ -289,7 +292,10 @@ public final class ProjectPurgeService: @unchecked Sendable {
                         var statBuf = stat()
                         // A symlinked folder is not offered: its size would be the target's, and removing it frees nothing.
                         if lstat(fullArtifactPath, &statBuf) == 0, (statBuf.st_mode & S_IFMT) != S_IFLNK {
-                            let modTime = Date(timeIntervalSince1970: TimeInterval(statBuf.st_mtimespec.tv_sec))
+                            // "Untouched" means the project as well: a project edited today whose node_modules was installed
+                            // months ago is in use, and its build folder may be what a running dev server reads.
+                            let artifactTime = Date(timeIntervalSince1970: TimeInterval(statBuf.st_mtimespec.tv_sec))
+                            let modTime = max(artifactTime, projectActivity)
                             let daysOld = Calendar.current.dateComponents([.day], from: modTime, to: Date()).day ?? 0
 
                             if daysOld >= minAgeDays {
@@ -329,6 +335,39 @@ public final class ProjectPurgeService: @unchecked Sendable {
                 )
             }
         }
+    }
+
+    /// The newest modification date among the project's own files: its folder, its entries and theirs (two levels
+    /// are enough to see an edit in `src/`, and an editor's save replaces the file and so touches its folder), plus
+    /// Git's index and HEAD log, which a commit or checkout changes. Build folders are not entered and `.git` is
+    /// read only for those files, so a big repository costs a few thousand `lstat` calls at most.
+    func lastActivity(inProjectAt path: String, contents: [String], entryLimit: Int = 2_000) -> Date {
+        var newest = Date.distantPast
+        var examined = 0
+        let artifactNames = Set(PurgeArtifactType.allCases.map(\.rawValue))
+
+        func note(_ fullPath: String) -> Bool {
+            var info = stat()
+            guard lstat(fullPath, &info) == 0 else { return false }
+            let date = Date(timeIntervalSince1970: TimeInterval(info.st_mtimespec.tv_sec))
+            if date > newest { newest = date }
+            return (info.st_mode & S_IFMT) == S_IFDIR
+        }
+
+        _ = note(path)
+        for name in contents where name != ".git" && !artifactNames.contains(name) {
+            guard examined < entryLimit else { break }
+            examined += 1
+            let child = "\(path)/\(name)"
+            guard note(child), let grandchildren = try? fileManager.contentsOfDirectory(atPath: child) else { continue }
+            for grandchild in grandchildren where !artifactNames.contains(grandchild) {
+                guard examined < entryLimit else { break }
+                examined += 1
+                _ = note("\(child)/\(grandchild)")
+            }
+        }
+        for gitFile in [".git/index", ".git/HEAD", ".git/logs/HEAD"] { _ = note("\(path)/\(gitFile)") }
+        return newest
     }
 
     // MARK: - Purging Execution
@@ -426,7 +465,7 @@ public final class ProjectPurgeService: @unchecked Sendable {
         guard let enumerator = fileManager.enumerator(
             at: URL(fileURLWithPath: path),
             includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileSizeKey],
-            options: [.skipsHiddenFiles]
+            options: []   // hidden folders count: pnpm keeps node_modules' packages in node_modules/.pnpm
         ) else { return 0 }
 
         var total: Int64 = 0

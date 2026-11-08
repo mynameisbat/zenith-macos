@@ -10,11 +10,16 @@ public struct IslandSettingsTab: View {
 
     public init() {}
 
+    /// The Widgets tab is 380 pt wide: with a timer, an event and the network speed side by side, the event title is cut.
+    private var allWidgetsOn: Bool { settings.showTimer && settings.showCalendar && settings.showNetwork }
+
     public var body: some View {
         ZenithSettingsPage {
             ZenithSettingsSection(
                 "Widgets",
-                footer: "Move the pointer to the notch to open the island, then pick the Widgets tab. A running timer stays next to the notch."
+                footer: allWidgetsOn
+                    ? LocalizedStringKey("Move the pointer to the notch to open the island, then pick the Widgets tab. A running timer stays next to the notch. With all three widgets on, a long event title is shortened to fit.")
+                    : LocalizedStringKey("Move the pointer to the notch to open the island, then pick the Widgets tab. A running timer stays next to the notch.")
             ) {
                 ZenithSettingsRow(
                     "Focus Timer",
@@ -50,6 +55,19 @@ public struct IslandSettingsTab: View {
                 if settings.showCalendar {
                     ZenithSettingsDivider(inset: 44)
                     calendarAccessRow
+                }
+
+                ZenithSettingsDivider(inset: 44)
+
+                ZenithSettingsRow(
+                    "Network Speed",
+                    subtitle: "Download and upload speed, measured only while the island is open on the Widgets tab.",
+                    symbol: "arrow.up.arrow.down",
+                    tint: ZenithTint.network
+                ) {
+                    Toggle("Network Speed", isOn: $settings.showNetwork)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
                 }
             }
 

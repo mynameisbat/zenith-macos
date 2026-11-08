@@ -112,6 +112,9 @@ public final class SystemCleanerService: ObservableObject {
     @Published public var isOptimizingMemory: Bool = false
     @Published public var lastFreedBytes: Int64? = nil
     @Published public var statusMessage: String? = nil
+    /// Names of the items the last clean could not remove, in full or in part (permission, an app holding them).
+    /// Kept apart from `statusMessage`, which the re-scan after a clean overwrites.
+    @Published public private(set) var lastFailedItemNames: [String] = []
 
     private let homeOverride: String?
 
@@ -553,35 +556,47 @@ public final class SystemCleanerService: ObservableObject {
         return prefix.hasPrefix("Signature: 8a477f597d28d172789f06886806bc55")
     }
 
-    /// Canonical safe directory roots where deletions are allowed.
-    nonisolated public static func safeDirectoryRoots(home: String) -> [String] {
+    /// Folders whose *entries* may be deleted (each cache inside `~/Library/Caches`, each build in DerivedData…), but
+    /// never the folder itself.
+    nonisolated static func containerRoots(home: String) -> [String] {
         [
             "\(home)/Library/Caches",
             "\(home)/Library/Developer/Xcode/DerivedData",
             "\(home)/Library/Developer/Xcode/iOS DeviceSupport",
-            "\(home)/Library/Developer/CoreSimulator",
-            "\(home)/Library/Developer/CoreSimulator/Caches",
             "\(home)/Library/Logs",
             "\(home)/Library/Saved Application State",
-            "\(home)/Library/pnpm",
-            "\(home)/Library/iTunes",
             "\(home)/Library/Containers/com.apple.mail/Data/Library/Mail Downloads",
-            "\(home)/Library/Application Support/Cursor/Cache",
             "\(home)/.Trash",
-            "\(home)/.npm",
-            "\(home)/.pnpm-store",
-            "\(home)/.yarn",
-            "\(home)/.bun",
-            "\(home)/.cache",
-            "\(home)/.cargo",
-            "\(home)/.cargo/registry",
-            "\(home)/.gradle",
-            "\(home)/.gradle/caches",
-            "\(home)/.android",
-            "\(home)/go/pkg/mod/cache",
             "\(home)/Downloads",
             NSTemporaryDirectory()
         ].map { URL(fileURLWithPath: $0).standardizedFileURL.path }
+    }
+
+    /// Exactly the cache folders the scan offers, which may be deleted whole or in part. The gate used to allow all of
+    /// `~/.cargo`, `~/.android`, `~/.gradle`, `~/.cache` and `~/Library/Developer/CoreSimulator`, which also hold
+    /// things that are not cache: Cargo's installed tools, emulator images, Gradle distributions, downloaded models.
+    nonisolated static func itemRoots(home: String) -> [String] {
+        [
+            "\(home)/Library/Developer/CoreSimulator/Caches",
+            "\(home)/Library/pnpm/store",
+            "\(home)/Library/iTunes/iPhone Software Updates",
+            "\(home)/Library/iTunes/iPad Software Updates",
+            "\(home)/Library/Application Support/Cursor/Cache",
+            "\(home)/.npm/_cacache",
+            "\(home)/.pnpm-store",
+            "\(home)/.bun/install/cache",
+            "\(home)/.cache/uv",
+            "\(home)/.cargo/registry/cache",
+            "\(home)/.cargo/git/db",
+            "\(home)/.gradle/caches",
+            "\(home)/.android/cache",
+            "\(home)/go/pkg/mod/cache"
+        ].map { URL(fileURLWithPath: $0).standardizedFileURL.path }
+    }
+
+    /// Canonical safe directory roots where deletions are allowed.
+    nonisolated public static func safeDirectoryRoots(home: String) -> [String] {
+        containerRoots(home: home) + itemRoots(home: home)
     }
 
     /// User and system roots that must NEVER be deleted.
@@ -631,14 +646,15 @@ public final class SystemCleanerService: ObservableObject {
             return false
         }
 
-        let safeRoots = safeDirectoryRoots(home: home)
-        // Candidate must be strictly within one of the safe directory roots, never equal to the root itself
-        let containingRoot = safeRoots.first { root in
-            let prefix = root.hasSuffix("/") ? root : root + "/"
-            return candidate.hasPrefix(prefix) && candidate != root
-        }
-
-        guard let root = containingRoot else {
+        // Exactly one of the cache folders the scan offers (or inside one), or inside a container (never the container
+        // itself). The specific folders are tried first: the temporary folder is a container too, and a test's whole
+        // home directory lives inside it.
+        let root: String
+        if let item = itemRoots(home: home).first(where: { candidate == $0 || candidate.hasPrefix($0 + "/") }) {
+            root = item
+        } else if let container = containerRoots(home: home).first(where: { candidate.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") && candidate != $0 }) {
+            root = container
+        } else {
             return false
         }
 
@@ -655,7 +671,8 @@ public final class SystemCleanerService: ObservableObject {
         }
 
         // A symlink between the root and the item would send the deletion somewhere the lexical check never saw.
-        guard staysInsideRootPhysically(candidate: candidate, root: root) else {
+        // (An item that is the root itself has nothing between them; cleaning treats a link there as a link.)
+        guard candidate == root || staysInsideRootPhysically(candidate: candidate, root: root) else {
             return false
         }
 
@@ -691,6 +708,33 @@ public final class SystemCleanerService: ObservableObject {
         return true
     }
 
+    // MARK: - Removal
+
+    /// Removes a file or folder. A tree some tool made read-only (Go's module cache is read-only on purpose) cannot be
+    /// emptied while its folders refuse writes, so on a refusal the folders inside it, and only those, get owner write
+    /// permission and the removal is tried once more. Symbolic links are never followed or changed.
+    /// The caller has already checked the path with `isPathSafeForDeletion`.
+    nonisolated static func removeItemMakingWritable(atPath path: String, fileManager: FileManager = .default) throws {
+        do {
+            try fileManager.removeItem(atPath: path)
+        } catch {
+            makeDirectoriesWritable(atPath: path, fileManager: fileManager)
+            try fileManager.removeItem(atPath: path)
+        }
+    }
+
+    nonisolated private static func makeDirectoriesWritable(atPath root: String, fileManager: FileManager) {
+        var pending = [root]
+        while let current = pending.popLast() {
+            var info = stat()
+            guard lstat(current, &info) == 0, (info.st_mode & S_IFMT) == S_IFDIR else { continue }
+            let mode = info.st_mode & 0o7777
+            if mode & 0o700 != 0o700 { _ = chmod(current, mode | 0o700) }
+            guard let names = try? fileManager.contentsOfDirectory(atPath: current) else { continue }
+            pending.append(contentsOf: names.map { current + "/" + $0 })
+        }
+    }
+
     // MARK: - Cleaning Logic
 
     public func cleanSelected() async -> Int64 {
@@ -701,9 +745,10 @@ public final class SystemCleanerService: ObservableObject {
         let itemsToDelete = effectiveSelectedItems
         let homeOverride = self.homeOverride
 
-        let freed = await Task.detached(priority: .userInitiated) { () -> Int64 in
+        let outcome = await Task.detached(priority: .userInitiated) { () -> (freed: Int64, failed: [String]) in
             let fm = FileManager.default
             var bytesFreed: Int64 = 0
+            var failed: [String] = []
             let home = homeOverride ?? fm.homeDirectoryForCurrentUser.path
 
             for item in itemsToDelete {
@@ -732,6 +777,7 @@ public final class SystemCleanerService: ObservableObject {
                             bytesFreed += item.size
                         } catch {
                             NSLog("[SystemCleaner] Could not unlink symlink \(candidatePath): \(error)")
+                            failed.append(item.name)
                         }
                     }
                     continue
@@ -739,19 +785,29 @@ public final class SystemCleanerService: ObservableObject {
 
                 if fm.fileExists(atPath: candidatePath) {
                     do {
-                        try fm.removeItem(atPath: candidatePath)
+                        try Self.removeItemMakingWritable(atPath: candidatePath, fileManager: fm)
                         bytesFreed += item.size
                     } catch {
                         NSLog("[SystemCleaner] Could not remove \(candidatePath): \(error)")
+                        // Part of it may have gone before the failure: count what is really gone, not nothing. If
+                        // only an empty folder is left (its parent refuses the last step), the space is freed and
+                        // there is nothing to report.
+                        let remaining = fm.fileExists(atPath: candidatePath) ? Self.calculateSize(of: candidatePath, fileManager: fm) : 0
+                        bytesFreed += max(0, item.size - remaining)
+                        if remaining > 0 { failed.append(item.name) }
                     }
                 }
             }
-            return bytesFreed
+            return (bytesFreed, failed)
         }.value
+        let freed = outcome.freed
+        self.lastFailedItemNames = outcome.failed
 
         self.lastFreedBytes = freed
         self.isCleaning = false
-        self.statusMessage = String(localized: "Successfully freed \(Self.formatBytes(freed))!")
+        self.statusMessage = outcome.failed.isEmpty
+            ? String(localized: "Successfully freed \(Self.formatBytes(freed))!")
+            : String(localized: "Freed \(Self.formatBytes(freed)); \(outcome.failed.count) could not be removed.")
 
         if freed > 0 {
             SystemCleaningHistoryTracker.shared.record(
@@ -954,10 +1010,12 @@ public final class SystemCleanerService: ObservableObject {
         }
 
         let keys: [URLResourceKey] = [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .fileSizeKey, .isSymbolicLinkKey]
+        // Everything a deletion removes is counted: hidden files, and what is inside an .app, .framework or .dSYM
+        // (DerivedData is mostly those; skipping them made a 3 GB folder read as a few hundred MB).
         guard let enumerator = fileManager.enumerator(
             at: rootURL,
             includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            options: []
         ) else { return 0 }
 
         var total: Int64 = 0

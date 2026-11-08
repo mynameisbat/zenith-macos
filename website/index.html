@@ -163,7 +163,8 @@
             <p>A local proxy that resolves the names of the sites you visit over DNS-over-HTTPS and splits the first TLS packet in two.</p>
             <ul>
               <li>Cloudflare, Google, Quad9, AdGuard, NextDNS or your own</li>
-              <li>Your previous proxy settings are saved and restored</li>
+              <li>Optional tracker blocking: a built-in list, or import a hosts file</li>
+              <li>Your previous proxy settings are saved and restored, even if Zenith is killed</li>
               <li>Not a VPN: your IP address is not hidden</li>
             </ul>
           </article>
@@ -201,9 +202,9 @@
           <figure class="shot shot-wide">
             <div class="stage stage-dark">
               <img src="assets/shots/island-widgets.png" width="760" height="192" loading="lazy"
-                   alt="Island Widgets tab with a focus timer at 18:42 with pause and stop buttons, and the next event, Design review, in 15 minutes">
+                   alt="Island Widgets tab with a focus timer at 18:42 with pause and stop buttons, the next event, Design review, in 15 minutes, and the network speed: 2.4 MB/s down and 180 KB/s up">
             </div>
-            <figcaption>Widgets: a focus timer and your next calendar event, with how long until it starts.</figcaption>
+            <figcaption>Widgets: a focus timer, your next calendar event, and the speed of your connection. Each is a switch in Settings.</figcaption>
           </figure>
 
           <figure class="shot shot-wide">
@@ -218,11 +219,11 @@
             <div class="stage">
               <picture>
                 <source srcset="assets/shots/command-hub-dark.png" media="(prefers-color-scheme: dark)">
-                <img src="assets/shots/command-hub-light.png" width="680" height="1054" loading="lazy"
-                     alt="Command Hub popover with a search field, four quick action tiles, the heaviest running apps with their CPU use, meters for CPU, memory and storage, a Privacy Shield switch, Scan and Boost buttons, and Settings and Quit">
+                <img src="assets/shots/command-hub-light.png" width="680" height="1098" loading="lazy"
+                     alt="Command Hub popover with a search field, four quick action tiles, the heaviest running apps with their CPU use, meters for CPU, memory and storage, the download and upload speed, a Privacy Shield switch, Scan and Boost buttons, and Settings and Quit">
               </picture>
             </div>
-            <figcaption>Command Hub: quick actions with your shortcuts, the heaviest apps (quit after a confirmation), system meters and switches.</figcaption>
+            <figcaption>Command Hub: quick actions with your shortcuts, the heaviest apps (quit after a confirmation), system meters, network speed and switches.</figcaption>
           </figure>
 
           <figure class="shot shot-wide">
@@ -230,7 +231,7 @@
               <picture>
                 <source srcset="assets/shots/settings-island-dark.png" media="(prefers-color-scheme: dark)">
                 <img src="assets/shots/settings-island-light.png" width="1440" height="1080" loading="lazy"
-                     alt="Settings window with a sidebar of colored icons and the Dynamic Island pane: Focus Timer and Next Calendar Event switches, focus and break lengths, and timer controls">
+                     alt="Settings window with a sidebar of colored icons and the Dynamic Island pane: Focus Timer, Next Calendar Event and Network Speed switches, focus and break lengths, and timer controls">
               </picture>
             </div>
             <figcaption>Settings, laid out like System Settings. It follows your accent color and Light or Dark mode.</figcaption>
@@ -360,7 +361,7 @@ open Zenith.app</code></pre>
 
   <footer class="foot">
     <div class="wrap foot-row">
-      <span class="brand small"><img src="assets/app-icon.png" width="20" height="20" alt=""> Zenith 2.3.1</span>
+      <span class="brand small"><img src="assets/app-icon.png" width="20" height="20" alt=""> Zenith 2.4.0</span>
       <span>MIT licensed · Made for macOS</span>
       <span class="foot-links">
         <a href="https://github.com/mynameisbat/zenith-macos">Source</a>

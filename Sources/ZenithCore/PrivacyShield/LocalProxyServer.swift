@@ -79,6 +79,23 @@ public final class LocalProxyServer: @unchecked Sendable {
         }
     }
 
+    private var _blocklist: TrackerBlocklist?
+
+    /// Domains the proxy refuses to connect to. Nil, or a list with nothing in it, blocks nothing. A blocked
+    /// connection is answered with `403 Forbidden` before any DoH lookup is made for it.
+    public var blocklist: TrackerBlocklist? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return _blocklist
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            _blocklist = newValue
+        }
+    }
+
     public init() {}
 
     /// Starts listening on 127.0.0.1:<port>. Binding completes asynchronously; use `startAndAwaitReady`
@@ -150,6 +167,9 @@ public final class LocalProxyServer: @unchecked Sendable {
         self._provider = provider
         self._hasBeenReady = false
         lock.unlock()
+
+        // A tunnel holds two sockets; the 256 an app launched from Finder is given runs out with a few busy tabs.
+        FileDescriptorLimit.raiseSoftLimit()
 
         let parameters = NWParameters.tcp
         parameters.allowLocalEndpointReuse = true
@@ -492,6 +512,14 @@ public final class LocalProxyServer: @unchecked Sendable {
             return
         }
 
+        if blocklist?.isBlocked(host: targetHost) == true {
+            Task { @MainActor in
+                PrivacyShieldStatistics.shared.recordBlockedRequest(domain: targetHost, port: targetPortRaw, protocolType: "HTTPS")
+            }
+            respondAndClose(clientConn, status: "403 Forbidden")
+            return
+        }
+
         Task { [weak self] in
             guard let self = self else { return }
             do {
@@ -652,6 +680,14 @@ public final class LocalProxyServer: @unchecked Sendable {
         if Self.isLocalHostName(host) && resolvedPort == self.port {
             unregisterConnection(clientConn)
             clientConn.cancel()
+            return
+        }
+
+        if blocklist?.isBlocked(host: host) == true {
+            Task { @MainActor in
+                PrivacyShieldStatistics.shared.recordBlockedRequest(domain: host, port: resolvedPort, protocolType: "HTTP")
+            }
+            respondAndClose(clientConn, status: "403 Forbidden")
             return
         }
 

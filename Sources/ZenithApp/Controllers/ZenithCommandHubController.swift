@@ -101,8 +101,14 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
 
     // MARK: - Telemetry Polling Lifecycle (Zero Idle CPU)
 
+    /// This controller's claim on `NetworkSpeedMonitor`. The popover keeps its view when it closes, so a view's
+    /// `onDisappear` cannot be relied on; the claim follows the same start and stop as the telemetry timer, and a
+    /// second stop (the timer calls it too, when it finds the popover gone) gives back nothing extra.
+    private let networkSpeed = NetworkSpeedLease()
+
     private func startTelemetryPolling() {
         stopTelemetryPolling()
+        networkSpeed.begin()
         ZenithCommandHubState.shared.refreshHardwareSnapshot()
         telemetryTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -118,6 +124,7 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
     private func stopTelemetryPolling() {
         telemetryTimer?.invalidate()
         telemetryTimer = nil
+        networkSpeed.end()
     }
 
     // MARK: - Key Event Handling

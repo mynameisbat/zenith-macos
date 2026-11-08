@@ -46,12 +46,15 @@ enum ScreenshotRenderer {
         // The island widgets: a focus timer part-way through and an invented meeting. Load the widget settings first,
         // or they would replace the flags set here with this Mac's when the timer card first reads them.
         _ = IslandWidgetSettings.shared
+        // The speed is invented too: never draw this Mac's real traffic.
+        NetworkSpeedMonitor.shared.pin(NetworkSpeed(downloadBytesPerSecond: 2_400_000, uploadBytesPerSecond: 180_000))
         island.nowPlayingTrack = NowPlayingTrack(
             app: .appleMusic, title: "Dawn Chorus", artist: "Example Band", album: "Field Notes",
             duration: 215, position: 84, isPlaying: true
         )
         island.showsTimerWidget = true
         island.showsCalendarWidget = true
+        island.showsNetworkWidget = true
         island.focusTimer = FocusTimerSnapshot(mode: .focus, isPaused: false, duration: 1_500, remaining: 1_122)
         island.calendarAccess = .granted
         island.upcomingEvent = UpcomingEvent(
@@ -67,6 +70,7 @@ enum ScreenshotRenderer {
         island.upcomingEvent = nil
         island.showsTimerWidget = false
         island.showsCalendarWidget = false
+        island.showsNetworkWidget = false
 
         // The Command Hub, with an invented process list.
         let hogs = [

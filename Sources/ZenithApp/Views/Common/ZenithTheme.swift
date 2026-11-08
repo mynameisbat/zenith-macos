@@ -149,6 +149,7 @@ public enum ZenithTint {
     public static let island = Color(white: 0.14)
     public static let timer = Color(nsColor: .systemOrange)
     public static let calendar = Color(nsColor: .systemRed)
+    public static let network = Color(nsColor: .systemCyan)
 }
 
 // MARK: - Section Header

@@ -84,7 +84,9 @@ struct CleanerOverlapAndDefaultsTests {
             try write(modules.appendingPathComponent("lib.js"))
             try "{}".write(to: project.appendingPathComponent("package.json"), atomically: true, encoding: .utf8)
             let when = Date().addingTimeInterval(-Double(days) * 86_400)
-            for path in [modules.appendingPathComponent("lib.js").path, modules.path] {
+            // The whole project ages, not only node_modules: a project whose own files changed this week is in use.
+            for path in [modules.appendingPathComponent("lib.js").path, modules.path,
+                         project.appendingPathComponent("package.json").path, project.path] {
                 try fm.setAttributes([.modificationDate: when], ofItemAtPath: path)
             }
         }

@@ -161,7 +161,8 @@ struct CleanupToolModelTests {
         try Data(repeating: 1, count: 4096).write(to: modules.appendingPathComponent("lib.js"))
         // Idle for a while: a project touched this week would not be ticked (OVL-04).
         let longAgo = Date().addingTimeInterval(-40 * 86_400)
-        for path in [modules.appendingPathComponent("lib.js").path, modules.path] {
+        for path in [modules.appendingPathComponent("lib.js").path, modules.path,
+                     project.appendingPathComponent("package.json").path, project.path] {
             try FileManager.default.setAttributes([.modificationDate: longAgo], ofItemAtPath: path)
         }
 

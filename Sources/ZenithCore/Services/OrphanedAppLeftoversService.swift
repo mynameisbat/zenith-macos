@@ -271,7 +271,7 @@ public final class OrphanedAppLeftoversService: @unchecked Sendable {
         guard let enumerator = FileManager.default.enumerator(
             at: url,
             includingPropertiesForKeys: keys,
-            options: [.skipsPackageDescendants]
+            options: []   // a change inside a bundle-like folder is a change: do not skip package contents
         ) else { return (0, 0, newest) }
 
         var totalSize: Int64 = 0

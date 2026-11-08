@@ -288,10 +288,11 @@ public final class ZenithIslandState: ObservableObject {
     @Published public var calendarAccess: CalendarAccessState = .notDetermined
     @Published public var showsTimerWidget: Bool = false
     @Published public var showsCalendarWidget: Bool = false
+    @Published public var showsNetworkWidget: Bool = false
 
     /// Whether the expanded island has a Widgets tab.
     public var showsWidgets: Bool {
-        showsTimerWidget || showsCalendarWidget
+        showsTimerWidget || showsCalendarWidget || showsNetworkWidget
     }
 
     private var collapseTimer: Task<Void, Never>?

@@ -49,6 +49,8 @@ public final class SystemProxyManager: @unchecked Sendable {
     private let runner: SystemCommandRunner
     private let defaults: UserDefaults
     private let portProbe: @Sendable (UInt16) -> Bool
+    /// Gets the user online if the app dies with the proxy on. Only for the real instance (the one with exit hooks).
+    private let watchdog: ProxyWatchdog?
 
     private let lock = NSLock()
     private var activeSnapshot: SystemProxySnapshot?
@@ -59,11 +61,13 @@ public final class SystemProxyManager: @unchecked Sendable {
         runner: @escaping SystemCommandRunner = SystemProxyManager.processRunner,
         defaults: UserDefaults = .standard,
         portProbe: @escaping @Sendable (UInt16) -> Bool = SystemProxyManager.isLoopbackPortListening,
-        installExitHooks: Bool = true
+        installExitHooks: Bool = true,
+        watchdog: ProxyWatchdog? = nil
     ) {
         self.runner = runner
         self.defaults = defaults
         self.portProbe = portProbe
+        self.watchdog = watchdog ?? (installExitHooks ? ProxyWatchdog() : nil)
         if installExitHooks {
             self.installExitHooks()
         }
@@ -185,6 +189,7 @@ public final class SystemProxyManager: @unchecked Sendable {
         }
 
         activeSnapshot = snapshot
+        watchdog?.start(port: port, service: service)
         return true
     }
 
@@ -308,6 +313,7 @@ public final class SystemProxyManager: @unchecked Sendable {
         if success {
             activeSnapshot = nil
             clearPersistedSnapshot()
+            watchdog?.stop()
         }
         return success
     }

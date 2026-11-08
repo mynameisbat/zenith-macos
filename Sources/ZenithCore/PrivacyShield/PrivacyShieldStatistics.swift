@@ -6,6 +6,8 @@ public enum PrivacyRequestStatus: String, Sendable, Codable {
     case shielded = "SHIELDED"
     case plain = "DIRECT"
     case failed = "FAILED"
+    /// Refused because the domain is on the tracker blocklist.
+    case blocked = "BLOCKED"
 }
 
 /// In-memory diagnostic log entry representing a single routed request through Privacy Shield.
@@ -80,6 +82,8 @@ public final class PrivacyShieldStatistics: ObservableObject {
     @Published public var lastChunkSize: Int = 2
     @Published public var dohLatencyMs: Int = 0
     @Published public var lastVerifiedAt: Date? = nil
+    @Published public var totalRequestsBlocked: Int = 0
+    @Published public var lastBlockedDomain: String? = nil
 
     /// Bounded in-memory ring buffer of recent routed requests (max 100).
     @Published public var recentRequests: [PrivacyRequestLogRecord] = []
@@ -93,6 +97,8 @@ public final class PrivacyShieldStatistics: ObservableObject {
         lastProtectedDomain = nil
         dohLatencyMs = 0
         lastVerifiedAt = nil
+        totalRequestsBlocked = 0
+        lastBlockedDomain = nil
         recentRequests.removeAll()
     }
 
@@ -135,6 +141,30 @@ public final class PrivacyShieldStatistics: ObservableObject {
         }
     }
 
+    /// A connection Privacy Shield refused because the domain is on the tracker blocklist.
+    public func recordBlockedRequest(
+        domain: String,
+        port: UInt16 = 443,
+        protocolType: String = "HTTPS"
+    ) {
+        totalRequestsBlocked += 1
+        lastBlockedDomain = domain
+        guard isRecordingEnabled else { return }
+        let record = PrivacyRequestLogRecord(
+            domain: domain,
+            port: port,
+            protocolType: protocolType,
+            resolvedIP: nil,
+            chunkSize: 0,
+            bytes: 0,
+            status: .blocked
+        )
+        recentRequests.insert(record, at: 0)
+        if recentRequests.count > Self.maxRecentRequestsCapacity {
+            recentRequests.removeLast(recentRequests.count - Self.maxRecentRequestsCapacity)
+        }
+    }
+
     public func recordFailedRequest(
         domain: String,
         port: UInt16 = 443,
@@ -155,6 +185,12 @@ public final class PrivacyShieldStatistics: ObservableObject {
                 recentRequests.removeLast(recentRequests.count - Self.maxRecentRequestsCapacity)
             }
         }
+    }
+
+    /// The listening port for what the user typed, or nil when it cannot be used: outside 1024...65535 (below 1024 a
+    /// normal app may not listen; above 65535 there is no such port).
+    nonisolated public static func validPort(_ value: Int) -> UInt16? {
+        (1024...65_535).contains(value) ? UInt16(value) : nil
     }
 
     public func updateLatency(_ ms: Int) {

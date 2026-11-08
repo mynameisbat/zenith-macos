@@ -22,6 +22,7 @@ public final class PrivacyShieldController: ObservableObject {
         PrivacyShieldStatistics.shared.isActive = false
         let savedProvider = SettingsStore.shared.dohProvider
         LocalProxyServer.shared.provider = savedProvider
+        LocalProxyServer.shared.blocklist = TrackerBlockingSettings.shared.blocklist
         PrivacyShieldStatistics.shared.selectedProvider = savedProvider
 
         // If the listener dies while the shield is on, the system proxy would point at a dead port.
@@ -55,8 +56,26 @@ public final class PrivacyShieldController: ObservableObject {
     public func start() async {
         guard !isRunning else { return }
 
-        let port = UInt16(statistics.port)
+        // The port is typed by the user: 70000 or -1 must be refused here, not trap in a conversion.
+        guard let port = PrivacyShieldStatistics.validPort(statistics.port) else {
+            ToastHUDController.shared.show(
+                message: "Choose a port between 1024 and 65535",
+                icon: "exclamationmark.triangle"
+            )
+            return
+        }
         let provider = statistics.selectedProvider
+
+        // Run from a disk image or an external drive, Zenith dies when that volume is ejected, and the proxy would be
+        // left pointing at nothing. Say so before it happens rather than after.
+        if AppLocation.isOnMountedVolume(Bundle.main.bundlePath) {
+            let proceed = DestructiveConfirmation.confirm(
+                title: "Zenith is running from a disk image or an external drive",
+                message: "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there.",
+                destructiveTitle: "Turn On Anyway"
+            )
+            guard proceed else { return }
+        }
 
         // The system proxy is only pointed at the listener once it is really accepting connections;
         // otherwise a busy port would leave all web traffic aimed at nothing while the UI says "Protected".

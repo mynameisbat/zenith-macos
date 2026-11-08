@@ -237,4 +237,27 @@ struct IslandWidgetsTests {
         reloaded.resetToDefaults()
         #expect(reloaded.showTimer && !reloaded.showCalendar && reloaded.focusMinutes == 25 && reloaded.breakMinutes == 5)
     }
+
+    @Test("IW-11: The network speed widget is off by default, saved, and counts as a widget for the tab")
+    func testNetworkWidgetSetting() {
+        let defaults = TestDefaults.make("IslandWidgetsTests_\(UUID().uuidString)")!
+        let island = ZenithIslandState()
+        let settings = IslandWidgetSettings(userDefaults: defaults, island: island)
+        #expect(!settings.showNetwork)
+        #expect(!island.showsNetworkWidget)
+
+        settings.showTimer = false
+        settings.showCalendar = false
+        #expect(!settings.showsAnyWidget)
+        #expect(!island.showsWidgets)
+
+        settings.showNetwork = true
+        #expect(settings.showsAnyWidget)
+        #expect(island.showsNetworkWidget && island.showsWidgets)
+
+        let reloaded = IslandWidgetSettings(userDefaults: defaults, island: ZenithIslandState())
+        #expect(reloaded.showNetwork)
+        reloaded.resetToDefaults()
+        #expect(!reloaded.showNetwork)
+    }
 }

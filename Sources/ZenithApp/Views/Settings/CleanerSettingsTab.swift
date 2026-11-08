@@ -103,6 +103,9 @@ public struct CleanerSettingsTab: View {
                         )
                         AudioFeedbackManager.shared.playNewCopySound()
                     }
+                    if let message = ZenithCommandHubView.failureMessage(for: cleaner.lastFailedItemNames) {
+                        ToastHUDController.shared.show(verbatim: message, icon: "exclamationmark.triangle.fill")
+                    }
                 }
             }
             Button("Cancel", role: .cancel) {}
