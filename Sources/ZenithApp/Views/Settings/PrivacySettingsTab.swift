@@ -74,7 +74,7 @@ public struct PrivacySettingsTab: View {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .stroke(controller.isRunning ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.08), lineWidth: 1)
                     )
-                Image(systemName: controller.isRunning ? "shield.checkered" : "shield.slash")
+                Image(systemName: controller.isRunning ? SymbolName.shieldProtected : "shield.slash")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(controller.isRunning ? .accentColor : .secondary)
             }

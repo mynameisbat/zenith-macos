@@ -90,7 +90,7 @@ public final class PrivacyShieldController: ObservableObject {
 
         ToastHUDController.shared.show(
             message: "Privacy Shield: Protected",
-            icon: "shield.checkered"
+            icon: SymbolName.shieldProtected
         )
     }
 

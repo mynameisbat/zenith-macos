@@ -129,7 +129,7 @@ public final class ScreenOCRCoordinator: ObservableObject {
                 // No text or barcodes found in image
                 toastController.show(
                     message: "No Text or QR Code Detected",
-                    icon: "exclamationmark.magnifyingglass"
+                    icon: SymbolName.noTextFound
                 )
                 return result
             }
@@ -156,7 +156,7 @@ public final class ScreenOCRCoordinator: ObservableObject {
                 NSLog("[Zenith] ScreenOCRCoordinator recognition error: \(error)")
                 toastController.show(
                     message: "No Text or QR Code Detected",
-                    icon: "exclamationmark.magnifyingglass"
+                    icon: SymbolName.noTextFound
                 )
                 return nil
             }
@@ -164,7 +164,7 @@ public final class ScreenOCRCoordinator: ObservableObject {
             NSLog("[Zenith] ScreenOCRCoordinator unexpected error: \(error)")
             toastController.show(
                 message: "No Text or QR Code Detected",
-                icon: "exclamationmark.magnifyingglass"
+                icon: SymbolName.noTextFound
             )
             return nil
         }

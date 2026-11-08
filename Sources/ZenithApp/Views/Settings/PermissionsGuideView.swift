@@ -31,7 +31,7 @@ public struct PermissionsGuideView: View {
                 permissionRow(
                     title: String(localized: "Accessibility"),
                     description: "To paste for you (⌘V) and to send media keys to a browser tab. Without it, items are only copied.",
-                    symbol: "accessibility",
+                    symbol: SymbolName.accessibility,
                     tint: Color(nsColor: .systemBlue),
                     status: viewModel.accessibilityGranted ? .allowed : .notAllowed,
                     action: { viewModel.openAccessibilitySettings() }
