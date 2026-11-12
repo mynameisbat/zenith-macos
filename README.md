@@ -44,7 +44,7 @@ xattr -cr /Applications/Zenith.app
 open /Applications/Zenith.app
 ```
 
-> **Note for macOS Gatekeeper:** Zenith is signed ad hoc and is **not notarized** (that needs an Apple Developer ID), so macOS will warn about an unidentified developer. Right-click (or Control-click) `Zenith.app` in `/Applications`, select **Open**, then click **Open** in the prompt.
+> **Note for macOS Gatekeeper:** Zenith is not signed with a Developer ID and is **not notarized** (that needs an Apple Developer ID), so macOS will warn about an unidentified developer. Right-click (or Control-click) `Zenith.app` in `/Applications`, select **Open**, then click **Open** in the prompt.
 
 ### Option 2: Build from Source
 **Prerequisites:** macOS 13.0 (Ventura) or higher, Xcode 16+ or Command Line Tools with Swift 6.0 toolchain.
@@ -67,6 +67,15 @@ cd zenith-macos
 # Launch the app
 open Zenith.app
 ```
+
+#### Signing your own builds
+By default `bundle_app.sh` signs ad hoc, and macOS treats every rebuild as a new app, so it asks for Accessibility, Screen Recording and Automation again. Run this once to keep them:
+
+```bash
+./scripts/setup_signing.sh
+```
+
+It creates a self-signed certificate, "Zenith Local Signing", in your login keychain (no Apple Developer account needed), and `bundle_app.sh` signs with it from then on. The first build asks you to let `codesign` use the key (choose **Always Allow**), and macOS asks for the permissions one last time. The identity lives only in that Mac's keychain (back it up from Keychain Access as a `.p12`), and it does **not** get past Gatekeeper on other Macs: that still needs a paid Developer ID and notarization. `ZENITH_SIGN_IDENTITY=-` forces ad-hoc signing.
 
 ---
 
@@ -122,8 +131,8 @@ open Zenith.app
   - **Left Wing**: Mini spinning vinyl disc with app badge / album artwork.
   - **Right Wing**: Animated jumping 4-bar equalizer visualizer with brand-matched dynamic color palettes.
   - **Expanded Player**: Hover over the island to reveal track metadata, a progress bar, and media controls (Play/Pause, Skip, Previous).
-  - **Browser audio**: Chrome-family browsers (Chrome, Edge, Brave, Arc, Vivaldi, Opera) and Safari are detected from the audio they hold open, because macOS 15.4+ no longer gives other apps Now Playing data. For known media sites (YouTube, X, SoundCloud, Twitch and a few more) the tab title is shown; for any other site only the browser name is. Firefox is not checked for its tab title.
-  - **Controls**: Music and Spotify are controlled over AppleScript; a browser is controlled with the hardware media key, which needs the Accessibility permission (the island says so when macOS refuses it).
+  - **Browser and other audio**: anything that reports to the system's Now Playing (Chrome-family browsers, Safari, Firefox, video players) is shown with its title, artist, artwork and position. macOS 15.4+ no longer gives this data to other apps directly, so Zenith reads it through a small helper library loaded by the system's own `perl`. A browser is shown under the browser's name.
+  - **Controls**: Music and Spotify are controlled over AppleScript; anything else is sent the command through the system's Now Playing, which needs no permission. Only if macOS refuses that does Zenith fall back to the hardware media key, which needs the Accessibility permission (the island says so when macOS refuses it).
   - **Tab Switcher**: Switch between Now Playing, Widgets and the Shelf when more than one is there; on a notched display the tabs sit either side of the notch (icons only when there are three).
 - **Widgets** (Settings → Dynamic Island):
   - **Focus timer**: a Pomodoro-style timer (25-minute focus, 5-minute break by default, both adjustable). While it runs, a progress ring and the time left sit either side of the notch; pause, resume or stop it from the island or from Settings. When it ends the island says so (with a sound if sound effects are on) and offers the break, or the next focus session.
@@ -216,11 +225,11 @@ Zenith is designed with privacy-first principles and minimal permission requirem
 
 2. **Accessibility (`kTCCServiceAccessibility`)** — **Optional**:
    - **Zero-Permission Hotkeys**: Zenith uses macOS Carbon Event HotKeys for all global triggers (`⌘⇧V`, `⌘⇧2`, `⌘⇧1`), which require **zero Accessibility permissions**.
-   - **What Accessibility is for**: it lets Zenith synthesize keystrokes: `⌘V` to paste a clipboard item straight into the front app (`AutoPasteService`), and the media keys that control browser playback from the island.
-   - Without it, selecting an item only copies it (paste with `⌘V` yourself), and the island's buttons cannot control a browser tab (it shows an "Allow Accessibility" notice).
+   - **What Accessibility is for**: it lets Zenith synthesize keystrokes: `⌘V` to paste a clipboard item straight into the front app (`AutoPasteService`), and, as a fallback, the media keys that control playback from the island.
+   - Without it, selecting an item only copies it (paste with `⌘V` yourself), and if macOS refuses a playback command from the island, the media-key fallback is unavailable (it shows an "Allow Accessibility" notice).
 
 3. **Automation (Apple Events)** — **Optional**:
-   - Lets Zenith control Music and Spotify and read the front tab of Safari and Chromium browsers for the Now Playing title. macOS asks the first time, once per app.
+   - Lets Zenith control Music and Spotify and read Music's artwork. macOS asks the first time, once per app.
 
 4. **Calendars** — **Optional**:
    - Only for the island's "Next calendar event" widget. macOS asks when you turn the widget on in Settings → Dynamic Island, never before. Without it the widget shows how to allow it. (A build run with `swift run` has no Info.plist, so it cannot ask; use the bundled `Zenith.app`.)

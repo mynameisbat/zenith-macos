@@ -1,4 +1,4 @@
 /* Zenith, Vietnamese: the texts macOS shows when it asks for a permission. */
-"NSAppleEventsUsageDescription" = "Zenith dùng Apple Events để biết Nhạc, Spotify và trình duyệt đang phát gì, điều khiển phát nhạc từ Dynamic Island, và nhờ Finder chuyển vào Thùng rác những thư mục còn sót mà macOS không cho ứng dụng khác di chuyển.";
+"NSAppleEventsUsageDescription" = "Zenith dùng Apple Events để biết Nhạc và Spotify đang phát gì, điều khiển phát nhạc từ Dynamic Island, và nhờ Finder chuyển vào Thùng rác những thư mục còn sót mà macOS không cho ứng dụng khác di chuyển.";
 "NSCalendarsFullAccessUsageDescription" = "Zenith hiện sự kiện lịch sắp tới của bạn trên Dynamic Island khi bạn bật widget Lịch. Sự kiện chỉ được đọc trên máy Mac này.";
 "NSCalendarsUsageDescription" = "Zenith hiện sự kiện lịch sắp tới của bạn trên Dynamic Island khi bạn bật widget Lịch. Sự kiện chỉ được đọc trên máy Mac này.";

@@ -71,6 +71,69 @@ public struct IslandSettingsTab: View {
                 }
             }
 
+            ZenithSettingsSection("Behavior") {
+                ZenithSettingsRow(
+                    "Volume and Brightness",
+                    subtitle: "Show the level on the island when you change it.",
+                    symbol: "speaker.wave.2.fill",
+                    tint: ZenithTint.audio
+                ) {
+                    Toggle("Volume and Brightness", isOn: $settings.showLevelHUD)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                }
+
+                ZenithSettingsDivider(inset: 44)
+
+                ZenithSettingsRow(
+                    "Hover Delay",
+                    subtitle: "How long the pointer rests on the closed island before it opens. A click opens it at once.",
+                    symbol: "cursorarrow.rays",
+                    tint: ZenithTint.island
+                ) {
+                    HStack(spacing: 6) {
+                        Text("\(hoverDelayText) s")
+                            .font(.system(size: 12.5))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: 52, alignment: .trailing)
+                        Stepper(
+                            "Hover Delay",
+                            value: $settings.hoverOpenDelay,
+                            in: IslandWidgetSettings.hoverDelayRange,
+                            step: IslandWidgetSettings.hoverDelayStep
+                        )
+                        .labelsHidden()
+                    }
+                }
+
+                ZenithSettingsDivider(inset: 44)
+
+                ZenithSettingsRow(
+                    "Swipe Gestures",
+                    subtitle: "Swipe down on the island to open it, up to close it, and sideways to change track.",
+                    symbol: "hand.draw",
+                    tint: ZenithTint.island
+                ) {
+                    Toggle("Swipe Gestures", isOn: $settings.scrollGestures)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                }
+
+                ZenithSettingsDivider(inset: 44)
+
+                ZenithSettingsRow(
+                    "Hide in Full-Screen Apps",
+                    subtitle: "Take the island away while an app is full screen. Notices then use the floating panel.",
+                    symbol: "arrow.up.left.and.arrow.down.right",
+                    tint: ZenithTint.screen
+                ) {
+                    Toggle("Hide in Full-Screen Apps", isOn: $settings.hideInFullscreen)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                }
+            }
+
             if settings.showTimer {
                 ZenithSettingsSection("Timer") {
                     timerControlRow
@@ -80,6 +143,11 @@ public struct IslandSettingsTab: View {
         .onAppear {
             calendar.refresh()
         }
+    }
+
+    /// "0.25", or "0,25" where the decimal separator is a comma; two decimals, as the 0.05 s step needs.
+    private var hoverDelayText: String {
+        settings.hoverOpenDelay.formatted(.number.precision(.fractionLength(2)))
     }
 
     private func minutesRow(_ title: LocalizedStringKey, value: Binding<Int>, range: ClosedRange<Int>, step: Int) -> some View {

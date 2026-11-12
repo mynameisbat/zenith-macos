@@ -248,13 +248,56 @@ public final class LocalProxyServer: @unchecked Sendable {
         startIdleSweep()
     }
 
-    /// Stops listening and terminates all active connections.
-    public func stop() {
-        lock.lock()
-        guard _isRunning || _listener != nil else {
-            lock.unlock()
+    /// Stops accepting new connections but lets the ones already open keep relaying until they end on their own, or
+    /// until `gracePeriod` has passed, when whatever is left is closed. Cutting a live tunnel kills the stream another
+    /// app holds through it (a download, a streaming response, a WebSocket); once the system proxy has been switched
+    /// back, that app's new connections no longer come here, so there is no reason to cut the old ones at once.
+    /// `stop()` still closes everything immediately, including connections left draining by this call.
+    public func stop(gracePeriod: TimeInterval) {
+        guard gracePeriod > 0 else {
+            stop()
             return
         }
+        lock.lock()
+        let currentListener = _listener
+        _listener = nil
+        _isRunning = false
+        // Strong references, so an identifier cannot be reused by a connection accepted after a restart.
+        let draining = Array(activeConnections.values)
+        lock.unlock()
+
+        currentListener?.cancel()
+        queue.asyncAfter(deadline: .now() + gracePeriod) { [weak self] in
+            self?.closeDrained(draining)
+        }
+    }
+
+    private func closeDrained(_ draining: [NWConnection]) {
+        lock.lock()
+        let stillOpen = draining.filter { activeConnections[ObjectIdentifier($0)] === $0 }
+        for conn in stillOpen {
+            let id = ObjectIdentifier(conn)
+            activeConnections.removeValue(forKey: id)
+            lastActivity.removeValue(forKey: id)
+            awaitingRequestHead.remove(id)
+            startedTunnels.remove(id)
+        }
+        // Not restarted in the meantime and nothing left to sweep: the idle timer has no more work.
+        var idleTimer: DispatchSourceTimer?
+        if _listener == nil, activeConnections.isEmpty {
+            idleTimer = sweepTimer
+            sweepTimer = nil
+        }
+        lock.unlock()
+        idleTimer?.cancel()
+        for conn in stillOpen {
+            conn.cancel()
+        }
+    }
+
+    /// Stops listening and terminates all active connections, including any left draining by `stop(gracePeriod:)`.
+    public func stop() {
+        lock.lock()
         let currentListener = _listener
         _listener = nil
         _isRunning = false

@@ -66,6 +66,15 @@ enum ScreenshotRenderer {
         save("island-widgets", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
         island.isExpanded = false
         save("island-timer", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: 40))
+        // The same closed island with the pointer on it, before it opens.
+        island.isHoverEmphasized = true
+        save("island-timer-hover", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: 40))
+        island.isHoverEmphasized = false
+        // A volume change, as the island shows it.
+        island.focusTimer = nil
+        island.showLevel(.volume, level: 0.62)
+        save("island-volume", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
+        island.dismissAlert()
         island.focusTimer = nil
         island.upcomingEvent = nil
         island.showsTimerWidget = false

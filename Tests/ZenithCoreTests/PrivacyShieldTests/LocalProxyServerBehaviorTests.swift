@@ -412,6 +412,97 @@ struct LocalProxyServerBehaviorTests {
         }
         #expect(result.sawEOF)
     }
+
+    // MARK: - Switching off
+
+    /// Echoes every chunk back until the client closes.
+    private static func echoOrigin() -> TestOrigin {
+        TestOrigin { fd, _ in
+            var chunk = [UInt8](repeating: 0, count: 4096)
+            while true {
+                let count = recv(fd, &chunk, chunk.count, 0)
+                if count <= 0 { return }
+                Sock.send(fd, Data(chunk[0..<count]))
+            }
+        }
+    }
+
+    /// True when something accepts a TCP connection on 127.0.0.1:<port>.
+    private static func accepts(port: UInt16) -> Bool {
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        defer { close(fd) }
+        var addr = Sock.address(port: port)
+        let result = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+        }
+        return result == 0
+    }
+
+    /// Opens a CONNECT tunnel to `originPort` and checks one round trip through it.
+    private static func openTunnel(proxyPort: UInt16, originPort: UInt16) -> (fd: Int32, ok: Bool) {
+        let client = Sock.connect(to: proxyPort, timeout: 5)
+        Sock.send(client, "CONNECT 127.0.0.1:\(originPort) HTTP/1.1\r\nHost: x\r\n\r\nfirst")
+        let reply = Sock.receive(client, until: Data("first".utf8))
+        return (client, String(data: reply, encoding: .utf8)?.hasSuffix("first") == true)
+    }
+
+    @Test("LP-12: Switching off with a grace period refuses new clients but keeps an open tunnel relaying")
+    func testGracefulStopKeepsTunnelsOpen() async throws {
+        let origin = Self.echoOrigin()
+        defer { origin.stop() }
+        let (server, proxyPort) = try await startProxy()
+        defer { server.stop() }
+        let originPort = origin.port
+
+        let tunnel = await offPool { Self.openTunnel(proxyPort: proxyPort, originPort: originPort) }
+        defer { close(tunnel.fd) }
+        #expect(tunnel.ok)
+
+        server.stop(gracePeriod: 30)
+        #expect(!server.isRunning)
+
+        let stillAccepting = await offPool { () -> Bool in
+            for _ in 0..<20 {
+                if !Self.accepts(port: proxyPort) { return false }
+                usleep(50_000)
+            }
+            return true
+        }
+        #expect(!stillAccepting, "the listener should be closed")
+
+        let later = await offPool { () -> String? in
+            Sock.send(tunnel.fd, "second")
+            return String(data: Sock.receive(tunnel.fd, until: Data("second".utf8)), encoding: .utf8)
+        }
+        #expect(later == "second")
+    }
+
+    @Test("LP-13: A tunnel still open when the grace period ends is closed; stop() closes a draining one at once")
+    func testGracePeriodEndsTunnels() async throws {
+        let origin = Self.echoOrigin()
+        defer { origin.stop() }
+        let (server, proxyPort) = try await startProxy()
+        defer { server.stop() }
+        let originPort = origin.port
+
+        let first = await offPool { Self.openTunnel(proxyPort: proxyPort, originPort: originPort) }
+        defer { close(first.fd) }
+        #expect(first.ok)
+        server.stop(gracePeriod: 0.3)
+        let ended = await offPool { Sock.receiveAll(first.fd) }
+        #expect(ended.sawEOF)
+        #expect(ended.data.isEmpty)
+
+        // Restarted on the same port, then drained with a long grace: an explicit stop() must not wait for it.
+        try await server.startAndAwaitReady(port: proxyPort, provider: .cloudflare)
+        let second = await offPool { Self.openTunnel(proxyPort: proxyPort, originPort: originPort) }
+        defer { close(second.fd) }
+        #expect(second.ok)
+        server.stop(gracePeriod: 60)
+        server.stop()
+        let cut = await offPool { Sock.receiveAll(second.fd) }
+        #expect(cut.sawEOF)
+    }
 }
 
 // MARK: - DoH IPv6 fallback

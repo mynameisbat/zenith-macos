@@ -14,7 +14,6 @@
 "%@ timer, %@ left" = "Hẹn giờ %1$@, còn %2$@";
 "%@ timer, %@ left, paused" = "Hẹn giờ %1$@, còn %2$@, đang tạm dừng";
 "%@ used (%@) of %@" = "Đã dùng %1$@ (%2$@) trên %3$@";
-"%@ video" = "Video %@";
 "%@ will go to the Trash, where you can still restore it:\n%@" = "%@ sẽ được chuyển vào Thùng rác, nơi bạn vẫn có thể khôi phục:\n%@";
 "%@ · %@ left" = "%1$@ · còn %2$@";
 "%@ · %@ left (paused)" = "%1$@ · còn %2$@ (tạm dừng)";
@@ -332,7 +331,6 @@
 "Play" = "Phát";
 "Play %@ sound" = "Phát âm thanh %@";
 "Play Sound Effects" = "Phát hiệu ứng âm thanh";
-"Playing audio" = "Đang phát âm thanh";
 "Playing now" = "Đang phát";
 "Port" = "Cổng";
 "Power Connected" = "Đã cắm nguồn";
@@ -495,7 +493,6 @@
 "Use %@" = "Dùng %@";
 "User Logs & Crash Reports" = "Nhật ký & báo cáo sự cố";
 "Version %@" = "Phiên bản %@";
-"Video on X" = "Video trên X";
 "Vision concurrency limit exceeded" = "Vượt giới hạn xử lý đồng thời của Vision";
 "Vision operation was cancelled" = "Thao tác Vision đã bị huỷ";
 "Vision processing failed: %@" = "Xử lý Vision thất bại: %@";
@@ -582,3 +579,15 @@
 "Zenith is running from a disk image or an external drive" = "Zenith đang chạy từ ảnh đĩa hoặc ổ đĩa ngoài";
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "Nếu ổ đó bị tháo ra khi Privacy Shield đang bật, Zenith sẽ thoát và mạng của bạn có thể mất cho đến khi bạn mở lại Zenith. Hãy kéo Zenith vào thư mục Applications rồi mở từ đó.";
 "Turn On Anyway" = "Vẫn bật";
+"Playback position" = "Vị trí phát";
+"Brightness" = "Độ sáng";
+"Behavior" = "Hành vi";
+"Volume and Brightness" = "Âm lượng và độ sáng";
+"Show the level on the island when you change it." = "Hiện mức trên island khi bạn thay đổi.";
+"Swipe Gestures" = "Cử chỉ vuốt";
+"Swipe down on the island to open it, up to close it, and sideways to change track." = "Vuốt xuống trên island để mở, vuốt lên để đóng, vuốt ngang để chuyển bài.";
+"Hide in Full-Screen Apps" = "Ẩn khi ứng dụng toàn màn hình";
+"Take the island away while an app is full screen. Notices then use the floating panel." = "Ẩn island khi một ứng dụng đang toàn màn hình. Thông báo khi đó dùng bảng nổi.";
+"Hover Delay" = "Độ trễ khi rê chuột";
+"How long the pointer rests on the closed island before it opens. A click opens it at once." = "Thời gian con trỏ dừng trên island đang đóng trước khi island mở ra. Bấm vào thì mở ngay.";
+"%@ s" = "%@ giây";
