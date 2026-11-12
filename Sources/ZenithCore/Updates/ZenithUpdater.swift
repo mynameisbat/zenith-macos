@@ -361,7 +361,9 @@ public final class ZenithUpdater: ObservableObject {
     }
 
     /// For `--render-screenshots`: show `release` as found, without asking GitHub or reading this Mac.
-    public func presentForScreenshot(release: UpdateRelease, refusal: UpdateInstallRefusal?) {
+    /// Writes `checkedAt` into this updater's settings, so pass one backed by a throwaway store.
+    public func presentForScreenshot(release: UpdateRelease, refusal: UpdateInstallRefusal?, checkedAt: Date) {
+        settings.lastCheckDate = checkedAt
         availableRelease = release
         installRefusal = refusal
         errorMessage = nil
@@ -370,13 +372,18 @@ public final class ZenithUpdater: ObservableObject {
 
     // MARK: Text
 
+    /// "Last checked 5 minutes ago." / "Not checked yet."
+    public func lastCheckedDescription(at date: Date) -> String {
+        guard let last = settings.lastCheckDate else { return String(localized: "Not checked yet.") }
+        return String(localized: "Last checked \(CleanerScanScheduleSettings.relative(last, now: date)).")
+    }
+
     /// One line describing where things stand, in the user's language. Versions are digits and dots, never grouped.
     public func statusDescription(at date: Date) -> String {
         let version = availableRelease?.version.description ?? ""
         switch phase {
         case .idle:
-            guard let last = settings.lastCheckDate else { return String(localized: "Not checked yet.") }
-            return String(localized: "Last checked \(CleanerScanScheduleSettings.relative(last, now: date)).")
+            return lastCheckedDescription(at: date)
         case .checking:
             return String(localized: "Checking for updates…")
         case .upToDate:

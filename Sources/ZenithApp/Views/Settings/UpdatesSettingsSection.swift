@@ -24,7 +24,10 @@ struct UpdatesSettingsSection: View {
         ) {
             ZenithSettingsRow(
                 title: Text("Zenith \(updater.runningVersion.description)"),
-                subtitle: Text(verbatim: updater.statusDescription(at: Date())),
+                // The row below already says a version is available; here say when GitHub was last asked.
+                subtitle: Text(verbatim: updater.phase == .available
+                    ? updater.lastCheckedDescription(at: Date())
+                    : updater.statusDescription(at: Date())),
                 symbol: "arrow.down.circle.fill",
                 tint: ZenithTint.general
             ) {
@@ -97,6 +100,7 @@ struct UpdatesSettingsSection: View {
                     .disabled(updater.isBusy)
                 }
             }
+            .fixedSize()
         }
     }
 }

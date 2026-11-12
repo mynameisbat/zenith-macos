@@ -46,6 +46,9 @@ open /Applications/Zenith.app
 
 > **Note for macOS Gatekeeper:** Zenith is not signed with a Developer ID and is **not notarized** (that needs an Apple Developer ID), so macOS will warn about an unidentified developer. Right-click (or Control-click) `Zenith.app` in `/Applications`, select **Open**, then click **Open** in the prompt.
 
+#### Updates
+Zenith checks GitHub for a new release once a day while it runs (Settings › General › Updates; switch off **Check Automatically** to stop it) and tells you once per version. **Install and Relaunch** downloads the DMG, checks that the app inside is signed with the same certificate as the copy you are running, replaces it (the old copy goes to the Trash) and reopens Zenith; nothing is installed without that click. A copy that cannot verify an update (signed ad hoc, run from a disk image, or translocated by macOS) offers **Download…** instead, which saves the DMG in Downloads for you to install by hand. Quitting for the update turns Privacy Shield off; turn it on again afterwards.
+
 ### Option 2: Build from Source
 **Prerequisites:** macOS 13.0 (Ventura) or higher, Xcode 16+ or Command Line Tools with Swift 6.0 toolchain.
 
@@ -76,6 +79,9 @@ By default `bundle_app.sh` signs ad hoc, and macOS treats every rebuild as a new
 ```
 
 It creates a self-signed certificate, "Zenith Local Signing", in your login keychain (no Apple Developer account needed), and `bundle_app.sh` signs with it from then on. The first build asks you to let `codesign` use the key (choose **Always Allow**), and macOS asks for the permissions one last time. The identity lives only in that Mac's keychain (back it up from Keychain Access as a `.p12`), and it does **not** get past Gatekeeper on other Macs: that still needs a paid Developer ID and notarization. `ZENITH_SIGN_IDENTITY=-` forces ad-hoc signing.
+
+#### Releases and the update certificate
+The certificate that signs a release is what installed copies trust for automatic updates: an update is installed only if it satisfies the running app's designated requirement (`identifier "com.zenith.workspace" and certificate leaf = H"…"`). So **every release must be signed with the same "Zenith Local Signing" certificate**. Back the identity up (Keychain Access › My Certificates › Export as `.p12`) and import it on any Mac that builds releases; `create_dmg.sh` prints the certificate hash to compare and refuses an ad-hoc signed app (`ZENITH_ALLOW_ADHOC_DMG=1` builds a local test DMG anyway, never publish it). If the identity is lost, installed copies refuse the next release and offer the manual download, so users install that one version by hand once; updates work again from there.
 
 ---
 

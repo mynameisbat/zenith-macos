@@ -176,7 +176,9 @@ enum ScreenshotRenderer {
             installer: ScreenshotUpdateInstaller(),
             autoSchedule: false
         )
-        renderUpdater.presentForScreenshot(release: ScreenshotUpdateFeed.sampleRelease, refusal: nil)
+        renderUpdater.presentForScreenshot(
+            release: ScreenshotUpdateFeed.sampleRelease, refusal: nil, checkedAt: Date().addingTimeInterval(-2 * 60 * 60)
+        )
         UpdatesSettingsSection.updaterProvider = { renderUpdater }
 
         let settingsModel = SettingsViewModel(
