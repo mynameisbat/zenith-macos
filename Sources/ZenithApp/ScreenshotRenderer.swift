@@ -168,6 +168,16 @@ enum ScreenshotRenderer {
         defer { renderDefaults.removePersistentDomain(forName: renderDefaultsName) }
         let renderClipboardPrivacy = ClipboardPrivacySettings(userDefaults: renderDefaults, monitor: nil)
         ClipboardPrivacySettingsSection.settingsProvider = { renderClipboardPrivacy }
+        // Updates: a made-up newer release, a feed and an installer that never touch the network or this Mac, and
+        // settings in the throwaway store (so "Check Automatically" shows its default).
+        let renderUpdater = ZenithUpdater(
+            settings: UpdateSettings(userDefaults: renderDefaults),
+            feed: ScreenshotUpdateFeed(),
+            installer: ScreenshotUpdateInstaller(),
+            autoSchedule: false
+        )
+        renderUpdater.presentForScreenshot(release: ScreenshotUpdateFeed.sampleRelease, refusal: nil)
+        UpdatesSettingsSection.updaterProvider = { renderUpdater }
 
         let settingsModel = SettingsViewModel(
             launchAtLoginService: ScreenshotLoginItem(),
@@ -251,4 +261,33 @@ private struct ScreenshotLoginItem: LaunchAtLoginServiceProtocol {
     var status: LaunchAtLoginStatus { .enabled }
     func enable() throws {}
     func disable() throws {}
+}
+
+/// Never asks GitHub: the renderer only shows `sampleRelease`.
+private struct ScreenshotUpdateFeed: UpdateFeed {
+    static let sampleRelease = UpdateRelease(
+        version: AppVersion("9.9.0")!,
+        tag: "v9.9.0",
+        assetName: "Zenith-9.9.0.dmg",
+        downloadURL: URL(string: "https://github.com/mynameisbat/zenith-macos/releases/download/v9.9.0/Zenith-9.9.0.dmg")!,
+        assetSize: 4_000_000,
+        sha256: nil
+    )
+
+    func latestRelease() async throws -> UpdateRelease? { Self.sampleRelease }
+}
+
+/// Installs nothing and reads nothing: the picture always shows the Install button.
+private struct ScreenshotUpdateInstaller: UpdateInstalling {
+    struct NotAvailable: Error {}
+
+    func install(_ release: UpdateRelease, progress: @escaping @Sendable (UpdateInstallProgress) -> Void) async throws -> URL {
+        throw NotAvailable()
+    }
+
+    func downloadForManualInstall(_ release: UpdateRelease, progress: @escaping @Sendable (Double?) -> Void) async throws -> URL {
+        throw NotAvailable()
+    }
+
+    func automaticInstallRefusal() -> UpdateInstallRefusal? { nil }
 }

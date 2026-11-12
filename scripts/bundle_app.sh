@@ -34,7 +34,8 @@ if [ -f "$BUILD_DIR/Zenith" ]; then
 elif [ -f "$BUILD_DIR/ZenithApp" ]; then
     cp "$BUILD_DIR/ZenithApp" "$MACOS_DIR/Zenith"
 else
-    cp "$BUILD_DIR/GoldenGateApp" "$MACOS_DIR/Zenith"
+    echo "error: the build produced no Zenith executable in $BUILD_DIR" >&2
+    exit 1
 fi
 chmod +x "$MACOS_DIR/Zenith"
 
@@ -115,17 +116,9 @@ echo "==> Stamping version $VERSION (build $BUILD)..."
 # Signs the adapter library first (perl refuses to load it unsigned), then the app, and verifies both.
 "$SCRIPT_DIR/sign_app.sh" "$APP_DIR"
 
-echo "==> Mirroring to GoldenGate.app for backwards compatibility..."
-rm -rf "$PROJECT_ROOT/GoldenGate.app"
-cp -R "$APP_DIR" "$PROJECT_ROOT/GoldenGate.app"
-# Also provide GoldenGateApp executable in GoldenGate.app for legacy scripts
-cp "$MACOS_DIR/Zenith" "$PROJECT_ROOT/GoldenGate.app/Contents/MacOS/GoldenGateApp"
-"$SCRIPT_DIR/sign_app.sh" "$PROJECT_ROOT/GoldenGate.app"
-
 echo "==> Registering with macOS LaunchServices & refreshing icon cache..."
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_DIR" || true
 touch "$APP_DIR"
-touch "$PROJECT_ROOT/GoldenGate.app"
 
 echo "==> Zenith.app created successfully at: $APP_DIR"
 echo "==> You can now launch it via: open Zenith.app"

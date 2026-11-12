@@ -42,6 +42,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = SystemProxyManager.shared.recoverFromUncleanShutdown(legacyPort: shieldPort)
         }
         ScheduledCleanerScanController.start()  // Cleaner's scheduled scan: off by default, scans only, never deletes
+        UpdateController.start()  // daily update check: on by default, installs only after the user's click
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Signs a built Zenith.app (or its GoldenGate.app mirror), inside out: the libraries in Contents/Frameworks and any
+# Signs a built Zenith.app, inside out: the libraries in Contents/Frameworks and any
 # extra executable in Contents/MacOS first, then the app. Called by bundle_app.sh; safe to run on a copy.
 #
 # Usage: scripts/sign_app.sh path/to/Zenith.app
@@ -86,7 +86,7 @@ for lib in "$APP"/Contents/Frameworks/*.dylib; do
     sign --identifier "$BUNDLE_ID.$(basename "$lib" .dylib)" "$lib"
     /usr/bin/codesign --verify --strict "$lib" || fail "$lib does not verify after signing."
 done
-# Extra executables beside the main one (GoldenGate.app carries a GoldenGateApp copy for legacy scripts).
+# Extra executables beside the main one, if a bundle ever carries any.
 for exe in "$APP"/Contents/MacOS/*; do
     [ -f "$exe" ] && [ "$(basename "$exe")" != "$MAIN_EXECUTABLE" ] || continue
     sign --identifier "$BUNDLE_ID.$(basename "$exe")" "$exe"

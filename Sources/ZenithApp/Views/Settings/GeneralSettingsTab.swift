@@ -45,6 +45,8 @@ public struct GeneralSettingsTab: View {
                 }
             }
 
+            UpdatesSettingsSection()
+
             ZenithSettingsSection(
                 "Clipboard",
                 footer: "When the history is full, the oldest unpinned item makes room for the next one. Pinned items always stay."
@@ -89,6 +91,7 @@ public struct GeneralSettingsTab: View {
                         viewModel.resetAllDefaults()
                         IslandWidgetSettings.shared.resetToDefaults()
                         ClipboardPrivacySettings.shared.resetToDefaults()
+                        UpdateSettings.shared.resetToDefaults()
                     }
                 }
                 .help("Put every setting, shortcut, sound and island widget back the way Zenith ships")
