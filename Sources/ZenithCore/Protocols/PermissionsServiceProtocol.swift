@@ -8,4 +8,11 @@ public protocol PermissionsServiceProtocol: Sendable {
     func requestAccessibilityPermission() -> Bool
     func openScreenRecordingSettings() -> Bool
     func openAccessibilitySettings() -> Bool
+    /// Calendar access as macOS reports it, read without asking.
+    func calendarAccess() -> CalendarAccessState
+}
+
+public extension PermissionsServiceProtocol {
+    /// Stand-ins that predate the calendar report it as unavailable.
+    func calendarAccess() -> CalendarAccessState { .unavailable }
 }

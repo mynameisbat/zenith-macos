@@ -170,6 +170,8 @@ public struct ClipboardRowView: View {
     public let onActivate: () -> Void
     public let onTogglePin: () -> Void
     public let onDelete: () -> Void
+    /// Paste as plain text or as a cleaned link.
+    public let onPasteVariant: (ClipboardPasteVariant) -> Void
 
     @StateObject private var hoverState = RowHoverState()
     @StateObject private var tapDebouncer = RowTapDebouncer()
@@ -181,7 +183,8 @@ public struct ClipboardRowView: View {
         onSelect: @escaping () -> Void,
         onActivate: @escaping () -> Void,
         onTogglePin: @escaping () -> Void,
-        onDelete: @escaping () -> Void = {}
+        onDelete: @escaping () -> Void = {},
+        onPasteVariant: @escaping (ClipboardPasteVariant) -> Void = { _ in }
     ) {
         self.item = item
         self.isSelected = isSelected
@@ -190,6 +193,7 @@ public struct ClipboardRowView: View {
         self.onActivate = onActivate
         self.onTogglePin = onTogglePin
         self.onDelete = onDelete
+        self.onPasteVariant = onPasteVariant
     }
 
     private var title: String {
@@ -240,6 +244,12 @@ public struct ClipboardRowView: View {
         })
         .contextMenu {
             Button("Paste") { onActivate() }
+            if item.offersPasteVariant(.plainText) {
+                Button("Paste as Plain Text") { onPasteVariant(.plainText) }
+            }
+            if item.offersPasteVariant(.cleanedLink) {
+                Button("Paste Clean Link") { onPasteVariant(.cleanedLink) }
+            }
             Button(item.isPinned ? "Unpin" : "Pin") { onTogglePin() }
             Divider()
             Button("Delete", role: .destructive) { onDelete() }

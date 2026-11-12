@@ -38,6 +38,7 @@ public struct ClipboardHistoryView: View {
                 ClipboardPreviewPane(
                     item: viewModel.selectedItem,
                     onPaste: { item in viewModel.selectItem(item) },
+                    onPasteVariant: { item, variant in viewModel.selectItem(item, variant: variant) },
                     onTogglePin: { item in viewModel.togglePin(item: item) },
                     onDelete: { item in
                         withAnimation(.zenithSpring) {
@@ -156,6 +157,9 @@ public struct ClipboardHistoryView: View {
                                         withAnimation(.zenithSpring) {
                                             viewModel.deleteItem(item: item)
                                         }
+                                    },
+                                    onPasteVariant: { variant in
+                                        viewModel.selectItem(item, variant: variant)
                                     }
                                 )
                                 .id(item.id)
@@ -232,6 +236,7 @@ public struct ClipboardHistoryView: View {
             Spacer(minLength: 8)
 
             ZenithKeyHint("↩", "Paste")
+            ZenithKeyHint("⇧↩", "Plain Text")
             ZenithKeyHint("⌘1–9", "Quick Paste")
             ZenithKeyHint("⌘P", "Pin")
             ZenithKeyHint("⌘⌫", "Delete")

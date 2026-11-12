@@ -161,6 +161,14 @@ enum ScreenshotRenderer {
 
         // Settings panes that only show settings (Cleaner and Privacy Shield read this Mac, so they are left out).
         // Permissions and login item are stand-ins, so the picture does not depend on this Mac either.
+        // Clipboard privacy is a setting too, but its list of ignored apps is this Mac's: show the built-in defaults
+        // from a throwaway store that is never saved and has no pasteboard monitor behind it.
+        let renderDefaultsName = "zenith.render-screenshots.\(UUID().uuidString)"
+        let renderDefaults = UserDefaults(suiteName: renderDefaultsName) ?? .standard
+        defer { renderDefaults.removePersistentDomain(forName: renderDefaultsName) }
+        let renderClipboardPrivacy = ClipboardPrivacySettings(userDefaults: renderDefaults, monitor: nil)
+        ClipboardPrivacySettingsSection.settingsProvider = { renderClipboardPrivacy }
+
         let settingsModel = SettingsViewModel(
             launchAtLoginService: ScreenshotLoginItem(),
             permissionsService: ScreenshotPermissions()
@@ -235,6 +243,7 @@ private struct ScreenshotPermissions: PermissionsServiceProtocol {
     func requestAccessibilityPermission() -> Bool { false }
     func openScreenRecordingSettings() -> Bool { false }
     func openAccessibilitySettings() -> Bool { false }
+    func calendarAccess() -> CalendarAccessState { .granted }
 }
 
 private struct ScreenshotLoginItem: LaunchAtLoginServiceProtocol {

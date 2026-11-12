@@ -80,12 +80,15 @@ public struct GeneralSettingsTab: View {
                 }
             }
 
+            ClipboardPrivacySettingsSection()
+
             HStack {
                 Spacer()
                 Button("Restore All Defaults") {
                     withAnimation(.zenithSpring) {
                         viewModel.resetAllDefaults()
                         IslandWidgetSettings.shared.resetToDefaults()
+                        ClipboardPrivacySettings.shared.resetToDefaults()
                     }
                 }
                 .help("Put every setting, shortcut, sound and island widget back the way Zenith ships")

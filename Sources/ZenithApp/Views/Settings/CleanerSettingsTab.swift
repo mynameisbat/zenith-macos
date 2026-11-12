@@ -4,6 +4,8 @@ import ZenithCore
 /// Settings tab for scanning, inspecting, and safely purging system and developer junk files.
 public struct CleanerSettingsTab: View {
     @ObservedObject public var cleaner: SystemCleanerService = .shared
+    @ObservedObject private var schedule: CleanerScanScheduleSettings = .shared
+    @ObservedObject private var scheduler: CleanerScanScheduler = .shared
 
     private enum Section: String, CaseIterable, Identifiable {
         case system = "System", projects = "Projects", installers = "Installers", leftovers = "Leftovers", drives = "Drives"
@@ -63,6 +65,9 @@ public struct CleanerSettingsTab: View {
                 // 2. Dual Telemetry Gauges (Storage Space & Live RAM)
                 telemetryGaugesCard
 
+                // 2b. Scheduled scan (scans only; cleaning stays behind Clean and its confirmation)
+                scheduledScanSection
+
                 // 3. Selection Toolbar (Select All / Items Count)
                 if !cleaner.categories.isEmpty {
                     selectionToolbar
@@ -115,6 +120,48 @@ public struct CleanerSettingsTab: View {
     }
 
     // MARK: - Subviews
+
+    private var scheduledScanSection: some View {
+        ZenithSettingsSection(
+            "Scheduled Scan",
+            footer: "Scans only while Zenith is running, at low priority. A scheduled scan never deletes anything: you still choose Clean and confirm. You are told when more than 1 GB can be cleaned."
+        ) {
+            ZenithSettingsRow(
+                "Scan Automatically",
+                subtitle: "Looks for cleanable files on a schedule.",
+                symbol: "calendar.badge.clock",
+                tint: ZenithTint.cleaner
+            ) {
+                Toggle("Scan Automatically", isOn: $schedule.isEnabled)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+            }
+
+            if schedule.isEnabled {
+                ZenithSettingsDivider(inset: 44)
+                ZenithSettingsRow("Frequency") {
+                    Picker("Frequency", selection: $schedule.interval) {
+                        ForEach(CleanerScanInterval.allCases) { interval in
+                            Text(verbatim: interval.title).tag(interval)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+            }
+
+            if schedule.isEnabled || schedule.lastResult != nil {
+                ZenithSettingsDivider(inset: 12)
+                TimelineView(.periodic(from: Date(), by: 60)) { context in
+                    ZenithSettingsRow(
+                        title: Text(verbatim: schedule.lastScanDescription(now: context.date)),
+                        subtitle: schedule.nextScanDescription(now: context.date, isScanning: scheduler.isRunningScheduledScan)
+                            .map { Text(verbatim: $0) }
+                    ) { EmptyView() }
+                }
+            }
+        }
+    }
 
     private var headerBanner: some View {
         HStack(alignment: .center, spacing: 14) {
