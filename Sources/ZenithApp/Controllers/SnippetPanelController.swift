@@ -42,7 +42,7 @@ public final class SnippetPanelController: NSObject, NSWindowDelegate {
     public static let panelSize = CGSize(width: 420, height: 360)
 
     private var panel: SnippetPanel?
-    private let model = SnippetPickerModel()
+    private let model = SnippetPickerModel(library: SnippetLibrary.shared)
     private var keyMonitor: Any?
     private var previousApplication: NSRunningApplication?
 

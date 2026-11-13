@@ -30,7 +30,7 @@ public enum SnippetLibraryError: Error, Equatable, LocalizedError {
 /// temporary folder.
 @MainActor
 public final class SnippetLibrary: ObservableObject {
-    public static let shared = SnippetLibrary()
+    public static let shared = SnippetLibrary(directory: nil)
     public static let fileName = "Snippets.json"
 
     @Published public private(set) var snippets: [Snippet]
@@ -158,7 +158,7 @@ public final class SnippetLibrary: ObservableObject {
 /// Typed expansion on/off and the apps it stays out of. Saved in `UserDefaults`.
 @MainActor
 public final class SnippetSettings: ObservableObject {
-    public static let shared = SnippetSettings()
+    public static let shared = SnippetSettings(userDefaults: .standard)
 
     public enum Keys {
         public static let typedExpansionEnabled = "zenith_snippets_typed_expansion"

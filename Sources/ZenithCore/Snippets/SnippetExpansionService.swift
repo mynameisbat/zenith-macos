@@ -29,13 +29,32 @@ extension SnippetInserter: SnippetInserting {
 /// turn of the main loop, after the key that completed it has reached the app.
 @MainActor
 public final class SnippetExpansionService: ObservableObject {
-    public static let shared = SnippetExpansionService(
-        keySource: EventTapSnippetKeySource(),
-        inserter: SnippetInserter(onOwnWrite: { PasteboardMonitor.shared.markOwnWrite(changeCount: $0) }),
-        frontmostBundleIdentifier: { NSWorkspace.shared.frontmostApplication?.bundleIdentifier },
-        isSecureInputOn: { IsSecureEventInputEnabled() },
-        clipboardIgnoredApps: { ClipboardPrivacySettings.shared.ignoredAppBundleIdentifiers }
-    )
+    public static let shared: SnippetExpansionService = makeShared()
+
+    /// Every argument spelled out: Swift 6.1 (CI) crashes while compiling a static initializer that evaluates
+    /// main-actor default arguments.
+    private static func makeShared() -> SnippetExpansionService {
+        let inserter = SnippetInserter(
+            pasteboard: NSPasteboard.general,
+            paster: AutoPasteService.shared,
+            keys: SystemSnippetKeyPoster(),
+            isTrusted: { SystemPermissions.checkAccessibilityPermission() },
+            scheduler: MainQueueClipboardScheduler(),
+            onOwnWrite: { PasteboardMonitor.shared.markOwnWrite(changeCount: $0) }
+        )
+        return SnippetExpansionService(
+            library: SnippetLibrary.shared,
+            settings: SnippetSettings.shared,
+            keySource: EventTapSnippetKeySource(),
+            inserter: inserter,
+            frontmostBundleIdentifier: { NSWorkspace.shared.frontmostApplication?.bundleIdentifier },
+            isSecureInputOn: { IsSecureEventInputEnabled() },
+            clipboardIgnoredApps: { ClipboardPrivacySettings.shared.ignoredAppBundleIdentifiers },
+            ownBundleIdentifier: Bundle.main.bundleIdentifier,
+            now: { Date() },
+            deferExpansion: true
+        )
+    }
 
     /// Whether the key source is running (typed expansion is on and allowed).
     @Published public private(set) var isListening = false
