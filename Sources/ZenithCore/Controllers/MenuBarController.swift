@@ -6,6 +6,8 @@ public enum MenuBarItemIdentifier {
     public static let clipboardHistory = NSUserInterfaceItemIdentifier("menuBar.clipboardHistory")
     public static let captureArea = NSUserInterfaceItemIdentifier("menuBar.captureArea")
     public static let captureFullscreen = NSUserInterfaceItemIdentifier("menuBar.captureFullscreen")
+    public static let recordScreen = NSUserInterfaceItemIdentifier("menuBar.recordScreen")
+    public static let scrollingCapture = NSUserInterfaceItemIdentifier("menuBar.scrollingCapture")
     public static let liveStatistics = NSUserInterfaceItemIdentifier("menuBar.liveStatistics")
     public static let clearHistory = NSUserInterfaceItemIdentifier("menuBar.clearHistory")
     public static let privacyShieldToggle = NSUserInterfaceItemIdentifier("menuBar.privacyShieldToggle")
@@ -19,6 +21,8 @@ public enum MenuBarItemTag: Int, CaseIterable, Sendable {
     case clipboardHistory = 1001
     case captureArea = 1002
     case captureFullscreen = 1003
+    case recordScreen = 1010
+    case scrollingCapture = 1011
     case liveStatistics = 1004
     case clearHistory = 1005
     case privacyShieldToggle = 1008
@@ -44,6 +48,8 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     public var onClipboardHistory: (@MainActor () -> Void)?
     public var onCaptureArea: (@MainActor () -> Void)?
     public var onCaptureFullscreen: (@MainActor () -> Void)?
+    public var onRecordScreen: (@MainActor () -> Void)?
+    public var onScrollingCapture: (@MainActor () -> Void)?
     public var onClearHistory: (@MainActor () -> Void)?
     public var onTogglePrivacyShield: (@MainActor () -> Void)?
     public var onShowPreferences: (@MainActor () -> Void)?
@@ -152,6 +158,29 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         captureFullscreenItem.tag = MenuBarItemTag.captureFullscreen.rawValue
         captureFullscreenItem.identifier = MenuBarItemIdentifier.captureFullscreen
         menu.addItem(captureFullscreenItem)
+
+        // Record Screen (⌃⌥R) and Scrolling Capture (⌃⌥L)
+        let recordItem = NSMenuItem(
+            title: String(localized: "Record Screen…"),
+            action: #selector(recordScreenAction(_:)),
+            keyEquivalent: "r"
+        )
+        recordItem.keyEquivalentModifierMask = [.control, .option]
+        recordItem.target = self
+        recordItem.tag = MenuBarItemTag.recordScreen.rawValue
+        recordItem.identifier = MenuBarItemIdentifier.recordScreen
+        menu.addItem(recordItem)
+
+        let scrollingItem = NSMenuItem(
+            title: String(localized: "Scrolling Capture"),
+            action: #selector(scrollingCaptureAction(_:)),
+            keyEquivalent: "l"
+        )
+        scrollingItem.keyEquivalentModifierMask = [.control, .option]
+        scrollingItem.target = self
+        scrollingItem.tag = MenuBarItemTag.scrollingCapture.rawValue
+        scrollingItem.identifier = MenuBarItemIdentifier.scrollingCapture
+        menu.addItem(scrollingItem)
 
         // 4. Separator
         menu.addItem(NSMenuItem.separator())
@@ -323,6 +352,14 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc public func captureFullscreenAction(_ sender: Any?) {
         onCaptureFullscreen?()
+    }
+
+    @objc public func recordScreenAction(_ sender: Any?) {
+        onRecordScreen?()
+    }
+
+    @objc public func scrollingCaptureAction(_ sender: Any?) {
+        onScrollingCapture?()
     }
 
     @objc public func clearHistoryAction(_ sender: Any?) {

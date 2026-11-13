@@ -54,6 +54,8 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
     public static let captureAreaId = "capture.area"
     public static let captureFullscreenId = "capture.fullscreen"
     public static let captureOCRId = "capture.ocr"
+    public static let recordScreenId = "capture.record"
+    public static let scrollingCaptureId = "capture.scrolling"
 
     // MARK: - Built-in Default Shortcut Configurations
 
@@ -114,6 +116,24 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
         keyEquivalent: "⌃⌥T"
     )
 
+    /// Screen recording: ⌃⌥R (Keycode 15: 'R'). Starts the selector; pressed while recording, it stops.
+    public static let defaultRecordScreen = HotKeyDefinition(
+        id: recordScreenId,
+        name: "Record Screen",
+        keyCode: 15, // kVK_ANSI_R
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue,
+        keyEquivalent: "⌃⌥R"
+    )
+
+    /// Scrolling capture: ⌃⌥L (Keycode 37: 'L', "long screenshot").
+    public static let defaultScrollingCapture = HotKeyDefinition(
+        id: scrollingCaptureId,
+        name: "Scrolling Capture",
+        keyCode: 37, // kVK_ANSI_L
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue,
+        keyEquivalent: "⌃⌥L"
+    )
+
     /// Key codes (with ⌘⇧) of macOS's screenshot shortcuts: 3, 4, 5 and 6. A Zenith shortcut on one of these fires
     /// together with the system's.
     public static let macOSScreenshotShortcuts: [(keyCode: UInt32, carbonModifiers: UInt32)] = {
@@ -141,7 +161,7 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
 
     /// The built-in shortcut of an action, if it has one.
     public static func builtIn(for id: String) -> HotKeyDefinition? {
-        defaultDictionary[id] ?? (id == captureOCRId ? defaultOCR : nil)
+        defaultDictionary[id] ?? [captureOCRId: defaultOCR, recordScreenId: defaultRecordScreen, scrollingCaptureId: defaultScrollingCapture][id]
     }
 
     /// Default dictionary containing all standard shortcut presets.

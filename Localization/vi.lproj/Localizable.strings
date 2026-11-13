@@ -585,7 +585,7 @@
 "How long the pointer rests on the closed island before it opens. A click opens it at once." = "Thời gian con trỏ dừng trên island đang đóng trước khi island mở ra. Bấm vào thì mở ngay.";
 "%@ s" = "%@ giây";
 "Calendars" = "Lịch";
-"Lets Zenith capture the screen and read text from it." = "Cho phép Zenith chụp màn hình và đọc chữ từ đó.";
+"Lets Zenith capture and record the screen and read text from it." = "Cho phép Zenith chụp, quay màn hình và đọc chữ từ đó.";
 "Lets Zenith press keys for you: ⌘V to paste, and media keys." = "Cho phép Zenith nhấn phím thay bạn: ⌘V để dán và các phím phương tiện.";
 "Lets Zenith tell other apps what to do: Music, Spotify and Finder." = "Cho phép Zenith ra lệnh cho các ứng dụng khác: Music, Spotify và Finder.";
 "Lets Zenith read your events to show the next one in the island." = "Cho phép Zenith đọc sự kiện của bạn để hiện sự kiện kế tiếp trên island.";
