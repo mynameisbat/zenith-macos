@@ -23,7 +23,21 @@ public struct ZenithDynamicIslandView: View {
         islandState.hasCompactActivity
     }
 
+    /// The closed island swells a little under the pointer before it opens (`ZenithIslandState.isHoverEmphasized`).
+    private var isEmphasized: Bool {
+        islandState.isHoverEmphasized && !islandState.isExpanded && !isDisplayingAlert
+    }
+
     private var currentWidth: CGFloat {
+        restingWidth + (isEmphasized ? 2 * ZenithTheme.Island.hoverEmphasisSide : 0)
+    }
+
+    /// Hanging from a notch it also grows down; a floating pill only stretches along the menu bar and stays in it.
+    private var currentHeight: CGFloat {
+        restingHeight + (isEmphasized && geometry.hasNotch ? ZenithTheme.Island.hoverEmphasisDrop : 0)
+    }
+
+    private var restingWidth: CGFloat {
         if isDisplayingAlert {
             return geometry.alertWidth
         } else if islandState.isExpanded {
@@ -37,7 +51,7 @@ public struct ZenithDynamicIslandView: View {
         }
     }
 
-    private var currentHeight: CGFloat {
+    private var restingHeight: CGFloat {
         if isDisplayingAlert {
             return geometry.effectiveAlertHeight
         } else if islandState.isExpanded {
@@ -118,17 +132,23 @@ public struct ZenithDynamicIslandView: View {
     private var islandContainer: some View {
         ZStack(alignment: .top) {
             if let alert = islandState.activeAlert {
-                alertCapsuleView(alert)
-                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+                Group {
+                    if let level = alert.level {
+                        levelCapsuleView(alert, level: level)
+                    } else {
+                        alertCapsuleView(alert)
+                    }
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
             } else if islandState.isExpanded {
                 expandedIslandContent
-                    .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+                    .transition(contentArrival)
             } else if let timer = islandState.focusTimer {
                 IslandTimerCompactWings(snapshot: timer, geometry: geometry)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         islandState.activeTab = .widgets
-                        islandState.onMouseEnter()
+                        islandState.open()
                     }
                     .accessibilityAddTraits(.isButton)
                     .accessibilityHint("Opens the timer")
@@ -143,7 +163,8 @@ public struct ZenithDynamicIslandView: View {
         .overlay(rimLightOverlay)
         .clipShape(currentShape)
         .scaleEffect(islandState.isDropTargeted ? 1.015 : 1.0, anchor: .top)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.isExpanded)
+        .animation(islandState.isExpanded ? ZenithIslandState.openingAnimation : ZenithIslandState.closingAnimation,
+                   value: islandState.isExpanded)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.activeAlert)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isNowPlayingActive)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.focusTimer == nil)
@@ -171,7 +192,7 @@ public struct ZenithDynamicIslandView: View {
         .frame(width: geometry.nowPlayingIdleWidth, height: geometry.nowPlayingIdleHeight)
         .contentShape(Rectangle())
         .onTapGesture {
-            islandState.onMouseEnter()
+            islandState.open()
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Now playing: \(track.title), \(track.artist)")
@@ -180,6 +201,51 @@ public struct ZenithDynamicIslandView: View {
     }
 
     // MARK: - Alert Capsule HUD
+
+    /// The shape leads and the page follows: it waits for the island to be most of the way open, then comes into
+    /// focus from the top edge. Leaving, it is gone before the shape has closed around it.
+    private var contentArrival: AnyTransition {
+        if islandState.prefersReducedMotion() { return .opacity }
+        return .asymmetric(
+            insertion: AnyTransition
+                .modifier(active: IslandContentArrival(progress: 0), identity: IslandContentArrival(progress: 1))
+                .animation(.easeOut(duration: 0.3).delay(0.1)),
+            removal: AnyTransition.opacity.animation(.easeIn(duration: 0.12))
+        )
+    }
+
+    /// A volume or brightness reading: its symbol, a bar and the percentage.
+    private func levelCapsuleView(_ alert: IslandAlert, level: Double) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: alert.icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 22, height: 18)
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.18))
+                    Capsule()
+                        .fill(Color.white)
+                        .frame(width: max(0, geo.size.width * CGFloat(level)))
+                }
+            }
+            .frame(height: 5)
+            .animation(.easeOut(duration: 0.12), value: level)
+
+            Text(verbatim: "\(Int((level * 100).rounded()))%")
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .foregroundColor(.white.opacity(0.8))
+                .frame(width: 36, alignment: .trailing)
+        }
+        .padding(.horizontal, 16)
+        .frame(width: geometry.alertWidth, height: geometry.alertHeight)
+        .padding(.top, geometry.hasNotch ? geometry.notchRect.height : 0)
+        .frame(width: geometry.alertWidth, height: geometry.effectiveAlertHeight, alignment: .top)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: alert.title))
+        .accessibilityValue(Text(verbatim: "\(Int((level * 100).rounded()))%"))
+    }
 
     private func alertCapsuleView(_ alert: IslandAlert) -> some View {
         HStack(spacing: 10) {
@@ -256,7 +322,8 @@ public struct ZenithDynamicIslandView: View {
                             track: track,
                             onPrevious: { NowPlayingService.shared.previousTrack() },
                             onTogglePlayPause: { NowPlayingService.shared.togglePlayPause() },
-                            onNext: { NowPlayingService.shared.nextTrack() }
+                            onNext: { NowPlayingService.shared.nextTrack() },
+                            onSeek: { NowPlayingService.shared.seek(to: $0) }
                         )
                     } else {
                         shelfContent
@@ -697,5 +764,17 @@ public struct IslandDropItemCardView: View {
                     .frame(width: 30, height: 30)
             }
         }
+    }
+}
+
+/// How far the expanded island's page has arrived: 0 is out of focus, small and invisible; 1 is in place.
+struct IslandContentArrival: ViewModifier {
+    let progress: Double
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(progress)
+            .blur(radius: (1 - progress) * 8)
+            .scaleEffect(0.9 + 0.1 * progress, anchor: .top)
     }
 }

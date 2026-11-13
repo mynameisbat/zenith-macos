@@ -21,6 +21,11 @@ public struct SystemPermissions {
         string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
     )!
 
+    /// Deep link to macOS System Settings -> Privacy & Security -> Calendars.
+    public static let calendarSettingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars"
+    )!
+
     /// Checks whether Zenith currently has permission to record/capture the screen.
     /// Does not present a dialog if permission is denied or not yet requested.
     public static func checkScreenRecordingPermission() -> Bool {
@@ -90,5 +95,10 @@ public final class SystemPermissionsService: PermissionsServiceProtocol, Sendabl
 
     public func openAccessibilitySettings() -> Bool {
         SystemPermissions.openAccessibilitySettings()
+    }
+
+    /// Reading the status never prompts; the provider only reports `.unavailable` outside an app bundle.
+    public func calendarAccess() -> CalendarAccessState {
+        EventKitUpcomingEventProvider().accessState()
     }
 }

@@ -11,7 +11,7 @@
 Zenith lives in your Menu Bar as a lightweight accessory app (no Dock icon), bringing several small utilities together in one native binary:
 1. **Native Screen OCR & Barcode/QR Extractor (`⌃⌥T`)** using on-device Apple Vision, with the result copied to the clipboard.
 2. **MacBook Dynamic Island & Drop Shelf** with a Now Playing display and controls (Apple Music, Spotify and browser audio), a charging HUD, and file previews.
-3. **Clipboard Manager (`⌘⇧V`)** with fuzzy search and automatic exclusion of items that password managers mark as concealed.
+3. **Clipboard Manager (`⌘⇧V`)** with fuzzy search, automatic exclusion of items that password managers mark as concealed, plain-text paste and optional auto-clear.
 4. **Shottr-Grade Screen Capture & Annotation (`⌘⇧2`)** with a live 16x pixel Loupe magnifier.
 5. **Disk cleaner, app uninstaller and process monitor (Mole-inspired)**, with a confirmation before anything is deleted.
 6. **Privacy Shield**: a local proxy that looks names up over DNS-over-HTTPS and splits the TLS handshake in two. It is not a VPN and does not hide your IP address.
@@ -27,7 +27,7 @@ Zenith lives in your Menu Bar as a lightweight accessory app (no Dock icon), bri
 ### Option 1: Download Pre-built DMG Installer (Recommended)
 Download the latest disk image from [GitHub Releases](https://github.com/mynameisbat/zenith-macos/releases):
 
-1. Download **`Zenith-2.4.0.dmg`** (or latest release).
+1. Download **`Zenith-2.5.0.dmg`** (or latest release).
 2. Double-click the DMG file to mount it.
 3. Drag **Zenith.app** into your **Applications** folder.
 4. Launch Zenith from Spotlight or Applications.
@@ -35,7 +35,7 @@ Download the latest disk image from [GitHub Releases](https://github.com/mynamei
 #### Terminal / CLI Installation
 ```bash
 # Mount DMG and copy to /Applications
-hdiutil attach Zenith-2.4.0.dmg
+hdiutil attach Zenith-2.5.0.dmg
 cp -R "/Volumes/Zenith/Zenith.app" /Applications/
 hdiutil detach "/Volumes/Zenith"
 
@@ -44,7 +44,10 @@ xattr -cr /Applications/Zenith.app
 open /Applications/Zenith.app
 ```
 
-> **Note for macOS Gatekeeper:** Zenith is signed ad hoc and is **not notarized** (that needs an Apple Developer ID), so macOS will warn about an unidentified developer. Right-click (or Control-click) `Zenith.app` in `/Applications`, select **Open**, then click **Open** in the prompt.
+> **Note for macOS Gatekeeper:** Zenith is not signed with a Developer ID and is **not notarized** (that needs an Apple Developer ID), so macOS will warn about an unidentified developer. Right-click (or Control-click) `Zenith.app` in `/Applications`, select **Open**, then click **Open** in the prompt.
+
+#### Updates
+Zenith checks GitHub for a new release once a day while it runs (Settings › General › Updates; switch off **Check Automatically** to stop it) and tells you once per version. **Install and Relaunch** downloads the DMG, checks that the app inside is signed with the same certificate as the copy you are running, replaces it (the old copy goes to the Trash) and reopens Zenith; nothing is installed without that click. A copy that cannot verify an update (signed ad hoc, run from a disk image, or translocated by macOS) offers **Download…** instead, which saves the DMG in Downloads for you to install by hand. Quitting for the update turns Privacy Shield off; turn it on again afterwards.
 
 ### Option 2: Build from Source
 **Prerequisites:** macOS 13.0 (Ventura) or higher, Xcode 16+ or Command Line Tools with Swift 6.0 toolchain.
@@ -67,6 +70,18 @@ cd zenith-macos
 # Launch the app
 open Zenith.app
 ```
+
+#### Signing your own builds
+By default `bundle_app.sh` signs ad hoc, and macOS treats every rebuild as a new app, so it asks for Accessibility, Screen Recording and Automation again. Run this once to keep them:
+
+```bash
+./scripts/setup_signing.sh
+```
+
+It creates a self-signed certificate, "Zenith Local Signing", in your login keychain (no Apple Developer account needed), and `bundle_app.sh` signs with it from then on. The first build asks you to let `codesign` use the key (choose **Always Allow**), and macOS asks for the permissions one last time. The identity lives only in that Mac's keychain (back it up from Keychain Access as a `.p12`), and it does **not** get past Gatekeeper on other Macs: that still needs a paid Developer ID and notarization. `ZENITH_SIGN_IDENTITY=-` forces ad-hoc signing.
+
+#### Releases and the update certificate
+The certificate that signs a release is what installed copies trust for automatic updates: an update is installed only if it satisfies the running app's designated requirement (`identifier "com.zenith.workspace" and certificate leaf = H"…"`). So **every release must be signed with the same "Zenith Local Signing" certificate**. Back the identity up (Keychain Access › My Certificates › Export as `.p12`) and import it on any Mac that builds releases; `create_dmg.sh` prints the certificate hash to compare and refuses an ad-hoc signed app (`ZENITH_ALLOW_ADHOC_DMG=1` builds a local test DMG anyway, never publish it). If the identity is lost, installed copies refuse the next release and offer the manual download, so users install that one version by hand once; updates work again from there.
 
 ---
 
@@ -96,9 +111,12 @@ open Zenith.app
 - **Filters**: All, Text, Links, Images and Pinned, together with search.
 - **Fast search**: in-memory search over the history with Unicode-aware fuzzy matching.
 - **Bounded memory**: an item over 25 MB is not kept, and the history as a whole is capped at 256 MB. The preview draws at most the first 20,000 characters.
-- **Sensitive Data Exclusion**: ignores pasteboard items marked as concealed or transient (the `org.nspasteboard` markers) and items from 1Password, Bitwarden and KeePassXC.
+- **Sensitive Data Exclusion**: ignores pasteboard items marked as concealed, transient or auto-generated (the `org.nspasteboard` markers), and anything copied while an app on your **ignored apps** list is in front. The list starts with common password managers (1Password, Bitwarden, KeePassXC, MacPass, Keychain Access, Passwords) and you edit it in Settings → General → Clipboard Privacy. The pasteboard is checked every half second and the front app is read at that moment, so a copy followed by a very fast switch to another app can be attributed to that other app.
+- **Auto-clear** (Settings → General → Clipboard Privacy, off by default): empties the system clipboard 30 seconds, 1, 5 or 10 minutes after a copy, and optionally when the screen locks or the Mac goes to sleep. It clears only if the clipboard still holds that same copy, never touches Zenith's history, and also covers what Zenith itself puts on the clipboard and copies that were not kept.
+- **Paste as plain text**: `⇧↵` in the clipboard panel, **Paste as Plain Text** in an item's right-click menu, or the button in the preview pane for rich text. The item in the history keeps its formatting.
+- **Clean links**: **Paste Clean Link** in the right-click menu removes tracking parameters (`utm_*`, `fbclid`, `gclid` and similar; `si` only on YouTube and Spotify links; `ref_src` and `ref_url` only on twitter.com and x.com). Optionally (**Clean Links When I Copy Them**, off by default) Zenith rewrites the clipboard when you copy exactly one `http(s)` link that has such parameters, and the history then stores the cleaned link. A copy that carries rich text, HTML, files, images or an app's private types is never rewritten.
 - **Item Pinning (`⌘P`)**: Pinned items are permanently preserved from FIFO eviction.
-- **Keyboard-Driven Workflow**: a click selects, a double-click or Return pastes; `⌘1`–`⌘9` instant paste, `⌘⌫` delete, `Ctrl+N` / `Ctrl+P` Emacs navigation. Right-click an item for Paste, Pin and Delete.
+- **Keyboard-Driven Workflow**: a click selects, a double-click or Return pastes; `⇧↵` pastes as plain text, `⌘1`–`⌘9` instant paste, `⌘⌫` delete, `Ctrl+N` / `Ctrl+P` Emacs navigation. Right-click an item for Paste, Paste as Plain Text, Paste Clean Link (for links), Pin and Delete.
 
 ### 4. 📸 Precision Screen Capture & Annotation Editor (`⌘⇧2`)
 - **Interactive 16x Loupe Magnifier**: Real-time pixel magnifier with center crosshairs and formatted RGB/HEX color sampling.
@@ -121,10 +139,14 @@ open Zenith.app
   - Track changes for **Apple Music** and **Spotify** arrive as system notifications (no polling); a light 1–2 s tick keeps the progress bar and other audio sources in sync.
   - **Left Wing**: Mini spinning vinyl disc with app badge / album artwork.
   - **Right Wing**: Animated jumping 4-bar equalizer visualizer with brand-matched dynamic color palettes.
-  - **Expanded Player**: Hover over the island to reveal track metadata, a progress bar, and media controls (Play/Pause, Skip, Previous).
-  - **Browser audio**: Chrome-family browsers (Chrome, Edge, Brave, Arc, Vivaldi, Opera) and Safari are detected from the audio they hold open, because macOS 15.4+ no longer gives other apps Now Playing data. For known media sites (YouTube, X, SoundCloud, Twitch and a few more) the tab title is shown; for any other site only the browser name is. Firefox is not checked for its tab title.
-  - **Controls**: Music and Spotify are controlled over AppleScript; a browser is controlled with the hardware media key, which needs the Accessibility permission (the island says so when macOS refuses it).
+  - **Expanded Player**: Hover over the island to reveal track metadata, a progress bar, and media controls (Play/Pause, Skip, Previous). The next and previous buttons are dimmed when the player does not take them (a video has no next track), and when the player accepts a position you can drag the progress bar to seek (Music and Spotify are sought over AppleScript, anything else through the system's Now Playing).
+  - **Browser and other audio**: anything that reports to the system's Now Playing (Chrome-family browsers, Safari, Firefox, video players) is shown with its title, artist, artwork and position. macOS 15.4+ no longer gives this data to other apps directly, so Zenith reads it through a small helper library loaded by the system's own `perl`. A browser is shown under the browser's name.
+  - **Controls**: Music and Spotify are controlled over AppleScript; anything else is sent the command through the system's Now Playing, which needs no permission. Only if macOS refuses that does Zenith fall back to the hardware media key, which needs the Accessibility permission (the island says so when macOS refuses it).
+  - **Hover, click and swipe**: resting the pointer on the closed island makes it swell slightly, and it opens after a short delay if the pointer stays (0.1 to 1 second, 0.25 by default). A click opens it at once. On a trackpad or Magic Mouse, swipe down on the island to open it, up to close it, and sideways to change track (fingers left means next track).
   - **Tab Switcher**: Switch between Now Playing, Widgets and the Shelf when more than one is there; on a notched display the tabs sit either side of the notch (icons only when there are three).
+- **Volume and brightness bar**: changing the volume (keys or Control Center) shows a level bar on the island. Brightness-key presses do too, read from the built-in display only; that part relies on macOS delivering the brightness keys to Zenith and has not been confirmed on a real keyboard yet. The system's own indicator still appears.
+- **Full-screen apps**: the island hides while an app is full screen on its display, both a real macOS full-screen Space and an app that covers the whole display with its own window (a game, a video player). Notices then use the floating panel. An app that goes full screen without a change of app is noticed only when the pointer comes near the island, a notice is about to show, or the app is activated again.
+- **Behavior settings** (Settings → Dynamic Island → Behavior): Volume and Brightness, Hover Delay, Swipe Gestures and Hide in Full-Screen Apps. Each switch can be turned off.
 - **Widgets** (Settings → Dynamic Island):
   - **Focus timer**: a Pomodoro-style timer (25-minute focus, 5-minute break by default, both adjustable). While it runs, a progress ring and the time left sit either side of the notch; pause, resume or stop it from the island or from Settings. When it ends the island says so (with a sound if sound effects are on) and offers the break, or the next focus session.
   - **Next calendar event**: your next timed event in the next 12 hours (or the one going on now) with how long until it starts, in its calendar's color. Off until you turn it on; macOS then asks for Calendar access. Events are read on your Mac only, through EventKit.
@@ -148,6 +170,8 @@ Nothing here deletes without asking: each action shows what will go (the largest
 - **Leftovers**: `com.vendor.app` folders in `~/Library` whose app is gone and that nothing has touched for 30 days. **Nothing is ticked for you**: they can hold data you would want back. Moved to the Trash.
 - **Drives**: Finder and Windows junk (`.DS_Store`, `._*` files, `Thumbs.db`, …) on mounted external drives (network shares are skipped). These are deleted, not trashed, and the confirmation says so.
 
+**Scheduled Scan** (Settings → Cleaner, off by default): scans every day, every week (the default) or every 30 days, only while Zenith is running and at low priority. It only scans and never deletes: cleaning still needs your click on Clean and the usual confirmation. You get one notice (on the island, or the floating toast) when at least 1 GB can be cleaned, and not again until the amount has grown by another 1 GB. Settings → Cleaner shows the last scheduled scan and when the next is due.
+
 **Elsewhere in the app**
 - **Boost** in the Command Hub purges inactive memory and flushes the DNS cache, and tells you honestly which step failed.
 - **Process monitor** in the Command Hub (see section 1).
@@ -158,6 +182,7 @@ Nothing here deletes without asking: each action shows what will go (the largest
 - **DoH providers**: Cloudflare, Google, Quad9, AdGuard, NextDNS, or your own endpoint. The DoH server itself is reached by its IP address (so its name is not looked up in plain DNS) and its certificate is checked against its real name.
 - **Tracker blocking** (Settings → Privacy Shield, off until you turn it on): refuses connections to advertising and tracking domains with a `403`, before any DoH lookup is made for them. It starts from a small built-in list (ad networks, ad exchanges and analytics endpoints; nothing sites need to work, such as CDNs, sign-in or tag managers) and you can **import a hosts file** or a list of domains (`0.0.0.0 ads.example.com`, one domain per line, or `||ads.example.com^` rules; up to 50 MB), add domains to **Always Block**, and list domains under **Never Block** when a site breaks. A listed domain covers its subdomains; a name with no dot (`com`) or a public suffix (`co.uk`) is refused so one bad line cannot block a whole country. Blocked requests show in the connection log and the Activity counter. Zenith never downloads a list itself: for a larger list, download a hosts file you trust (for example Steven Black's unified hosts) and import it. If Zenith is killed or crashes while the shield is on, a small separate watchdog process switches the proxy off so your internet keeps working, and the next launch restores your own earlier settings. Run from a disk image or an external drive, Zenith warns before turning the shield on, because ejecting that volume ends the app.
 - **TLS ClientHello chunker**: splits the first TLS handshake packet of a connection into two pieces (after the first 2 bytes), with a 5 ms pause between them, which can defeat simple Deep Packet Inspection.
+- **Turning it off**: the system proxy is put back first, the proxy stops accepting new connections, and connections other apps already have open (a download, a stream) are allowed to finish, for up to 30 seconds, before whatever is left is closed. Quitting Zenith while the shield is on ends every connection that goes through it, because those connections end inside Zenith's process.
 - **Limits**: it is not a VPN and does not hide your IP address or the addresses you connect to. It only covers traffic from apps that honour the system proxy, and only the primary network service. Tracker blocking works at the domain level only: it cannot remove an ad that is served from the same domain as the page, and it does not look inside HTTPS. SOCKS and PAC proxy settings are ignored, and the local proxy has no authentication. The anti-DPI split has not been verified against a real filtering network.
 
 ### 8. 🔊 Native Audio Feedback
@@ -181,6 +206,7 @@ Nothing here deletes without asking: each action shows what will go (the largest
 | `Tab` / `⇧Tab` | Clipboard Hub | Cycle down / up through list |
 | `⌃N` / `⌃P` | Clipboard Hub | Emacs style next / previous item (also `⌃J` / `⌃K`) |
 | `↵` (Enter) | Clipboard Hub | Paste selected item into active application |
+| `⇧↵` (Shift-Enter) | Clipboard Hub | Paste selected item as plain text (the history item keeps its formatting) |
 | `⌘1` ... `⌘9` | Clipboard Hub | Quick select &amp; paste item 1–9 |
 | `⌘⌫` / `⌦` | Clipboard Hub | Delete selected clip from history |
 | `⌘P` | Clipboard Hub | Toggle pin status on selected clip |
@@ -205,7 +231,7 @@ Nothing here deletes without asking: each action shows what will go (the largest
 
 ## 🔒 System Permissions Guide
 
-Zenith is designed with privacy-first principles and minimal permission requirements:
+Zenith is designed with privacy-first principles and minimal permission requirements. Settings → Permissions shows one card per permission (Screen Recording, Accessibility, Automation, Calendars): its state, what it is for, what still works without it and which features use it. It warns when a permission is granted but nothing you turned on uses it (today only Calendars can show that, because it is the only feature with a switch), and hints when a feature that is on lacks its permission. It never asks for a permission itself; Automation shows as "asked per app" because macOS reports it only per target app.
 
 1. **Screen Recording (`kTCCServiceScreenCapture`)** — **Required for Capture**:
    - Required by Apple's `ScreenCaptureKit` to capture displays, coordinate marquee crops, and sample RGB pixels in the loupe magnifier.
@@ -216,11 +242,11 @@ Zenith is designed with privacy-first principles and minimal permission requirem
 
 2. **Accessibility (`kTCCServiceAccessibility`)** — **Optional**:
    - **Zero-Permission Hotkeys**: Zenith uses macOS Carbon Event HotKeys for all global triggers (`⌘⇧V`, `⌘⇧2`, `⌘⇧1`), which require **zero Accessibility permissions**.
-   - **What Accessibility is for**: it lets Zenith synthesize keystrokes: `⌘V` to paste a clipboard item straight into the front app (`AutoPasteService`), and the media keys that control browser playback from the island.
-   - Without it, selecting an item only copies it (paste with `⌘V` yourself), and the island's buttons cannot control a browser tab (it shows an "Allow Accessibility" notice).
+   - **What Accessibility is for**: it lets Zenith synthesize keystrokes: `⌘V` to paste a clipboard item straight into the front app (`AutoPasteService`), and, as a fallback, the media keys that control playback from the island.
+   - Without it, selecting an item only copies it (paste with `⌘V` yourself), and if macOS refuses a playback command from the island, the media-key fallback is unavailable (it shows an "Allow Accessibility" notice).
 
 3. **Automation (Apple Events)** — **Optional**:
-   - Lets Zenith control Music and Spotify and read the front tab of Safari and Chromium browsers for the Now Playing title. macOS asks the first time, once per app.
+   - Lets Zenith control Music and Spotify, read Music's artwork, and ask Finder to move protected leftovers to the Trash (Cleaner → Leftovers). macOS asks the first time, once per app.
 
 4. **Calendars** — **Optional**:
    - Only for the island's "Next calendar event" widget. macOS asks when you turn the widget on in Settings → Dynamic Island, never before. Without it the widget shows how to allow it. (A build run with `swift run` has no Info.plist, so it cannot ask; use the bundled `Zenith.app`.)

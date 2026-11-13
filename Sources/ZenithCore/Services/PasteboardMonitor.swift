@@ -5,7 +5,8 @@ import UniformTypeIdentifiers
 
 /// Concrete implementation of PasteboardServiceProtocol monitoring NSPasteboard.
 public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Sendable {
-    public static let shared = PasteboardMonitor()
+    /// The app's monitor of the general pasteboard. Only this one asks which app is in front.
+    public static let shared = PasteboardMonitor(frontmostApplication: WorkspaceFrontmostApplicationProvider())
 
     private let queue = DispatchQueue(label: "com.zenith.pasteboard.monitor", qos: .utility)
     private let lock = NSLock()
@@ -20,10 +21,47 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
     private var lastObservedChangeCount: Int = 0
     private var lastSuppressedChangeCount: Int = -1
 
-    public init(pasteboard: NSPasteboard = .general, pollingInterval: TimeInterval = 0.5) {
+    /// Which app a copy came from. Nil (the default, and what tests use) means unknown: no copy is skipped for its app.
+    private let frontmostApplication: FrontmostApplicationProviding?
+    private var _captureOptions = ClipboardCaptureOptions()
+    private var _changeObserver: (@MainActor @Sendable (Int) -> Void)?
+
+    public init(
+        pasteboard: NSPasteboard = .general,
+        pollingInterval: TimeInterval = 0.5,
+        frontmostApplication: FrontmostApplicationProviding? = nil
+    ) {
         self.pasteboard = pasteboard
         self.pollingInterval = pollingInterval
+        self.frontmostApplication = frontmostApplication
         self.lastObservedChangeCount = pasteboard.changeCount
+    }
+
+    /// Ignored apps and link cleaning, applied to each copy as it is read (`ClipboardPrivacySettings` sets them).
+    public var captureOptions: ClipboardCaptureOptions {
+        get { lock.withLock { _captureOptions } }
+        set { lock.withLock { _captureOptions = newValue } }
+    }
+
+    /// Called on the main thread with the pasteboard's change count whenever it holds something new: a copy made
+    /// elsewhere (kept in the history or not) or one of Zenith's own writes. Not called for `clear()`.
+    public var changeObserver: (@MainActor @Sendable (Int) -> Void)? {
+        get { lock.withLock { _changeObserver } }
+        set { lock.withLock { _changeObserver = newValue } }
+    }
+
+    /// Looks at the pasteboard now instead of waiting for the next poll (main thread). Used by tests.
+    public func checkForChanges() {
+        pollPasteboard()
+    }
+
+    private func notifyChange(_ count: Int) {
+        guard let observer = changeObserver else { return }
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { observer(count) }
+        } else {
+            DispatchQueue.main.async { observer(count) }
+        }
     }
 
     public var isMonitoring: Bool {
@@ -73,9 +111,7 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
 
     public func copyItemToPasteboard(_ item: ClipboardItem) {
         lock.lock()
-        defer { lock.unlock() }
-
-        autoreleasepool {
+        let newCount: Int = autoreleasepool {
             pasteboard.clearContents()
             switch item.payload {
             case .plainText(let text):
@@ -92,14 +128,15 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
             let newCount = pasteboard.changeCount
             lastSuppressedChangeCount = newCount
             lastObservedChangeCount = newCount
+            return newCount
         }
+        lock.unlock()
+        notifyChange(newCount)
     }
 
     public func writeImageToPasteboard(_ image: CGImage) {
         lock.lock()
-        defer { lock.unlock() }
-
-        autoreleasepool {
+        let newCount: Int = autoreleasepool {
             pasteboard.clearContents()
             let bitmapRep = NSBitmapImageRep(cgImage: image)
             if let pngData = bitmapRep.representation(using: .png, properties: [:]) {
@@ -109,7 +146,10 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
             let newCount = pasteboard.changeCount
             lastSuppressedChangeCount = newCount
             lastObservedChangeCount = newCount
+            return newCount
         }
+        lock.unlock()
+        notifyChange(newCount)
     }
 
     public func clear() {
@@ -151,26 +191,49 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
 
             lastObservedChangeCount = currentCount
             let handler = onChangeHandler
+            let options = _captureOptions
             lock.unlock()
 
             // Step 2: Read raw data snapshot on Main Thread within autoreleasepool
-            guard let types = pasteboard.types, !types.isEmpty else { return }
+            guard let copiedTypes = pasteboard.types, !copiedTypes.isEmpty else { return }
+            var currentTypes = copiedTypes
 
-            if SensitivePasteboardMarker.containsSensitiveType(in: types) {
+            // Passwords, generated or temporary copies, and copies made in an ignored app stay out of the history.
+            let decision = ClipboardCapturePolicy.decide(
+                types: copiedTypes.map(\.rawValue),
+                itemTypes: (pasteboard.pasteboardItems ?? []).map { $0.types.map(\.rawValue) },
+                frontmostBundleIdentifier: frontmostApplication?.frontmostBundleIdentifier(),
+                options: options
+            )
+            guard decision == .record else {
+                notifyChange(currentCount)
                 return
             }
-            if let pbItems = pasteboard.pasteboardItems {
-                for pbItem in pbItems {
-                    if SensitivePasteboardMarker.containsSensitiveType(in: pbItem.types) {
-                        return
-                    }
-                }
+
+            // A copied link with tracking parameters is written back cleaned. That write is Zenith's own, so the
+            // next poll does not see it as a new copy, and only the cleaned link is kept.
+            var cleanedText: String?
+            if options.cleanLinksOnCopy,
+               let items = pasteboard.pasteboardItems, items.count == 1,
+               // The types the copying app declared, not the legacy names the system derives from them.
+               let cleaned = ClipboardCapturePolicy.cleanedLinkRewrite(
+                   types: items[0].types.map(\.rawValue),
+                   string: pasteboard.string(forType: .string)
+               ) {
+                let newCount = rewriteLink(cleaned, originalTypes: copiedTypes)
+                cleanedText = cleaned
+                currentTypes = pasteboard.types ?? [.string]
+                notifyChange(newCount)
+            } else {
+                notifyChange(currentCount)
             }
 
+            let types = currentTypes
             let pngData = types.contains(.png) ? pasteboard.data(forType: .png) : nil
             let tiffData = (pngData == nil && types.contains(.tiff)) ? pasteboard.data(forType: .tiff) : nil
             let rtfData = types.contains(.rtf) ? pasteboard.data(forType: .rtf) : nil
-            let plainText = (types.contains(.string) || rtfData != nil) ? pasteboard.string(forType: .string) : nil
+            let plainText = cleanedText
+                ?? ((types.contains(.string) || rtfData != nil) ? pasteboard.string(forType: .string) : nil)
 
             // Step 3: Offload heavy text/image parsing and thumbnail creation to background queue
             queue.async { [weak self] in
@@ -188,6 +251,29 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
                 }
             }
         }
+    }
+
+    /// Replaces a copied link with its cleaned form, keeping the URL flavor and the link's title if it had them.
+    /// Returns the new change count, which is marked as Zenith's own write.
+    private func rewriteLink(_ cleaned: String, originalTypes: [NSPasteboard.PasteboardType]) -> Int {
+        let urlNameType = NSPasteboard.PasteboardType("public.url-name")
+        let urlName = originalTypes.contains(urlNameType) ? pasteboard.string(forType: urlNameType) : nil
+        let link = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        lock.lock()
+        defer { lock.unlock() }
+        pasteboard.clearContents()
+        pasteboard.setString(cleaned, forType: .string)
+        if originalTypes.contains(.URL) {
+            pasteboard.setString(link, forType: .URL)
+        }
+        if let urlName {
+            pasteboard.setString(urlName, forType: urlNameType)
+        }
+        let newCount = pasteboard.changeCount
+        lastSuppressedChangeCount = newCount
+        lastObservedChangeCount = newCount
+        return newCount
     }
 
     private func processRawPasteboardSnapshot(

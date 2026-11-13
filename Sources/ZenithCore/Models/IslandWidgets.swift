@@ -202,12 +202,29 @@ public final class IslandWidgetSettings: ObservableObject {
         public static let showNetwork = "zenith_island_show_network"
         public static let focusMinutes = "zenith_island_focus_minutes"
         public static let breakMinutes = "zenith_island_break_minutes"
+        public static let showLevelHUD = "zenith_island_show_level_hud"
+        public static let hideInFullscreen = "zenith_island_hide_in_fullscreen"
+        public static let scrollGestures = "zenith_island_scroll_gestures"
+        public static let hoverOpenDelay = "zenith_island_hover_open_delay"
     }
 
     public static let focusRange = 5...120
     public static let breakRange = 1...60
     public static let defaultFocusMinutes = 25
     public static let defaultBreakMinutes = 5
+    /// Seconds the pointer rests on the closed island before it opens.
+    public static let hoverDelayRange: ClosedRange<Double> = 0.1...1.0
+    public static let hoverDelayStep = 0.05
+    public static let defaultHoverOpenDelay = 0.25
+
+    /// `seconds` within `hoverDelayRange`, on a 0.05 s step. A value that is not a number gives the default.
+    public static func clampedHoverDelay(_ seconds: Double) -> Double {
+        guard seconds.isFinite else { return defaultHoverOpenDelay }
+        let stepped = (seconds / hoverDelayStep).rounded() * hoverDelayStep
+        let clamped = min(max(stepped, hoverDelayRange.lowerBound), hoverDelayRange.upperBound)
+        // Two decimals, so 0.15 is stored and compared as 0.15, not 0.15000000000000002.
+        return (clamped * 100).rounded() / 100
+    }
 
     @Published public var showTimer: Bool {
         didSet { save(showTimer, Keys.showTimer); syncIsland() }
@@ -219,6 +236,31 @@ public final class IslandWidgetSettings: ObservableObject {
 
     @Published public var showNetwork: Bool {
         didSet { save(showNetwork, Keys.showNetwork); syncIsland() }
+    }
+
+    /// Volume and brightness changes appear on the island.
+    @Published public var showLevelHUD: Bool {
+        didSet { save(showLevelHUD, Keys.showLevelHUD); syncIsland() }
+    }
+
+    /// The island is taken away while a full-screen app has the display.
+    @Published public var hideInFullscreen: Bool {
+        didSet { save(hideInFullscreen, Keys.hideInFullscreen); syncIsland() }
+    }
+
+    /// Swipes on the island open, close and change track.
+    @Published public var scrollGestures: Bool {
+        didSet { save(scrollGestures, Keys.scrollGestures); syncIsland() }
+    }
+
+    /// How long the pointer must rest on the closed island before it opens, in seconds.
+    @Published public var hoverOpenDelay: Double {
+        didSet {
+            let clamped = Self.clampedHoverDelay(hoverOpenDelay)
+            if clamped != hoverOpenDelay { hoverOpenDelay = clamped }
+            save(clamped, Keys.hoverOpenDelay)
+            syncIsland()
+        }
     }
 
     @Published public var focusMinutes: Int {
@@ -246,6 +288,11 @@ public final class IslandWidgetSettings: ObservableObject {
         self.showTimer = userDefaults.object(forKey: Keys.showTimer) as? Bool ?? true
         self.showCalendar = userDefaults.object(forKey: Keys.showCalendar) as? Bool ?? false
         self.showNetwork = userDefaults.object(forKey: Keys.showNetwork) as? Bool ?? false
+        self.showLevelHUD = userDefaults.object(forKey: Keys.showLevelHUD) as? Bool ?? true
+        self.hideInFullscreen = userDefaults.object(forKey: Keys.hideInFullscreen) as? Bool ?? true
+        self.scrollGestures = userDefaults.object(forKey: Keys.scrollGestures) as? Bool ?? true
+        let delay = userDefaults.object(forKey: Keys.hoverOpenDelay) as? Double ?? Self.defaultHoverOpenDelay
+        self.hoverOpenDelay = Self.clampedHoverDelay(delay)
         let focus = userDefaults.object(forKey: Keys.focusMinutes) as? Int ?? Self.defaultFocusMinutes
         self.focusMinutes = min(max(focus, Self.focusRange.lowerBound), Self.focusRange.upperBound)
         let pause = userDefaults.object(forKey: Keys.breakMinutes) as? Int ?? Self.defaultBreakMinutes
@@ -262,6 +309,10 @@ public final class IslandWidgetSettings: ObservableObject {
         showTimer = true
         showCalendar = false
         showNetwork = false
+        showLevelHUD = true
+        hideInFullscreen = true
+        scrollGestures = true
+        hoverOpenDelay = Self.defaultHoverOpenDelay
         focusMinutes = Self.defaultFocusMinutes
         breakMinutes = Self.defaultBreakMinutes
     }
@@ -274,5 +325,9 @@ public final class IslandWidgetSettings: ObservableObject {
         island?.showsTimerWidget = showTimer
         island?.showsCalendarWidget = showCalendar
         island?.showsNetworkWidget = showNetwork
+        island?.showsLevelHUD = showLevelHUD
+        island?.allowsScrollGestures = scrollGestures
+        island?.hoverOpenDelay = hoverOpenDelay
+        if island?.hidesInFullscreen != hideInFullscreen { island?.hidesInFullscreen = hideInFullscreen }
     }
 }

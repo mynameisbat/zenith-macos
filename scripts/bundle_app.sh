@@ -34,9 +34,21 @@ if [ -f "$BUILD_DIR/Zenith" ]; then
 elif [ -f "$BUILD_DIR/ZenithApp" ]; then
     cp "$BUILD_DIR/ZenithApp" "$MACOS_DIR/Zenith"
 else
-    cp "$BUILD_DIR/GoldenGateApp" "$MACOS_DIR/Zenith"
+    echo "error: the build produced no Zenith executable in $BUILD_DIR" >&2
+    exit 1
 fi
 chmod +x "$MACOS_DIR/Zenith"
+
+# The Now Playing adapter is loaded by /usr/bin/perl, never by Zenith itself (see Sources/ZenithNowPlayingAdapter).
+echo "==> Copying the Now Playing adapter..."
+ADAPTER_NAME="libZenithNowPlayingAdapter.dylib"
+FRAMEWORKS_DIR="$CONTENTS_DIR/Frameworks"
+if [ ! -f "$BUILD_DIR/$ADAPTER_NAME" ]; then
+    echo "error: $BUILD_DIR/$ADAPTER_NAME was not built" >&2
+    exit 1
+fi
+mkdir -p "$FRAMEWORKS_DIR"
+cp "$BUILD_DIR/$ADAPTER_NAME" "$FRAMEWORKS_DIR/$ADAPTER_NAME"
 
 echo "==> Copying Zenith AppIcon.icns..."
 if [ -f "$PROJECT_ROOT/AppIcon.icns" ]; then
@@ -88,7 +100,7 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Zenith uses Apple Events to see what Music, Spotify and your browser are playing, to control playback from the Dynamic Island, and to ask Finder to move to the Trash a leftover folder that macOS does not let other apps move.</string>
+    <string>Zenith uses Apple Events to see what Music and Spotify are playing, to control playback from the Dynamic Island, and to ask Finder to move to the Trash a leftover folder that macOS does not let other apps move.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>Zenith shows your next calendar event in the Dynamic Island when you turn on the Calendar widget. Events are only read on this Mac.</string>
     <key>NSCalendarsUsageDescription</key>
@@ -100,20 +112,13 @@ EOF
 echo "==> Stamping version $VERSION (build $BUILD)..."
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $BUILD" "$CONTENTS_DIR/Info.plist"
 
-echo "==> Performing ad-hoc code signature..."
-codesign --force --deep --sign - "$APP_DIR"
-
-echo "==> Mirroring to GoldenGate.app for backwards compatibility..."
-rm -rf "$PROJECT_ROOT/GoldenGate.app"
-cp -R "$APP_DIR" "$PROJECT_ROOT/GoldenGate.app"
-# Also provide GoldenGateApp executable in GoldenGate.app for legacy scripts
-cp "$MACOS_DIR/Zenith" "$PROJECT_ROOT/GoldenGate.app/Contents/MacOS/GoldenGateApp"
-codesign --force --deep --sign - "$PROJECT_ROOT/GoldenGate.app"
+# "Zenith Local Signing" (scripts/setup_signing.sh) if this Mac has it, so permissions survive rebuilds; ad hoc otherwise.
+# Signs the adapter library first (perl refuses to load it unsigned), then the app, and verifies both.
+"$SCRIPT_DIR/sign_app.sh" "$APP_DIR"
 
 echo "==> Registering with macOS LaunchServices & refreshing icon cache..."
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_DIR" || true
 touch "$APP_DIR"
-touch "$PROJECT_ROOT/GoldenGate.app"
 
 echo "==> Zenith.app created successfully at: $APP_DIR"
 echo "==> You can now launch it via: open Zenith.app"

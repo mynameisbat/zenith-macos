@@ -235,6 +235,9 @@ public struct IslandAlert: Identifiable, Sendable, Equatable {
     public let subtitle: String?
     public let tintColor: Color?
     public let timestamp: Date
+    /// Set for a volume or brightness reading: the island draws a bar from 0 to 1 instead of text.
+    public let level: Double?
+    public let levelKind: IslandLevelKind?
 
     public init(
         id: UUID = UUID(),
@@ -242,7 +245,9 @@ public struct IslandAlert: Identifiable, Sendable, Equatable {
         title: String,
         subtitle: String? = nil,
         tintColor: Color? = nil,
-        timestamp: Date = Date()
+        timestamp: Date = Date(),
+        level: Double? = nil,
+        levelKind: IslandLevelKind? = nil
     ) {
         self.id = id
         self.icon = icon
@@ -250,6 +255,8 @@ public struct IslandAlert: Identifiable, Sendable, Equatable {
         self.subtitle = subtitle
         self.tintColor = tintColor
         self.timestamp = timestamp
+        self.level = level
+        self.levelKind = levelKind
     }
 
     /// Dynamic theme color for this alert HUD (e.g. green for MagSafe charging, amber for low battery).
@@ -272,6 +279,8 @@ public final class ZenithIslandState: ObservableObject {
 
     @Published public var isExpanded: Bool = false
     @Published public var isHovered: Bool = false
+    /// The closed island is drawn slightly larger: the pointer is on it and it is about to open.
+    @Published public var isHoverEmphasized: Bool = false
     @Published public var isDropTargeted: Bool = false
     @Published public var isDraggingOut: Bool = false
     @Published public var isEnabled: Bool = true
@@ -290,11 +299,37 @@ public final class ZenithIslandState: ObservableObject {
     @Published public var showsCalendarWidget: Bool = false
     @Published public var showsNetworkWidget: Bool = false
 
+    // Behaviour (written by `IslandWidgetSettings`).
+    /// Volume and brightness changes show as a bar on the island.
+    public var showsLevelHUD: Bool = true
+    /// Swipes on the island open, close and change track.
+    public var allowsScrollGestures: Bool = true
+    /// The island steps aside while a full-screen app has the display.
+    @Published public var hidesInFullscreen: Bool = true
+    /// A full-screen app has the display and the island is out of the way: nothing is drawn and hover does nothing.
+    @Published public private(set) var isHiddenForFullscreen: Bool = false
+
     /// Whether the expanded island has a Widgets tab.
     public var showsWidgets: Bool {
         showsTimerWidget || showsCalendarWidget || showsNetworkWidget
     }
 
+    /// How long the pointer must stay on the closed island before it opens, so a pointer that only crosses the menu
+    /// bar does not throw it open. Zero opens at once. Set from `IslandWidgetSettings.hoverOpenDelay`.
+    public var hoverOpenDelay: TimeInterval = 0.25
+    /// Whether the user asked macOS to reduce motion; the closed island then does not swell under the pointer.
+    public var prefersReducedMotion: @MainActor () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+
+    /// Set when the island was closed by hand with the pointer still on it: hover must not throw it open again
+    /// until the pointer has left.
+    public private(set) var isHoverSuppressed = false
+
+    /// Growing, the island swings a little past its size and settles; shrinking, it goes straight to the notch it
+    /// hugs and never past it.
+    public static let openingAnimation = Animation.spring(response: 0.42, dampingFraction: 0.74)
+    public static let closingAnimation = Animation.spring(response: 0.28, dampingFraction: 1)
+
+    private var hoverOpenTask: Task<Void, Never>?
     private var collapseTimer: Task<Void, Never>?
     private var dragOutTimer: Task<Void, Never>?
     private var rimLightFadeTask: Task<Void, Never>?
@@ -385,6 +420,63 @@ public final class ZenithIslandState: ObservableObject {
         }
     }
 
+    /// Shows a volume or brightness level as a bar for a moment. A level of the same kind already showing is
+    /// updated in place, so holding the key moves the bar instead of replaying the alert.
+    public func showLevel(_ kind: IslandLevelKind, level: Double, isMuted: Bool = false) {
+        guard isEnabled, showsLevelHUD, !isHiddenForFullscreen, level.isFinite else { return }
+        let clamped = min(max(level, 0), 1)
+        alertDismissWorkItem?.cancel()
+        alertDismissTask?.cancel()
+
+        let isUpdate = activeAlert?.levelKind == kind
+        let alert = IslandAlert(
+            id: isUpdate ? activeAlert?.id ?? UUID() : UUID(),
+            icon: kind.icon(level: clamped, isMuted: isMuted),
+            title: kind.title,
+            tintColor: .white,
+            level: isMuted ? 0 : clamped,
+            levelKind: kind
+        )
+        if isUpdate {
+            activeAlert = alert
+        } else {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                activeAlert = alert
+                isRimLightVisible = true
+            }
+        }
+
+        alertDismissTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            guard let self = self, !Task.isCancelled else { return }
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                self.activeAlert = nil
+                if !self.isExpanded {
+                    self.isRimLightVisible = false
+                }
+            }
+        }
+    }
+
+    /// Takes the island off the display while a full-screen app has it, and brings it back afterwards.
+    public func setHiddenForFullscreen(_ hidden: Bool) {
+        guard hidden != isHiddenForFullscreen else { return }
+        if hidden {
+            hoverOpenTask?.cancel()
+            hoverOpenTask = nil
+            collapseTimer?.cancel()
+            collapseTimer = nil
+            isHovered = false
+            isHoverEmphasized = false
+            isHoverSuppressed = false
+            if !isDropTargeted, !isDraggingOut, previewItem == nil {
+                isExpanded = false
+                isRimLightVisible = false
+            }
+        }
+        isHiddenForFullscreen = hidden
+    }
+
     /// Immediately cancels and dismisses any active transient alert HUD.
     public func dismissAlert() {
         alertDismissWorkItem?.cancel()
@@ -399,40 +491,126 @@ public final class ZenithIslandState: ObservableObject {
         }
     }
 
+    /// The pointer reached the island. An open island stays open; a closed one swells at once and opens after
+    /// `hoverOpenDelay` if the pointer is still there. A file dragged onto it opens it without waiting.
     public func onMouseEnter() {
+        guard !isHiddenForFullscreen else { return }
         collapseTimer?.cancel()
         collapseTimer = nil
         rimLightFadeTask?.cancel()
         rimLightFadeTask = nil
         isHovered = true
 
-        if !isExpanded {
+        guard !isExpanded else {
+            if !isRimLightVisible { scheduleRimLight() }
+            return
+        }
+        guard hoverOpenDelay > 0, !isDropTargeted else {
+            open()
+            return
+        }
+        guard !isHoverSuppressed, hoverOpenTask == nil else { return }
+        if !prefersReducedMotion() {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                isHoverEmphasized = true
+            }
+        }
+        let nanos = UInt64(hoverOpenDelay * 1_000_000_000)
+        hoverOpenTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: nanos)
+            guard let self = self, !Task.isCancelled else { return }
+            self.hoverOpenTask = nil
+            // The pointer may have gone while this waited.
+            guard self.isHovered else { return }
+            self.open()
+        }
+    }
+
+    /// Opens the island now, as a click on it does. Leaving with the pointer closes it again.
+    public func open() {
+        hoverOpenTask?.cancel()
+        hoverOpenTask = nil
+        collapseTimer?.cancel()
+        collapseTimer = nil
+        isHovered = true
+        isHoverEmphasized = false
+        isHoverSuppressed = false
+        guard !isExpanded else { return }
+        isRimLightVisible = false
+        withAnimation(Self.openingAnimation) {
+            isExpanded = true
+        }
+        scheduleRimLight()
+    }
+
+    /// Closes the island now, as a swipe up on it does. The pointer is usually still on it, so hover stays quiet
+    /// until `pointerLeft()`. An island that is holding a dragged file or a preview stays open.
+    public func close() {
+        guard isExpanded, !isDropTargeted, !isDraggingOut, previewItem == nil else { return }
+        hoverOpenTask?.cancel()
+        hoverOpenTask = nil
+        collapseTimer?.cancel()
+        collapseTimer = nil
+        rimLightFadeTask?.cancel()
+        rimLightFadeTask = nil
+        isHovered = false
+        isHoverEmphasized = false
+        isHoverSuppressed = true
+        withAnimation(Self.closingAnimation) {
             isRimLightVisible = false
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                isExpanded = true
-            }
-            // Delay rim light fade-in until expansion morph has fully settled (280ms)
-            // This ensures NO border is ever exposed or visible during the morph or on quick re-hover
-            rimLightFadeTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 280_000_000)
-                guard let self = self, !Task.isCancelled, self.isExpanded else { return }
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    self.isRimLightVisible = true
-                }
-            }
-        } else if !isRimLightVisible {
-            rimLightFadeTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 280_000_000)
-                guard let self = self, !Task.isCancelled, self.isExpanded else { return }
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    self.isRimLightVisible = true
-                }
+            isExpanded = false
+        }
+    }
+
+    /// The pointer is off the island: hover works again.
+    public func pointerLeft() {
+        isHoverSuppressed = false
+    }
+
+    /// Whether a left click should open the closed island now instead of waiting out `hoverOpenDelay`: the pointer
+    /// is on the island as it is drawn, the island is closed and showing (not hidden for full screen, no notice on
+    /// it). A click anywhere else is not the island's and must reach whatever is under it.
+    public func opensOnClick(pointerOnIsland: Bool) -> Bool {
+        pointerOnIsland && isEnabled && isHovered && !isExpanded && !isHiddenForFullscreen
+            && activeAlert == nil && !isDraggingOut
+    }
+
+    /// A left click at the pointer. Opens the closed island and returns true when `opensOnClick` allows it, so the
+    /// caller can keep the click; otherwise changes nothing and returns false.
+    @discardableResult
+    public func handleClick(pointerOnIsland: Bool) -> Bool {
+        guard opensOnClick(pointerOnIsland: pointerOnIsland) else { return false }
+        open()
+        return true
+    }
+
+    /// Waits for a hover opening in flight, if any. For tests.
+    func waitForHoverOpening() async {
+        await hoverOpenTask?.value
+    }
+
+    /// The rim light fades in only once the opening morph has settled (280 ms), so no border shows during the morph
+    /// or on a quick re-hover.
+    private func scheduleRimLight() {
+        rimLightFadeTask?.cancel()
+        rimLightFadeTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 280_000_000)
+            guard let self = self, !Task.isCancelled, self.isExpanded else { return }
+            withAnimation(.easeInOut(duration: 0.22)) {
+                self.isRimLightVisible = true
             }
         }
     }
 
     public func onMouseLeave() {
         isHovered = false
+        hoverOpenTask?.cancel()
+        hoverOpenTask = nil
+        if isHoverEmphasized {
+            withAnimation(.spring(response: 0.26, dampingFraction: 1)) {
+                isHoverEmphasized = false
+            }
+        }
         // Never collapse or hide rim light if user is currently interacting with an item preview
         guard previewItem == nil else { return }
 
@@ -449,7 +627,7 @@ public final class ZenithIslandState: ObservableObject {
             try? await Task.sleep(nanoseconds: 300_000_000) // 300ms grace period
             guard let self = self, !Task.isCancelled else { return }
             if self.isCompletelyIdle && self.isExpanded {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                withAnimation(Self.closingAnimation) {
                     self.isExpanded = false
                 }
             }

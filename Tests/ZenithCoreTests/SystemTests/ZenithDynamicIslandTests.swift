@@ -58,7 +58,8 @@ struct ZenithDynamicIslandTests {
         #expect(!state.isHovered)
         #expect(!state.isDropTargeted)
 
-        // Mouse enter should trigger expansion
+        // Mouse enter should trigger expansion (at once here; the wait before opening is IslandHoverTests')
+        state.hoverOpenDelay = 0
         state.onMouseEnter()
         #expect(state.isHovered)
         #expect(state.isExpanded)
@@ -127,6 +128,7 @@ struct ZenithDynamicIslandTests {
     @MainActor
     func testRapidHoverRaceConditionHandling() async {
         let state = ZenithIslandState()
+        state.hoverOpenDelay = 0     // this test is about closing; the wait before opening is IslandHoverTests'
 
         // 1. Enter
         state.onMouseEnter()
@@ -172,6 +174,7 @@ struct ZenithDynamicIslandTests {
     @MainActor
     func testDragOutLifecycle() {
         let state = ZenithIslandState()
+        state.hoverOpenDelay = 0     // opened at once, as a click does
         #expect(!state.isDraggingOut)
 
         // Enter and begin drag out
@@ -346,7 +349,7 @@ struct ZenithDynamicIslandTests {
     @MainActor
     func testActiveAlertStatePriority() {
         let state = ZenithIslandState()
-        state.onMouseEnter()
+        state.open()
         #expect(state.isExpanded == true)
 
         state.triggerAlert(icon: "doc.on.clipboard", title: "Copied Snippet", duration: 0.2)

@@ -66,6 +66,15 @@ enum ScreenshotRenderer {
         save("island-widgets", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
         island.isExpanded = false
         save("island-timer", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: 40))
+        // The same closed island with the pointer on it, before it opens.
+        island.isHoverEmphasized = true
+        save("island-timer-hover", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: 40))
+        island.isHoverEmphasized = false
+        // A volume change, as the island shows it.
+        island.focusTimer = nil
+        island.showLevel(.volume, level: 0.62)
+        save("island-volume", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
+        island.dismissAlert()
         island.focusTimer = nil
         island.upcomingEvent = nil
         island.showsTimerWidget = false
@@ -152,6 +161,26 @@ enum ScreenshotRenderer {
 
         // Settings panes that only show settings (Cleaner and Privacy Shield read this Mac, so they are left out).
         // Permissions and login item are stand-ins, so the picture does not depend on this Mac either.
+        // Clipboard privacy is a setting too, but its list of ignored apps is this Mac's: show the built-in defaults
+        // from a throwaway store that is never saved and has no pasteboard monitor behind it.
+        let renderDefaultsName = "zenith.render-screenshots.\(UUID().uuidString)"
+        let renderDefaults = UserDefaults(suiteName: renderDefaultsName) ?? .standard
+        defer { renderDefaults.removePersistentDomain(forName: renderDefaultsName) }
+        let renderClipboardPrivacy = ClipboardPrivacySettings(userDefaults: renderDefaults, monitor: nil)
+        ClipboardPrivacySettingsSection.settingsProvider = { renderClipboardPrivacy }
+        // Updates: a made-up newer release, a feed and an installer that never touch the network or this Mac, and
+        // settings in the throwaway store (so "Check Automatically" shows its default).
+        let renderUpdater = ZenithUpdater(
+            settings: UpdateSettings(userDefaults: renderDefaults),
+            feed: ScreenshotUpdateFeed(),
+            installer: ScreenshotUpdateInstaller(),
+            autoSchedule: false
+        )
+        renderUpdater.presentForScreenshot(
+            release: ScreenshotUpdateFeed.sampleRelease, refusal: nil, checkedAt: Date().addingTimeInterval(-2 * 60 * 60)
+        )
+        UpdatesSettingsSection.updaterProvider = { renderUpdater }
+
         let settingsModel = SettingsViewModel(
             launchAtLoginService: ScreenshotLoginItem(),
             permissionsService: ScreenshotPermissions()
@@ -226,6 +255,7 @@ private struct ScreenshotPermissions: PermissionsServiceProtocol {
     func requestAccessibilityPermission() -> Bool { false }
     func openScreenRecordingSettings() -> Bool { false }
     func openAccessibilitySettings() -> Bool { false }
+    func calendarAccess() -> CalendarAccessState { .granted }
 }
 
 private struct ScreenshotLoginItem: LaunchAtLoginServiceProtocol {
@@ -233,4 +263,33 @@ private struct ScreenshotLoginItem: LaunchAtLoginServiceProtocol {
     var status: LaunchAtLoginStatus { .enabled }
     func enable() throws {}
     func disable() throws {}
+}
+
+/// Never asks GitHub: the renderer only shows `sampleRelease`.
+private struct ScreenshotUpdateFeed: UpdateFeed {
+    static let sampleRelease = UpdateRelease(
+        version: AppVersion("9.9.0")!,
+        tag: "v9.9.0",
+        assetName: "Zenith-9.9.0.dmg",
+        downloadURL: URL(string: "https://github.com/mynameisbat/zenith-macos/releases/download/v9.9.0/Zenith-9.9.0.dmg")!,
+        assetSize: 4_000_000,
+        sha256: nil
+    )
+
+    func latestRelease() async throws -> UpdateRelease? { Self.sampleRelease }
+}
+
+/// Installs nothing and reads nothing: the picture always shows the Install button.
+private struct ScreenshotUpdateInstaller: UpdateInstalling {
+    struct NotAvailable: Error {}
+
+    func install(_ release: UpdateRelease, progress: @escaping @Sendable (UpdateInstallProgress) -> Void) async throws -> URL {
+        throw NotAvailable()
+    }
+
+    func downloadForManualInstall(_ release: UpdateRelease, progress: @escaping @Sendable (Double?) -> Void) async throws -> URL {
+        throw NotAvailable()
+    }
+
+    func automaticInstallRefusal() -> UpdateInstallRefusal? { nil }
 }

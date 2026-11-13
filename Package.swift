@@ -29,6 +29,12 @@ let package = Package(
         .executable(
             name: "Zenith",
             targets: ["ZenithApp"]
+        ),
+        // Loaded into /usr/bin/perl to read the system's Now Playing (see the target below). Never linked into the app.
+        .library(
+            name: "ZenithNowPlayingAdapter",
+            type: .dynamic,
+            targets: ["ZenithNowPlayingAdapter"]
         )
     ],
     dependencies: [],
@@ -46,6 +52,14 @@ let package = Package(
                 "ZenithCore"
             ],
             path: "Sources/ZenithApp"
+        ),
+        // C-callable glue around the private MediaRemote framework. It runs inside a perl process, on its own, so it
+        // uses the Swift 5 language mode: its state is guarded by one serial queue rather than by actor isolation.
+        .target(
+            name: "ZenithNowPlayingAdapter",
+            dependencies: [],
+            path: "Sources/ZenithNowPlayingAdapter",
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         // Modern Swift Testing test suites (Tiers 1-4)
         .testTarget(

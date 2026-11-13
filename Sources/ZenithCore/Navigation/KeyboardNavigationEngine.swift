@@ -137,15 +137,22 @@ public final class ClipboardHistoryViewModel: ObservableObject {
         selectItem(item)
     }
 
-    public func selectItem(_ item: ClipboardItem) {
+    /// Pastes the item at `index` as plain text or as a cleaned link (falls back to the item itself when the
+    /// variant does not apply, e.g. plain text of an image).
+    public func selectItem(at index: Int, variant: ClipboardPasteVariant) {
+        guard index >= 0, index < filteredItems.count else { return }
+        selectItem(filteredItems[index], variant: variant)
+    }
+
+    public func selectItem(_ item: ClipboardItem, variant: ClipboardPasteVariant = .original) {
         if let store = store {
             // 1. Authoritative store bumps item to index 0 with new timestamp and copies to pasteboard
-            store.selectAndRestoreItem(item)
+            store.selectAndRestoreItem(item, variant: variant)
             // 2. Immediately reflect updated recency ordering locally
             self.items = store.items
         } else {
             // Standalone fallback: copy to pasteboard and bump locally
-            pasteboardService.copyItemToPasteboard(item)
+            pasteboardService.copyItemToPasteboard(item.pasteboardItem(for: variant) ?? item)
             if let idx = items.firstIndex(where: { $0.id == item.id }) {
                 let existing = items.remove(at: idx)
                 let bumped = ClipboardItem(
@@ -414,6 +421,14 @@ public final class KeyboardNavigationEngine {
                 viewModel.navigateUp()
                 return true
             }
+        }
+
+        // 5a. Shift + Return: paste as plain text (the history item keeps its formatting)
+        if relevantModifiers == [.shift] && (keyCode == KeyCodes.returnKey || keyCode == KeyCodes.keypadEnter) {
+            if !viewModel.filteredItems.isEmpty {
+                viewModel.selectItem(at: viewModel.selectedIndex, variant: .plainText)
+            }
+            return true
         }
 
         // 6. Check Navigation & Selection (Zero modifiers)

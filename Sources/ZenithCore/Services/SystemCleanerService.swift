@@ -209,7 +209,9 @@ public final class SystemCleanerService: ObservableObject {
 
     // MARK: - Scanning Logic
 
-    public func scan() async {
+    /// - Parameter priority: The priority of the detached task that walks the disk. A scheduled scan passes a low one
+    ///   (`CleanerScanScheduler`); a scan the user asked for keeps `.userInitiated`.
+    public func scan(priority: TaskPriority = .userInitiated) async {
         guard !isScanning && !isCleaning else { return }
         isScanning = true
         statusMessage = String(localized: "Analyzing system storage...")
@@ -217,7 +219,7 @@ public final class SystemCleanerService: ObservableObject {
         refreshDiskSpace()
 
         let homeOverride = self.homeOverride
-        let scannedCategories = await Task.detached(priority: .userInitiated) { () -> [JunkCategory] in
+        let scannedCategories = await Task.detached(priority: priority) { () -> [JunkCategory] in
             let fm = FileManager.default
             let home = homeOverride ?? fm.homeDirectoryForCurrentUser.path
             var result: [JunkCategory] = []

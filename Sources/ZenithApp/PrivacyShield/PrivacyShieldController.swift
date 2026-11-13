@@ -117,7 +117,9 @@ public final class PrivacyShieldController: ObservableObject {
     public func stop() async {
         // Put the user's proxy settings back before the listener goes away, so traffic is never aimed at a dead port.
         let restored = await SystemProxyManager.shared.disableProxy()
-        LocalProxyServer.shared.stop()
+        // New connections now go direct; let the tunnels other apps already hold finish instead of cutting them.
+        // Quitting still closes them (applicationWillTerminate calls `stop()`, and the process ends anyway).
+        LocalProxyServer.shared.stop(gracePeriod: restored ? 30 : 0)
         self.isRunning = false
         statistics.isActive = false
 

@@ -34,7 +34,8 @@ public final class ToastHUDController: NSObject {
     public func show(verbatim message: String, icon: String = "checkmark.circle.fill", subtitle: String? = nil) {
         dismissWorkItem?.cancel()
 
-        if ZenithIslandState.shared.isEnabled {
+        // A full-screen app has taken the island off the display; the floating panel still shows there.
+        if ZenithIslandState.shared.isEnabled, !ZenithIslandState.shared.isHiddenForFullscreen {
             // The island alert is read aloud by `triggerAlert`.
             ZenithIslandState.shared.triggerAlert(icon: icon, title: message, subtitle: subtitle)
             if let panel = panel, panel.isVisible {

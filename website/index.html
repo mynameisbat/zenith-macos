@@ -118,6 +118,9 @@
               <li>Previews text, images, links and color codes</li>
               <li>Skips items that password managers mark as concealed</li>
               <li>Bounded: 25 MB per item, 256 MB in total</li>
+              <li>Copies made in apps you choose are not kept (common password managers are on the list by default)</li>
+              <li>Optional: empty the system clipboard after a delay, and when the Mac locks or sleeps</li>
+              <li>Paste as plain text with <kbd>⇧↵</kbd>, or paste a link without its tracking parameters</li>
               <li>Global hotkeys need no Accessibility permission</li>
             </ul>
           </article>
@@ -131,10 +134,13 @@
             <p>Now Playing for Music, Spotify and browser audio, a focus timer and your next calendar event, a charging HUD, and a shelf to park files and snippets at the top of the screen.</p>
             <ul>
               <li>A running timer stays beside the notch</li>
+              <li>Resting the pointer on it opens it after a short delay you can set; a click opens it at once, and a swipe can open it, close it or change track</li>
+              <li>Hides while an app is full screen on its display; notices then use a floating panel</li>
+              <li>Next and previous are dimmed when the player does not take them, and the progress bar seeks when it can</li>
               <li>Calendar access is asked only when you turn that widget on</li>
-              <li>Chrome-family browsers and Safari are detected from the audio they hold open</li>
-              <li>Tab titles for known media sites; other sites show the browser name</li>
-              <li>Browser controls need Accessibility</li>
+              <li>Browser audio is read from the system's Now Playing: title, artist, artwork and position</li>
+              <li>A browser is shown under the browser's name, whatever the site</li>
+              <li>Playback controls need no permission; a media-key fallback needs Accessibility</li>
             </ul>
           </article>
 
@@ -150,6 +156,7 @@
             <p>Scan caches, build folders, old installers, deleted apps' leftovers and junk on external drives; uninstall or slim an app by dropping it on the shelf; quit heavy processes.</p>
             <ul>
               <li>Every deletion shows what goes and waits for you</li>
+              <li>Optional scheduled scan: it only scans, never deletes, and tells you once when at least 1 GB can be cleaned</li>
               <li>Docker Desktop's virtual disk is never offered</li>
               <li>Uninstall and slim send the originals to the Trash</li>
             </ul>
@@ -165,6 +172,7 @@
               <li>Cloudflare, Google, Quad9, AdGuard, NextDNS or your own</li>
               <li>Optional tracker blocking: a built-in list, or import a hosts file</li>
               <li>Your previous proxy settings are saved and restored, even if Zenith is killed</li>
+              <li>Switching it off lets connections that are already open finish, for up to 30 seconds</li>
               <li>Not a VPN: your IP address is not hidden</li>
             </ul>
           </article>
@@ -300,8 +308,8 @@
             <p>Folders of deleted apps are only offered when they look like a bundle identifier, no same-vendor app is installed and nothing has touched them for 30 days. Nothing is ticked for you, because they can hold data you would want back.</p>
           </div>
           <div>
-            <h3>Browser support is uneven</h3>
-            <p>Tab titles work for Safari and Chromium browsers. Firefox has no AppleScript, so the island shows only its name, and Firefox audio detection has not been tried.</p>
+            <h3>Browser audio rests on a workaround</h3>
+            <p>macOS 15.4 and later give Now Playing data only to Apple's own programs, so Zenith reads it through the system's <code>perl</code>. It has been tried with Chrome; Safari and Firefox have not been tried. If Apple closes this, only Music and Spotify will show.</p>
           </div>
           <div>
             <h3>Tested on macOS 15 and 27</h3>
@@ -315,6 +323,7 @@
     <section class="section alt" id="permissions">
       <div class="wrap">
         <h2>Permissions, and why</h2>
+        <p class="section-lead">Settings has a Permissions page with one card for each: its state, what it is for, and what still works without it. It never asks for a permission itself.</p>
         <div class="perms">
           <div>
             <h3>Screen Recording <span class="tag need">needed for capture</span></h3>
@@ -322,11 +331,15 @@
           </div>
           <div>
             <h3>Accessibility <span class="tag opt">optional</span></h3>
-            <p>Lets Zenith press <kbd>⌘V</kbd> to paste for you and send the media keys that control a browser tab. Without it, items are only copied and the island says how to allow it.</p>
+            <p>Lets Zenith press <kbd>⌘V</kbd> to paste for you and send a media key when macOS refuses a playback command from the island. Without it, items are only copied and the island says how to allow it.</p>
           </div>
           <div>
             <h3>Automation <span class="tag opt">optional</span></h3>
-            <p>Lets Zenith control Music and Spotify and read the front tab of Safari and Chromium browsers for the track title. macOS asks once per app.</p>
+            <p>Lets Zenith control Music and Spotify, read Music's artwork, and ask Finder to move protected leftovers to the Trash. macOS asks once per app.</p>
+          </div>
+          <div>
+            <h3>Calendars <span class="tag opt">optional</span></h3>
+            <p>Only for the island's calendar widget. macOS asks when you turn the widget on, never before.</p>
           </div>
         </div>
       </div>
@@ -361,7 +374,7 @@ open Zenith.app</code></pre>
 
   <footer class="foot">
     <div class="wrap foot-row">
-      <span class="brand small"><img src="assets/app-icon.png" width="20" height="20" alt=""> Zenith 2.4.0</span>
+      <span class="brand small"><img src="assets/app-icon.png" width="20" height="20" alt=""> Zenith 2.5.0</span>
       <span>MIT licensed · Made for macOS</span>
       <span class="foot-links">
         <a href="https://github.com/mynameisbat/zenith-macos">Source</a>

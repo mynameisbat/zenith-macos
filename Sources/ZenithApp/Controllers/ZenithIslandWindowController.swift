@@ -270,6 +270,12 @@ public final class ZenithIslandWindowController: NSObject {
     private var collapseTask: Task<Void, Never>?
     private var globalMouseMonitor: Any?
     private var localMouseMonitor: Any?
+    private var globalScrollMonitor: Any?
+    private var fullscreenObservers: [NSObjectProtocol] = []
+    private var localScrollMonitor: Any?
+    private var localClickMonitor: Any?
+    private var lastPointerCoverCheck: TimeInterval = 0
+    private var scrollGesture = IslandScrollGesture()
     private let mouseStateLock = NSLock()
     private var isIgnoringMouseEvents: Bool = true
 
@@ -320,6 +326,11 @@ public final class ZenithIslandWindowController: NSObject {
             prev.0 == curr.0 && prev.1 == curr.1 && prev.2 == curr.2
         }
         .sink { [weak self] isExpanded, activeAlert, isDropTargeted in
+            // A notice is about to be drawn: make sure no app has taken the display meanwhile (a game gone full screen
+            // without a Space change), or it would be drawn over the game.
+            if activeAlert != nil, ZenithIslandState.shared.activeAlert == nil {
+                Task { @MainActor [weak self] in self?.updateFullscreenVisibility() }
+            }
             self?.handleStateChange(
                 isExpanded: isExpanded,
                 hasActiveAlert: activeAlert != nil,
@@ -414,35 +425,178 @@ public final class ZenithIslandWindowController: NSObject {
             return event
         }
 
+        // Swipes on the island: down opens it, up closes it, sideways changes track. Scroll events reach a global
+        // monitor without any permission, and reading them does not take them from the app under the pointer.
+        self.globalScrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            let sample = Self.scrollSample(from: event)
+            let mouseLoc = NSEvent.mouseLocation
+            Task { @MainActor [weak self] in
+                self?.handleScroll(sample, screenPoint: mouseLoc)
+            }
+        }
+        self.localScrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            self?.handleScroll(Self.scrollSample(from: event), screenPoint: NSEvent.mouseLocation)
+            return event
+        }
+
+        // A click on the closed island opens it without waiting out the hover delay. The panel only takes clicks
+        // while the pointer is on the island as drawn (`handleMouseMoved`), and this looks only at clicks that reached
+        // the panel, so a click anywhere else (menu bar, windows underneath) is never seen here, let alone kept.
+        self.localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            guard let self = self, let panel = self.panel, event.window === panel else { return event }
+            let point = panel.convertPoint(toScreen: event.locationInWindow)
+            let opened = ZenithIslandState.shared.handleClick(pointerOnIsland: self.activeScreenRect.contains(point))
+            return opened ? nil : event
+        }
+
         handleMouseMoved(screenPoint: NSEvent.mouseLocation)
 
         // Start system media & battery monitoring for Dynamic Island
         NowPlayingService.shared.startMonitoring()
         PowerSourceMonitorService.shared.startMonitoring()
         IslandWidgetsCoordinator.shared.start()
+        IslandLevelHUDService.shared.start()
+
+        // Step aside for a full-screen app. A Space change is reported as it starts, so look again once it has landed;
+        // an app that covers the screen with its own window (a game) often does so a moment after it comes forward,
+        // so look once more after that. There is no notification for a window growing, see `recheckCoverNearPointer`.
+        let workspace = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.activeSpaceDidChangeNotification, NSWorkspace.didActivateApplicationNotification] {
+            let token = workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.updateFullscreenVisibility()
+                    try? await Task.sleep(nanoseconds: 600_000_000)
+                    self?.updateFullscreenVisibility()
+                    try? await Task.sleep(nanoseconds: 1_400_000_000)
+                    self?.updateFullscreenVisibility()
+                }
+            }
+            fullscreenObservers.append(token)
+        }
+        ZenithIslandState.shared.$hidesInFullscreen
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                // The new value is published before it is stored.
+                Task { @MainActor [weak self] in self?.updateFullscreenVisibility() }
+            }
+            .store(in: &cancellables)
+        updateFullscreenVisibility()
+    }
+
+    /// Hides the island while the Space in front on its display belongs to a full-screen app, or while the frontmost
+    /// app covers that display with a window of its own (menu-bar strip included).
+    private func updateFullscreenVisibility() {
+        guard let panel = panel else { return }
+        let state = ZenithIslandState.shared
+        let screen = NSScreen.screens.first { $0.frame == geometry.screenFrame }
+        let display = screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+        var hide = false
+        if state.hidesInFullscreen, let display {
+            hide = FullscreenSpaceProbe.currentSpaceIsFullscreen(onDisplay: display)
+                || FullscreenWindowProbe.frontmostAppCoversDisplay(display)
+        }
+        guard hide != state.isHiddenForFullscreen else { return }
+        state.setHiddenForFullscreen(hide)
+        panel.alphaValue = hide ? 0 : 1
+        handleMouseMoved(screenPoint: NSEvent.mouseLocation)
     }
 
     /// Evaluates cursor position to toggle mouse click passthrough.
+    /// The island as it is drawn now, in screen coordinates: what the pointer can hover, click and swipe.
+    private var activeScreenRect: CGRect {
+        let state = ZenithIslandState.shared
+        if state.isExpanded || state.isDropTargeted {
+            return geometry.expandedFrame
+        } else if state.activeAlert != nil {
+            return geometry.alertFrame
+        } else if state.hasCompactActivity {
+            return geometry.compactActivityFrame(showsTimer: state.focusTimer != nil)
+        } else {
+            return geometry.idleFrame
+        }
+    }
+
+    /// Distances in the direction the fingers moved, whatever the "natural scrolling" setting is.
+    nonisolated private static func scrollSample(from event: NSEvent) -> IslandScrollGesture.Sample {
+        let phase: IslandScrollGesture.Phase
+        if !event.momentumPhase.isEmpty {
+            phase = .momentum
+        } else if event.phase.contains(.began) || event.phase.contains(.mayBegin) {
+            phase = .began
+        } else if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
+            phase = .ended
+        } else if event.phase.contains(.changed) {
+            phase = .changed
+        } else {
+            phase = .none
+        }
+        // A wheel reports lines, a trackpad points.
+        let scale = event.hasPreciseScrollingDeltas ? 1.0 : 10.0
+        let direction = event.isDirectionInvertedFromDevice ? 1.0 : -1.0
+        return IslandScrollGesture.Sample(
+            fingersRight: Double(event.scrollingDeltaX) * scale * direction,
+            fingersDown: Double(event.scrollingDeltaY) * scale * direction,
+            phase: phase,
+            timestamp: event.timestamp
+        )
+    }
+
+    private func handleScroll(_ sample: IslandScrollGesture.Sample, screenPoint: NSPoint) {
+        let state = ZenithIslandState.shared
+        guard state.isEnabled, state.allowsScrollGestures, !state.isHiddenForFullscreen, panel != nil,
+              state.activeAlert == nil, activeScreenRect.contains(screenPoint) else { return }
+
+        // Sideways belongs to the shelf when it is showing: its items scroll that way.
+        let showsPlayer = !state.isExpanded || state.activeTab == .nowPlaying
+        let allowsTrackChange = state.nowPlayingTrack != nil && showsPlayer
+        guard let action = scrollGesture.handle(sample, isExpanded: state.isExpanded, allowsTrackChange: allowsTrackChange) else {
+            return
+        }
+        switch action {
+        case .open:
+            state.open()
+        case .close:
+            state.close()
+        case .nextTrack:
+            guard state.nowPlayingTrack?.canSkipNext == true else { return }
+            NowPlayingService.shared.nextTrack()
+        case .previousTrack:
+            guard state.nowPlayingTrack?.canSkipPrevious == true else { return }
+            NowPlayingService.shared.previousTrack()
+        }
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
+    }
+
+    /// An app can take the whole display while it stays in front (a game switching to full screen), and nothing
+    /// reports that. The pointer coming near the island is when it matters, so look then, at most twice a second;
+    /// the move monitors call `handleMouseMoved` only near the island, so this costs nothing elsewhere.
+    private func recheckCoverNearPointer(_ screenPoint: NSPoint) {
+        guard ZenithIslandState.shared.hidesInFullscreen,
+              geometry.idleFrame.insetBy(dx: -30, dy: -30).contains(screenPoint) else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastPointerCoverCheck >= 0.5 else { return }
+        lastPointerCoverCheck = now
+        updateFullscreenVisibility()
+    }
+
     public func handleMouseMoved(screenPoint: NSPoint) {
         guard let panel = panel else { return }
         let state = ZenithIslandState.shared
+        recheckCoverNearPointer(screenPoint)
+
+        // Out of the way of a full-screen app: nothing to hover, and every click goes to that app.
+        if state.isHiddenForFullscreen {
+            if !panel.ignoresMouseEvents { panel.ignoresMouseEvents = true }
+            mouseStateLock.lock()
+            isIgnoringMouseEvents = true
+            mouseStateLock.unlock()
+            return
+        }
 
         // If the user is currently hovering or interacting with the floating preview card,
         // keep the island engaged and don't trigger mouse leave.
         if let previewFrame = IslandPreviewWindowController.shared.currentFrame, previewFrame.contains(screenPoint) {
             return
-        }
-
-        // Determine current interactive bounds in screen coordinates
-        let activeScreenRect: CGRect
-        if state.isExpanded || state.isDropTargeted {
-            activeScreenRect = geometry.expandedFrame
-        } else if state.activeAlert != nil {
-            activeScreenRect = geometry.alertFrame
-        } else if state.hasCompactActivity {
-            activeScreenRect = geometry.compactActivityFrame(showsTimer: state.focusTimer != nil)
-        } else {
-            activeScreenRect = geometry.idleFrame
         }
 
         let isInside = activeScreenRect.contains(screenPoint)
@@ -466,6 +620,7 @@ public final class ZenithIslandWindowController: NSObject {
             mouseStateLock.lock()
             isIgnoringMouseEvents = true
             mouseStateLock.unlock()
+            state.pointerLeft()
             if state.isEligibleForHoverExpansion {
                 state.onMouseLeave()
             }
@@ -540,6 +695,12 @@ public final class ZenithIslandWindowController: NSObject {
             NSEvent.removeMonitor(monitor)
             globalMouseMonitor = nil
         }
+        for monitor in [globalScrollMonitor, localScrollMonitor, localClickMonitor].compactMap({ $0 }) {
+            NSEvent.removeMonitor(monitor)
+        }
+        globalScrollMonitor = nil
+        localScrollMonitor = nil
+        localClickMonitor = nil
         if let monitor = localMouseMonitor {
             NSEvent.removeMonitor(monitor)
             localMouseMonitor = nil
@@ -547,6 +708,9 @@ public final class ZenithIslandWindowController: NSObject {
         collapseTask?.cancel()
         collapseTask = nil
         cancellables.removeAll()
+        fullscreenObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        fullscreenObservers.removeAll()
+        IslandLevelHUDService.shared.stop()
         NowPlayingService.shared.stopMonitoring()
         PowerSourceMonitorService.shared.stopMonitoring()
         IslandPreviewWindowController.shared.dismiss()

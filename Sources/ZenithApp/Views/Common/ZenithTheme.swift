@@ -92,6 +92,9 @@ public enum ZenithTheme {
         public static let fillHover = Color.white.opacity(0.14)
         public static let fillActive = Color.white.opacity(0.2)
         public static let hairline = Color.white.opacity(0.1)
+        /// How far each side of the closed island moves out, and how far its bottom edge drops, under the pointer.
+        public static let hoverEmphasisSide: CGFloat = 8
+        public static let hoverEmphasisDrop: CGFloat = 5
     }
 }
 

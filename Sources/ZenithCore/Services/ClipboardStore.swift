@@ -262,7 +262,7 @@ public struct FuzzySearchEngine: Sendable {
 /// Concurrency-safe history store managing historical clipboard items.
 /// An `ObservableObject`: view models subscribe to `objectWillChange`.
 public final class ClipboardStore: ObservableObject, @unchecked Sendable {
-    public static let shared = ClipboardStore()
+    public static let shared = ClipboardStore(startsPrivacyFeatures: true)
 
     private let lock = NSLock()
 
@@ -289,19 +289,25 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
 
     private let searchEngine = FuzzySearchEngine()
 
+    /// The app's store also starts the clipboard privacy features (ignored apps, link cleaning, auto-clear) when it
+    /// starts monitoring. Off for every other store, so tests never touch the real clipboard or session.
+    private let startsPrivacyFeatures: Bool
+
     // MARK: - Initializers
 
     public init(
         pasteboardService: PasteboardServiceProtocol = PasteboardMonitor.shared,
         settingsStore: SettingsStore = .shared,
         initialItems: [ClipboardItem] = [],
-        maxTotalBytes: Int = ClipboardLimits.maxTotalBytes
+        maxTotalBytes: Int = ClipboardLimits.maxTotalBytes,
+        startsPrivacyFeatures: Bool = false
     ) {
         self.pasteboardService = pasteboardService
         self.settingsStore = settingsStore
         self.maxTotalBytes = maxTotalBytes
         self._items = initialItems
         self._capacityOverride = nil
+        self.startsPrivacyFeatures = startsPrivacyFeatures
     }
 
     /// Convenience initializer for unit tests with a fixed capacity limit.
@@ -370,6 +376,13 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
 
     /// Connects to the pasteboard service and begins ingestion.
     public func startMonitoring() {
+        if startsPrivacyFeatures, let monitor = pasteboardService as? PasteboardMonitor {
+            Self.onMain {
+                // Loading the settings pushes ignored apps and link cleaning into the monitor.
+                _ = ClipboardPrivacySettings.shared
+                ClipboardAutoClearController.shared.start(observing: monitor)
+            }
+        }
         pasteboardService.startMonitoring { [weak self] item in
             self?.ingest(item)
         }
@@ -378,6 +391,19 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
     /// Stops monitoring the pasteboard service.
     public func stopMonitoring() {
         pasteboardService.stopMonitoring()
+        if startsPrivacyFeatures, let monitor = pasteboardService as? PasteboardMonitor {
+            Self.onMain {
+                ClipboardAutoClearController.shared.stop(observing: monitor)
+            }
+        }
+    }
+
+    private static func onMain(_ work: @escaping @MainActor @Sendable () -> Void) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { work() }
+        } else {
+            DispatchQueue.main.async { work() }
+        }
     }
 
     // MARK: - Ingestion & Mutation
@@ -459,7 +485,8 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
     }
 
     /// Selects an item from history, updates its timestamp to front, and restores to pasteboard.
-    public func selectAndRestoreItem(_ item: ClipboardItem) {
+    /// `variant` writes it as plain text or as a cleaned link instead; the item in the history keeps its content.
+    public func selectAndRestoreItem(_ item: ClipboardItem, variant: ClipboardPasteVariant = .original) {
         lock.lock()
         if let index = _items.firstIndex(where: { $0.id == item.id }) {
             let existing = _items.remove(at: index)
@@ -476,7 +503,7 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
         }
         lock.unlock()
         notifyChange()
-        pasteboardService.copyItemToPasteboard(item)
+        pasteboardService.copyItemToPasteboard(item.pasteboardItem(for: variant) ?? item)
     }
 
     /// Toggles the pinned status of an item.

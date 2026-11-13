@@ -123,6 +123,10 @@ public struct NowPlayingTrack: Identifiable, Sendable, Equatable {
     public let position: TimeInterval
     public let isPlaying: Bool
     public let artworkData: Data?
+    /// What the player lets a remote do. A video has no next track, and only some players take a position.
+    public let canSkipNext: Bool
+    public let canSkipPrevious: Bool
+    public let canSeek: Bool
 
     public init(
         app: NowPlayingApp,
@@ -132,7 +136,10 @@ public struct NowPlayingTrack: Identifiable, Sendable, Equatable {
         duration: TimeInterval = 0,
         position: TimeInterval = 0,
         isPlaying: Bool = true,
-        artworkData: Data? = nil
+        artworkData: Data? = nil,
+        canSkipNext: Bool = true,
+        canSkipPrevious: Bool = true,
+        canSeek: Bool = false
     ) {
         self.id = "\(app.rawValue):\(artist):\(title)"
         self.app = app
@@ -143,6 +150,20 @@ public struct NowPlayingTrack: Identifiable, Sendable, Equatable {
         self.position = max(0, min(position, max(1, duration)))
         self.isPlaying = isPlaying
         self.artworkData = artworkData
+        self.canSkipNext = canSkipNext
+        self.canSkipPrevious = canSkipPrevious
+        self.canSeek = canSeek
+    }
+
+    /// The same track with another position, playing state or artwork.
+    public func replacing(position: TimeInterval? = nil, isPlaying: Bool? = nil, artworkData: Data?? = nil) -> NowPlayingTrack {
+        NowPlayingTrack(
+            app: app, title: title, artist: artist, album: album, duration: duration,
+            position: position ?? self.position,
+            isPlaying: isPlaying ?? self.isPlaying,
+            artworkData: artworkData ?? self.artworkData,
+            canSkipNext: canSkipNext, canSkipPrevious: canSkipPrevious, canSeek: canSeek
+        )
     }
 
     /// Playback progress ratio clamped between 0.0 and 1.0.
@@ -161,7 +182,7 @@ public struct NowPlayingTrack: Identifiable, Sendable, Equatable {
         Self.formatTime(duration)
     }
 
-    private static func formatTime(_ seconds: TimeInterval) -> String {
+    public static func formatTime(_ seconds: TimeInterval) -> String {
         guard seconds > 0 && !seconds.isNaN && !seconds.isInfinite else { return "0:00" }
         let total = Int(seconds)
         let mins = total / 60
@@ -174,6 +195,9 @@ public struct NowPlayingTrack: Identifiable, Sendable, Equatable {
         lhs.isPlaying == rhs.isPlaying &&
         abs(lhs.position - rhs.position) < 2.0 &&
         abs(lhs.duration - rhs.duration) < 1.0 &&
-        lhs.artworkData?.count == rhs.artworkData?.count
+        lhs.artworkData?.count == rhs.artworkData?.count &&
+        lhs.canSkipNext == rhs.canSkipNext &&
+        lhs.canSkipPrevious == rhs.canSkipPrevious &&
+        lhs.canSeek == rhs.canSeek
     }
 }

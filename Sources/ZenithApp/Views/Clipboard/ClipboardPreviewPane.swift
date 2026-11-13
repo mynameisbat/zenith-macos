@@ -28,6 +28,8 @@ final class PreviewImageLoader: ObservableObject {
 struct ClipboardPreviewPane: View {
     let item: ClipboardItem?
     let onPaste: (ClipboardItem) -> Void
+    /// Paste as plain text or as a cleaned link.
+    var onPasteVariant: (ClipboardItem, ClipboardPasteVariant) -> Void = { _, _ in }
     let onTogglePin: (ClipboardItem) -> Void
     let onDelete: (ClipboardItem) -> Void
 
@@ -208,6 +210,20 @@ struct ClipboardPreviewPane: View {
             .controlSize(.regular)
             .help("Paste into the app you were using (Return)")
 
+            if item.offersPasteVariant(.plainText) {
+                ViewThatFits(in: .horizontal) {
+                    plainTextButton(item, iconOnly: false)
+                    plainTextButton(item, iconOnly: true)
+                }
+            }
+
+            if item.offersPasteVariant(.cleanedLink) {
+                ViewThatFits(in: .horizontal) {
+                    cleanLinkButton(item, iconOnly: false)
+                    cleanLinkButton(item, iconOnly: true)
+                }
+            }
+
             if let url = item.linkURL {
                 Button {
                     NSWorkspace.shared.open(url)
@@ -238,5 +254,35 @@ struct ClipboardPreviewPane: View {
             .help("Delete from history (⌘⌫)")
             .accessibilityLabel("Delete")
         }
+    }
+
+    private func plainTextButton(_ item: ClipboardItem, iconOnly: Bool) -> some View {
+        Button {
+            onPasteVariant(item, .plainText)
+        } label: {
+            if iconOnly {
+                Image(systemName: "textformat.size.smaller")
+            } else {
+                Label("Plain Text", systemImage: "textformat.size.smaller")
+            }
+        }
+        .buttonStyle(.bordered)
+        .help("Paste without formatting (Shift-Return)")
+        .accessibilityLabel("Paste as Plain Text")
+    }
+
+    private func cleanLinkButton(_ item: ClipboardItem, iconOnly: Bool) -> some View {
+        Button {
+            onPasteVariant(item, .cleanedLink)
+        } label: {
+            if iconOnly {
+                Image(systemName: "wand.and.stars")
+            } else {
+                Label("Clean Link", systemImage: "wand.and.stars")
+            }
+        }
+        .buttonStyle(.bordered)
+        .help("Paste the link without its tracking parameters")
+        .accessibilityLabel("Paste Clean Link")
     }
 }
