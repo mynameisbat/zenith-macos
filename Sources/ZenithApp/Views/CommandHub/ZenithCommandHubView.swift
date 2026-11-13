@@ -63,6 +63,14 @@ public struct ZenithCommandHubView: View {
                 .padding(.horizontal, 6)
                 .padding(.vertical, 8)
 
+            HubPortsSection(query: trimmedQuery) {
+                SettingsTab.requestSelection(.ports)
+                onClose()
+                onOpenPreferences()
+            }
+            .padding(.horizontal, 6)
+            .padding(.bottom, 8)
+
             sectionDivider
 
             VStack(spacing: 12) {
@@ -85,6 +93,7 @@ public struct ZenithCommandHubView: View {
         .onAppear {
             isSearchFocused = true
             hubState.refreshHardwareSnapshot()
+            PortManagerModel.shared.refresh()
         }
         .onValueChange(of: hubState.presentationID) { _ in
             isSearchFocused = true
