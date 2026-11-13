@@ -43,6 +43,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         ScheduledCleanerScanController.start()  // Cleaner's scheduled scan: off by default, scans only, never deletes
         UpdateController.start()  // daily update check: on by default, installs only after the user's click
+        AIAgentsCoordinator.shared.start()  // AI agents on the island: off by default, reads local logs only
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

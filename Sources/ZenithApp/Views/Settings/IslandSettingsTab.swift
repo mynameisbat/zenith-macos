@@ -71,6 +71,8 @@ public struct IslandSettingsTab: View {
                 }
             }
 
+            AIAgentsSettingsSection()
+
             ZenithSettingsSection("Behavior") {
                 ZenithSettingsRow(
                     "Volume and Brightness",

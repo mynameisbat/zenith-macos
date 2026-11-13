@@ -225,6 +225,8 @@ public enum IslandExpandedTab: String, Sendable, Equatable, CaseIterable {
     case nowPlaying
     /// The focus timer and the next calendar event.
     case widgets
+    /// Coding agents at work (`AIAgentMonitor`).
+    case aiAgents
 }
 
 /// Represents a transient alert HUD shown inside the notch capsule.
@@ -298,6 +300,10 @@ public final class ZenithIslandState: ObservableObject {
     @Published public var showsTimerWidget: Bool = false
     @Published public var showsCalendarWidget: Bool = false
     @Published public var showsNetworkWidget: Bool = false
+
+    // AI agents (written by `AIAgentMonitor`): the tools worth a card, and whether the feature is on at all.
+    @Published public var aiAgents: [AIAgentSnapshot] = []
+    @Published public var showsAIAgentsTab: Bool = false
 
     // Behaviour (written by `IslandWidgetSettings`).
     /// Volume and brightness changes show as a bar on the island.
