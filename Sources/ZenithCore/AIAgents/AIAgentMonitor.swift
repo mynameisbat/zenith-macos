@@ -82,7 +82,7 @@ public final class AIAgentMonitor: ObservableObject {
                 MainActor.assumeIsolated { self?.apply(pass) }
             }
         }
-        worker.queue.async {
+        worker.queue.async { [worker] in
             worker.configure(sources: handoff.sources, watcher: handoff.watcher, generation: generation)
             worker.deliver = deliver
             worker.startWatching { [weak worker] changed in
