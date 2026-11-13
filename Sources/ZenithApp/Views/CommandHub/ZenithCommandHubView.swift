@@ -68,6 +68,7 @@ public struct ZenithCommandHubView: View {
             VStack(spacing: 12) {
                 metersRow
                 controlsRow
+                KeepAwakeHubRow()
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
