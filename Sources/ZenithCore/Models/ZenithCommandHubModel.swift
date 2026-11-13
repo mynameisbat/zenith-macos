@@ -8,6 +8,7 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
     case screen = "screen"
     case ocr = "ocr"
     case clipboard = "clipboard"
+    case cleaning = "cleaning"
 
     public var title: String {
         switch self {
@@ -15,6 +16,7 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
         case .screen: return String(localized: "Capture Screen")
         case .ocr: return String(localized: "Copy Text")
         case .clipboard: return String(localized: "Clipboard")
+        case .cleaning: return String(localized: "Cleaning Mode")
         }
     }
 
@@ -25,6 +27,7 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
         case .screen: return String(localized: "Capture the whole screen and annotate it")
         case .ocr: return String(localized: "Select an area and copy its text, QR code or barcode")
         case .clipboard: return String(localized: "Open clipboard history")
+        case .cleaning: return String(localized: "Block the keyboard and trackpad for a moment to wipe them")
         }
     }
 
@@ -34,6 +37,7 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
         case .screen: return "macwindow"
         case .ocr: return "text.viewfinder"
         case .clipboard: return "list.clipboard"
+        case .cleaning: return "keyboard"
         }
     }
 
@@ -45,6 +49,7 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
         case .screen: return "⌘⇧1"
         case .ocr: return HotKeyDefinition.defaultOCR.keyEquivalent
         case .clipboard: return HotKeyDefinition.defaultClipboard.keyEquivalent
+        case .cleaning: return HotKeyDefinition.defaultCleaningMode.keyEquivalent
         }
     }
 
@@ -55,6 +60,7 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
         case .screen: return HotKeyDefinition.captureFullscreenId
         case .ocr: return HotKeyDefinition.captureOCRId
         case .clipboard: return HotKeyDefinition.clipboardToggleId
+        case .cleaning: return HotKeyDefinition.cleaningModeId
         }
     }
 
@@ -68,6 +74,8 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
             return ["ocr", "text", "recognize", "recognise", "read", "extract", "qr", "barcode", "vision"]
         case .clipboard:
             return ["clipboard", "history", "paste", "clips", "pasteboard"]
+        case .cleaning:
+            return ["cleaning", "clean", "wipe", "keyboard", "trackpad", "block", "lock", "dust"]
         }
     }
 

@@ -121,6 +121,27 @@ public final class SettingsViewModel: ObservableObject {
             .store(in: &cancellables)
 
         refreshPermissions()
+
+        if let tab = Self.requestedTab {
+            selectedTab = tab
+            Self.requestedTab = nil
+        }
+        Self.tabRequests
+            .sink { [weak self] tab in
+                self?.selectedTab = tab
+                Self.requestedTab = nil
+            }
+            .store(in: &cancellables)
+    }
+
+    /// A pane another part of the app wants Settings to show (e.g. Permissions, when a feature lacks one).
+    private static var requestedTab: SettingsTab?
+    private static let tabRequests = PassthroughSubject<SettingsTab, Never>()
+
+    /// Makes Settings show `tab`: now if the window exists, else when it is created. Call before showing the window.
+    public static func request(_ tab: SettingsTab) {
+        requestedTab = tab
+        tabRequests.send(tab)
     }
 
     // MARK: - General Tab Bindings

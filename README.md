@@ -95,6 +95,7 @@ The certificate that signs a release is what installed copies trust for automati
   - **Capture Screen** (`⇧⌘1`).
   - **Copy Text** (`⌃⌥T`): OCR, QR codes and barcodes.
   - **Clipboard** (`⇧⌘V`).
+  - **Cleaning Mode**: blocks the keyboard, trackpad and mouse (media and brightness keys too) so you can wipe them, behind a black or dimmed screen with a countdown. It always ends by itself (60 s by default, 15 s to 5 min in Settings → General), or early when you hold `⌃⌥⌘` for 2 seconds. Needs Accessibility; its global shortcut (`⌃⌥⇧K`) is off until you turn it on.
 - **Running apps**: the heaviest user processes with their app icons, memory and CPU; quit one (after a confirmation) with its ✕ or `⌘1`–`⌘4` (`SIGTERM`, then `SIGKILL` if needed).
 - **Meters**: CPU, memory, free storage and battery, plus Bluetooth accessories' battery, and the download and upload speed of your Wi-Fi or Ethernet connection. The speed is measured only while the hub is open.
 - **Switches**: Privacy Shield on/off, Scan/Clean system junk (asks first) and Boost; **Settings…** and **Quit Zenith** at the bottom, as in a menu.
