@@ -72,6 +72,11 @@ public struct ZenithCommandHubView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
 
+            HomebrewHubRow {
+                HomebrewSettingsLink.request()
+                onOpenPreferences()
+            }
+
             sectionDivider
 
             appRow
