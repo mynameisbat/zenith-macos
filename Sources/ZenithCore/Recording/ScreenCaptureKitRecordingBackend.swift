@@ -31,7 +31,7 @@ public final class ScreenCaptureKitRecordingBackend: NSObject, ScreenRecordingBa
 
     public func start(_ request: RecordingRequest) async throws {
         guard CGPreflightScreenCaptureAccess() else { throw ScreenRecordingError.permissionDenied }
-        guard lock.withLock({ stream == nil && writer == nil }) else { throw ScreenRecordingError.alreadyRecording }
+        guard lock.withLock({ self.stream == nil && self.writer == nil }) else { throw ScreenRecordingError.alreadyRecording }
 
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         let filter = try Self.makeFilter(for: request, content: content)
@@ -108,7 +108,7 @@ public final class ScreenCaptureKitRecordingBackend: NSObject, ScreenRecordingBa
             }
             // A missing or busy microphone does not stop the recording; the picture and system sound go on.
             if (try? capture.start()) != nil {
-                lock.withLock { microphone = capture }
+                lock.withLock { self.microphone = capture }
             } else {
                 NSLog("[Zenith] Recording: the microphone could not be started; recording without it.")
             }
