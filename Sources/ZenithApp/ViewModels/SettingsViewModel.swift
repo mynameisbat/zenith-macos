@@ -8,6 +8,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case shortcuts = "Shortcuts"
     case audio = "Audio"
     case island = "Dynamic Island"
+    case snippets = "Snippets"
     case privacy = "Privacy"
     case cleaner = "Cleaner"
     case permissions = "Permissions"
@@ -20,6 +21,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .shortcuts: return "command"
         case .audio: return "speaker.wave.2.fill"
         case .island: return "capsule.fill"
+        case .snippets: return "text.badge.plus"
         case .privacy: return "lock.shield.fill"
         case .cleaner: return "sparkles"
         case .permissions: return "hand.raised.fill"
@@ -32,6 +34,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .shortcuts: return "Global Hotkeys"
         case .audio: return "Sound Feedback"
         case .island: return "Widgets & Timer"
+        case .snippets: return "Text Expansion"
         case .privacy: return "Encrypted DNS"
         case .cleaner: return "Caches & Junk"
         case .permissions: return "Screen & Access"
@@ -45,6 +48,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .shortcuts: return String(localized: "Shortcuts")
         case .audio: return String(localized: "Audio")
         case .island: return String(localized: "Dynamic Island")
+        case .snippets: return String(localized: "Snippets")
         case .privacy: return String(localized: "Privacy Shield")
         case .cleaner: return String(localized: "Cleaner")
         case .permissions: return String(localized: "Permissions")
@@ -58,6 +62,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .shortcuts: return ["hotkey", "keyboard", "keys"]
         case .audio: return ["sound", "volume"]
         case .island: return ["notch", "timer", "pomodoro", "focus", "calendar", "event", "widget"]
+        case .snippets: return ["snippet", "text", "expansion", "abbreviation", "trigger", "template"]
         case .privacy: return ["dns", "doh", "proxy", "shield"]
         case .cleaner: return ["junk", "cache", "disk", "storage", "uninstall"]
         case .permissions: return ["accessibility", "screen recording", "automation", "calendar"]
@@ -66,7 +71,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
 
     public var sectionTitle: String {
         switch self {
-        case .general, .shortcuts, .audio, .island:
+        case .general, .shortcuts, .audio, .island, .snippets:
             return "WORKSPACE"
         case .privacy, .cleaner, .permissions:
             return "SYSTEM & SECURITY"

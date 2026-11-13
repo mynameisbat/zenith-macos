@@ -43,6 +43,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         ScheduledCleanerScanController.start()  // Cleaner's scheduled scan: off by default, scans only, never deletes
         UpdateController.start()  // daily update check: on by default, installs only after the user's click
+        SnippetExpansionService.shared.refresh()  // typed snippet expansion: off by default, needs Accessibility
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
@@ -55,6 +56,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardStore.shared.stopMonitoring()
         MenuBarController.shared.teardown()
         HotKeyManager.shared.unregisterAll()
+        SnippetExpansionService.shared.stop()
     }
 
     public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -148,6 +150,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             (HotKeyDefinition.defaultOCR, {
                 Task { @MainActor in
                     ScreenOCRCoordinator.shared.startAreaOCR()
+                }
+            }),
+            // Snippet menu
+            (HotKeyDefinition.defaultSnippetsMenu, {
+                Task { @MainActor in
+                    SnippetPanelController.shared.toggle()
                 }
             })
         ])

@@ -55,6 +55,15 @@ public struct ShortcutsSettingsTab: View {
                     defaultPreset: HotKeyDefinition.defaultOCR,
                     altPreset: nil
                 )
+                ZenithSettingsDivider(inset: 44)
+                shortcutRow(
+                    id: HotKeyDefinition.snippetsMenuId,
+                    title: String(localized: "Insert Snippet"),
+                    symbol: "text.badge.plus",
+                    tint: ZenithTint.snippets,
+                    defaultPreset: HotKeyDefinition.defaultSnippetsMenu,
+                    altPreset: nil
+                )
             }
         }
     }

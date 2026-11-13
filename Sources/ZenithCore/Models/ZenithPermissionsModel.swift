@@ -73,6 +73,7 @@ public enum ZenithPermissionFeature: String, CaseIterable, Sendable, Identifiabl
     case musicArtwork
     case leftoversTrash
     case calendarWidget
+    case snippetExpansion
 
     public var id: String { rawValue }
 
@@ -82,6 +83,7 @@ public enum ZenithPermissionFeature: String, CaseIterable, Sendable, Identifiabl
         case .autoPaste, .mediaKeyFallback: return .accessibility
         case .playerControls, .musicArtwork, .leftoversTrash: return .automation
         case .calendarWidget: return .calendar
+        case .snippetExpansion: return .accessibility
         }
     }
 
@@ -96,6 +98,7 @@ public enum ZenithPermissionFeature: String, CaseIterable, Sendable, Identifiabl
         case .musicArtwork: return String(localized: "Album art from Music")
         case .leftoversTrash: return String(localized: "Cleaner \u{2192} Leftovers: protected folders")
         case .calendarWidget: return String(localized: "Next calendar event in the island")
+        case .snippetExpansion: return String(localized: "Expand text snippets as you type")
         }
     }
 }
@@ -248,18 +251,21 @@ public protocol ZenithFeatureActivityProviding {
     func activity(for feature: ZenithPermissionFeature) -> ZenithFeatureActivity
 }
 
-/// Reads the settings Zenith really has. Only the calendar widget has a switch; the rest are always available.
+/// Reads the settings Zenith really has. Features without a switch are always available.
 @MainActor
 public struct LiveFeatureActivity: ZenithFeatureActivityProviding {
     private let widgets: IslandWidgetSettings
+    private let snippets: SnippetSettings
 
-    public init(widgets: IslandWidgetSettings = .shared) {
+    public init(widgets: IslandWidgetSettings = .shared, snippets: SnippetSettings = .shared) {
         self.widgets = widgets
+        self.snippets = snippets
     }
 
     public func activity(for feature: ZenithPermissionFeature) -> ZenithFeatureActivity {
         switch feature {
         case .calendarWidget: return widgets.showCalendar ? .on : .off
+        case .snippetExpansion: return snippets.isTypedExpansionEnabled ? .on : .off
         default: return .alwaysAvailable
         }
     }
