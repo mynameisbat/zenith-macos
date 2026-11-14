@@ -142,7 +142,8 @@ struct TrackerBlocklistTests {
         #expect(domains.count == 200_000)
         #expect(list.isBlocked(host: "x.host42.tracker42.example"))
         #expect(!list.isBlocked(host: "x.host42.tracker43.example"))
-        #expect(Date().timeIntervalSince(started) < 10)
+        // A generous ceiling: it only catches a quadratic slowdown. The shared CI runner took 11 s once with 10.
+        #expect(Date().timeIntervalSince(started) < 30)
     }
 
     // MARK: Built-in list
