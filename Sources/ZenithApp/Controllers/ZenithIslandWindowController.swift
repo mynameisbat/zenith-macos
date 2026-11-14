@@ -275,6 +275,8 @@ public final class ZenithIslandWindowController: NSObject {
     private var localScrollMonitor: Any?
     private var localClickMonitor: Any?
     private var lastPointerCoverCheck: TimeInterval = 0
+    private var pointerWatch = IslandPointerWatch()
+    private var pointerTimer: Timer?
     private var scrollGesture = IslandScrollGesture()
     private let mouseStateLock = NSLock()
     private var isIgnoringMouseEvents: Bool = true
@@ -399,30 +401,9 @@ public final class ZenithIslandWindowController: NSObject {
             object: nil
         )
 
-        // System-wide mouse movement monitors:
-        // Automatically make the window completely transparent to mouse clicks (ignoresMouseEvents = true)
-        // whenever the cursor is outside the visible island. This completely eliminates any dead zones,
-        // allowing 100% of mouse clicks to pass directly through to nearby menu bar icons and windows underneath.
-        self.globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] _ in
-            guard let self = self else { return }
-            let mouseLoc = NSEvent.mouseLocation
-            // Fast-path guard: if cursor is outside the dynamic island interactive region
-            // and the panel is already ignoring mouse events while idle, skip scheduling
-            // an asynchronous Task on @MainActor.
-            let idleInteractionRect = self.geometry.idleFrame.insetBy(dx: -30, dy: -30)
-            if !idleInteractionRect.contains(mouseLoc) {
-                self.mouseStateLock.lock()
-                let ignoring = self.isIgnoringMouseEvents
-                self.mouseStateLock.unlock()
-                if ignoring {
-                    return
-                }
-            }
-            Task { @MainActor [weak self] in
-                self?.handleMouseMoved(screenPoint: mouseLoc)
-            }
-        }
-
+        // The pointer is followed by a slow timer, and the system-wide monitors exist only while it is near the island
+        // (`pollPointer`): a global monitor left on all the time has every mouse and scroll event sent to this process.
+        // The local ones below only see events for Zenith's own windows, so they stay.
         self.localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] event in
             guard let self = self else { return event }
             let mouseLoc = NSEvent.mouseLocation
@@ -439,15 +420,8 @@ public final class ZenithIslandWindowController: NSObject {
             return event
         }
 
-        // Swipes on the island: down opens it, up closes it, sideways changes track. Scroll events reach a global
-        // monitor without any permission, and reading them does not take them from the app under the pointer.
-        self.globalScrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-            let sample = Self.scrollSample(from: event)
-            let mouseLoc = NSEvent.mouseLocation
-            Task { @MainActor [weak self] in
-                self?.handleScroll(sample, screenPoint: mouseLoc)
-            }
-        }
+        // Swipes on the island: down opens it, up closes it, sideways changes track (the global half is in
+        // `installGlobalMonitors`).
         self.localScrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             self?.handleScroll(Self.scrollSample(from: event), screenPoint: NSEvent.mouseLocation)
             return event
@@ -464,6 +438,7 @@ public final class ZenithIslandWindowController: NSObject {
         }
 
         handleMouseMoved(screenPoint: NSEvent.mouseLocation)
+        pollPointer()
 
         // Start system media & battery monitoring for Dynamic Island
         NowPlayingService.shared.startMonitoring()
@@ -579,6 +554,86 @@ public final class ZenithIslandWindowController: NSObject {
             NowPlayingService.shared.previousTrack()
         }
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
+    }
+
+    // MARK: - Pointer watch
+
+    /// Reads where the pointer is (no event involved) and keeps the global monitors only while it is near the island
+    /// or the island is taking mouse events. See `IslandPointerWatch` for why.
+    private func pollPointer() {
+        guard panel != nil else { return }
+        let location = NSEvent.mouseLocation
+        mouseStateLock.lock()
+        let takingEvents = !isIgnoringMouseEvents
+        mouseStateLock.unlock()
+        let decision = pointerWatch.sample(
+            location: location,
+            zone: IslandPointerWatch.zone(around: geometry.expandedFrame),
+            isEngaged: takingEvents || IslandPreviewWindowController.shared.currentFrame != nil,
+            now: ProcessInfo.processInfo.systemUptime
+        )
+        if decision.wantsEventMonitors {
+            let justInstalled = installGlobalMonitors()
+            if justInstalled || decision.moved { handleMouseMoved(screenPoint: location) }
+        } else {
+            removeGlobalMonitors()
+        }
+        schedulePointerPoll(every: decision.nextInterval)
+    }
+
+    private func schedulePointerPoll(every interval: TimeInterval) {
+        if let timer = pointerTimer, timer.isValid, timer.timeInterval == interval { return }
+        pointerTimer?.invalidate()
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.pollPointer() }
+        }
+        timer.tolerance = interval * 0.3
+        RunLoop.main.add(timer, forMode: .common)
+        pointerTimer = timer
+    }
+
+    /// Returns true if the monitors were not there before.
+    @discardableResult
+    private func installGlobalMonitors() -> Bool {
+        guard globalMouseMonitor == nil else { return false }
+        // Makes the window transparent to clicks (ignoresMouseEvents = true) whenever the pointer is outside the
+        // visible island, so clicks reach nearby menu bar icons and the windows underneath.
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] _ in
+            guard let self = self else { return }
+            let mouseLoc = NSEvent.mouseLocation
+            // Fast-path guard: if cursor is outside the dynamic island interactive region
+            // and the panel is already ignoring mouse events while idle, skip scheduling
+            // an asynchronous Task on @MainActor.
+            let idleInteractionRect = self.geometry.idleFrame.insetBy(dx: -30, dy: -30)
+            if !idleInteractionRect.contains(mouseLoc) {
+                self.mouseStateLock.lock()
+                let ignoring = self.isIgnoringMouseEvents
+                self.mouseStateLock.unlock()
+                if ignoring {
+                    return
+                }
+            }
+            Task { @MainActor [weak self] in
+                self?.handleMouseMoved(screenPoint: mouseLoc)
+            }
+        }
+        // Scroll events reach a global monitor without any permission, and reading them does not take them from the
+        // app under the pointer.
+        globalScrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            let sample = Self.scrollSample(from: event)
+            let mouseLoc = NSEvent.mouseLocation
+            Task { @MainActor [weak self] in
+                self?.handleScroll(sample, screenPoint: mouseLoc)
+            }
+        }
+        return true
+    }
+
+    private func removeGlobalMonitors() {
+        if let monitor = globalMouseMonitor { NSEvent.removeMonitor(monitor) }
+        if let monitor = globalScrollMonitor { NSEvent.removeMonitor(monitor) }
+        globalMouseMonitor = nil
+        globalScrollMonitor = nil
     }
 
     /// An app can take the whole display while it stays in front (a game switching to full screen), and nothing
@@ -705,14 +760,12 @@ public final class ZenithIslandWindowController: NSObject {
     /// Teardown dynamic island panel when quitting.
     public func teardown() {
         NotificationCenter.default.removeObserver(self, name: NSApplication.didChangeScreenParametersNotification, object: nil)
-        if let monitor = globalMouseMonitor {
+        pointerTimer?.invalidate()
+        pointerTimer = nil
+        removeGlobalMonitors()
+        for monitor in [localScrollMonitor, localClickMonitor].compactMap({ $0 }) {
             NSEvent.removeMonitor(monitor)
-            globalMouseMonitor = nil
         }
-        for monitor in [globalScrollMonitor, localScrollMonitor, localClickMonitor].compactMap({ $0 }) {
-            NSEvent.removeMonitor(monitor)
-        }
-        globalScrollMonitor = nil
         localScrollMonitor = nil
         localClickMonitor = nil
         if let monitor = localMouseMonitor {

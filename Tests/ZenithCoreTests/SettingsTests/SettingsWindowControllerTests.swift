@@ -162,6 +162,34 @@ struct SettingsWindowControllerTests {
         controller.dismiss()
     }
 
+    @Test("SW-10: A closed window lets its content go and gets a new one when shown again; a visible one keeps it")
+    @MainActor
+    func testContentReleasedWhileHidden() {
+        let controller = SettingsWindowController()
+        controller.contentReleaseDelay = 3_600  // the test releases by hand
+        var built = 0
+        controller.viewControllerProvider = {
+            built += 1
+            return NSViewController()
+        }
+        controller.show()
+        #expect(built == 1)
+
+        controller.releaseContentIfHidden()
+        #expect(controller.window?.contentViewController != nil)  // on screen: untouched
+
+        controller.dismiss()
+        #expect(controller.window?.contentViewController != nil)  // kept for a quick reopen
+        controller.releaseContentIfHidden()
+        #expect(controller.window?.contentViewController == nil)
+
+        controller.show()
+        #expect(built == 2)
+        #expect(controller.window?.contentViewController != nil)
+        #expect(controller.window?.frame.size == NSSize(width: SettingsWindowController.defaultWidth, height: SettingsWindowController.defaultHeight))
+        controller.dismiss()
+    }
+
     @Test("SW-06: Close Button Direct Action and Delegate Routing")
     @MainActor
     func testCloseButtonActionAndDelegate() {
