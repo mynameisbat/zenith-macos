@@ -43,6 +43,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         ScheduledCleanerScanController.start()  // Cleaner's scheduled scan: off by default, scans only, never deletes
         UpdateController.start()  // daily update check: on by default, installs only after the user's click
+        KeepAwakeHotKeyController.shared.apply()  // keep awake's shortcut: off by default
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
@@ -51,6 +52,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = SystemProxyManager.shared.disableProxySynchronously()
         }
         LocalProxyServer.shared.stop()
+        KeepAwakeService.shared.stop()  // release the power assertion; the Mac may sleep again
         ZenithIslandWindowController.shared.teardown()
         ClipboardStore.shared.stopMonitoring()
         MenuBarController.shared.teardown()

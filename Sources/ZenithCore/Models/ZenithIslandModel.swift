@@ -293,6 +293,8 @@ public final class ZenithIslandState: ObservableObject {
 
     // Widgets (written by `FocusTimerService`, `CalendarWidgetModel` and `IslandWidgetSettings`).
     @Published public var focusTimer: FocusTimerSnapshot? = nil
+    /// Keep awake while it holds the Mac awake (and the island indicator is on); see `KeepAwakeService`.
+    @Published public var keepAwake: KeepAwakeSnapshot? = nil
     @Published public var upcomingEvent: UpcomingEvent? = nil
     @Published public var calendarAccess: CalendarAccessState = .notDetermined
     @Published public var showsTimerWidget: Bool = false

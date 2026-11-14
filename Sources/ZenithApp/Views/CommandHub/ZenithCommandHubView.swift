@@ -75,7 +75,12 @@ public struct ZenithCommandHubView: View {
 
             VStack(spacing: 12) {
                 metersRow
-                controlsRow
+                // One grid, so the switches of Privacy Shield and Keep Awake line up whatever the labels' width
+                // (it changes with the language).
+                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 12) {
+                    controlsRow
+                    KeepAwakeHubRow()
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
@@ -538,50 +543,54 @@ public struct ZenithCommandHubView: View {
         )
     }
 
+    /// Privacy Shield's row of the controls grid: label, switch, then the Clean and Boost buttons at the trailing edge.
     private var controlsRow: some View {
-        HStack(spacing: 8) {
-            Toggle(isOn: shieldBinding) {
-                HStack(spacing: 6) {
-                    ZenithIconTile(systemName: "lock.shield.fill", tint: ZenithTint.privacy, size: 20)
-                    Text("Privacy Shield")
-                        .font(.system(size: 12.5))
-                        .lineLimit(1)
-                        .fixedSize()
-                }
-            }
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            .disabled(privacyController.isTransitioning)
-            .help(privacyController.isRunning
-                    ? "On: sites are looked up over encrypted DNS through a local proxy"
-                    : "Off. Turn on to look sites up over encrypted DNS through a local proxy")
-
-            Spacer(minLength: 4)
-
-            Button {
-                runCleaner()
-            } label: {
-                Label(cleanTitle, systemImage: "sparkles")
-                    .labelStyle(.titleAndIcon)
-                    .monospacedDigit()
+        GridRow {
+            HStack(spacing: 6) {
+                ZenithIconTile(systemName: "lock.shield.fill", tint: ZenithTint.privacy, size: 20)
+                Text("Privacy Shield")
+                    .font(.system(size: 12.5))
                     .lineLimit(1)
                     .fixedSize()
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(cleaner.isCleaning || cleaner.isScanning || (!hasNotScannedJunk && cleaner.selectedJunkSize == 0))
-            .help(cleanHelp)
+            .accessibilityHidden(true)
 
-            Button {
-                runBoost()
-            } label: {
-                Label("Boost", systemImage: "bolt.fill")
-                    .labelStyle(.titleAndIcon)
-                    .fixedSize()
+            Toggle("Privacy Shield", isOn: shieldBinding)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .disabled(privacyController.isTransitioning)
+                .help(privacyController.isRunning
+                        ? "On: sites are looked up over encrypted DNS through a local proxy"
+                        : "Off. Turn on to look sites up over encrypted DNS through a local proxy")
+
+            HStack(spacing: 8) {
+                Button {
+                    runCleaner()
+                } label: {
+                    Label(cleanTitle, systemImage: "sparkles")
+                        .labelStyle(.titleAndIcon)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(cleaner.isCleaning || cleaner.isScanning || (!hasNotScannedJunk && cleaner.selectedJunkSize == 0))
+                .help(cleanHelp)
+
+                Button {
+                    runBoost()
+                } label: {
+                    Label("Boost", systemImage: "bolt.fill")
+                        .labelStyle(.titleAndIcon)
+                        .fixedSize()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Free inactive memory and flush the DNS cache")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .help("Free inactive memory and flush the DNS cache")
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 
