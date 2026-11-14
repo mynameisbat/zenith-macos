@@ -222,6 +222,7 @@ public struct ZenithCommandHubView: View {
         switch action {
         case .area: return ZenithTint.capture
         case .screen: return ZenithTint.screen
+        case .record: return ZenithTint.recording
         case .ocr: return ZenithTint.ocr
         case .clipboard: return ZenithTint.clipboard
         case .cleaning: return ZenithTint.general
@@ -298,6 +299,8 @@ public struct ZenithCommandHubView: View {
             onAreaCapture()
         case .screen:
             onFullscreenCapture()
+        case .record:
+            ScreenRecordingCoordinator.shared.toggle()  // starts choosing, or stops a running recording
         case .ocr:
             onScreenOCR()
         case .clipboard:
