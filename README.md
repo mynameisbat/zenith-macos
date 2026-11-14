@@ -127,7 +127,7 @@ The certificate that signs a release is what installed copies trust for automati
   - Swept-wing vector arrows (`A`).
   - Solid and hollow rectangles (`R`).
   - Typography text callouts (`T`).
-  - Pixelated / blur redaction tool (`B`) for sensitive tokens.
+  - Pixelated / blur redaction tool (`B`) for sensitive tokens, and a solid black Redact box (`X`) that hides them for good.
   - Crop (`C`).
 - **100% Retina Fidelity**: Exports annotations directly at native physical display backing resolution (PNG & JPEG) with zero downsampling.
 - **Rapid Keyboard Workflow**:
@@ -135,6 +135,8 @@ The certificate that signs a release is what installed copies trust for automati
   - `⌘S`: Export high-resolution image to disk.
   - `⌘Z` / `⇧⌘Z`: Full undo/redo command stack.
   - `Esc`: Dismiss editor safely.
+- **Screen Recording (`⌃⌥R`)**: drag for an area, click a window, or press Return for the whole screen, then set system audio, microphone, pointer, click rings, 30/60 fps and a 3-2-1 countdown in the bar that appears. ScreenCaptureKit records into H.264 or HEVC `.mov`/`.mp4` (Settings → General → Screen Recording; saved to Movies, Desktop or a folder you choose); the system sound and the microphone (`AVAudioEngine`, on every supported macOS) are mixed into one track. Zenith's own windows are left out. A red stop button with the elapsed time sits in the menu bar (or press `⌃⌥R` again); afterwards the clip opens with Show in Finder, Trim (a trimmed copy is saved beside it) and Export as GIF (capped width and frame rate).
+- **Scrolling Capture (`⌃⌥L`)**: drag over a page; with Accessibility allowed Zenith scrolls it for you, otherwise you scroll by hand. Frames are joined by finding their vertical overlap (a fixed toolbar or footer appears once), until the end of the page or 30,000 px, and the tall picture opens in the annotation editor.
 
 ### 5. 🏝 Dynamic Island, Now Playing & Battery HUD
 - **Hardware-Aware Notch Integration**: Seamlessly integrates into MacBook display camera notches as well as external monitors with zero Mini-LED light bleed (`#06070a`).
@@ -202,6 +204,8 @@ Nothing here deletes without asking: each action shows what will go (the largest
 | `⌘⇧2` | Global | Start Area Screen Capture &amp; Loupe Magnifier (Preset alt: `⌘⇧X`) |
 | `⌃⌥T` | Global | Screen OCR &amp; Barcode / QR Code Recognition (not `⌘⇧3`: macOS uses that for its own screenshot) |
 | `⌘⇧1` | Global | Capture Entire Active Display |
+| `⌃⌥R` | Global | Record the screen (press again to stop) |
+| `⌃⌥L` | Global | Scrolling capture (press again to finish) |
 | `⌘⇧V` | Global | Open Clipboard History Manager (Preset alt: `⌥V`) |
 | **Clipboard History Hub** | | *(Floating Panel &amp; Menu Bar)* |
 | `↑` / `↓` | Clipboard Hub | Navigate up / down |
@@ -235,7 +239,7 @@ Nothing here deletes without asking: each action shows what will go (the largest
 
 ## 🔒 System Permissions Guide
 
-Zenith is designed with privacy-first principles and minimal permission requirements. Settings → Permissions shows one card per permission (Screen Recording, Accessibility, Automation, Calendars): its state, what it is for, what still works without it and which features use it. It warns when a permission is granted but nothing you turned on uses it (today only Calendars can show that, because it is the only feature with a switch), and hints when a feature that is on lacks its permission. It never asks for a permission itself; Automation shows as "asked per app" because macOS reports it only per target app.
+Zenith is designed with privacy-first principles and minimal permission requirements. Settings → Permissions shows one card per permission (Screen Recording, Accessibility, Automation, Calendars, Microphone): its state, what it is for, what still works without it and which features use it. It warns when a permission is granted but nothing you turned on uses it (today Calendars and Microphone can show that: they are the features with a switch), and hints when a feature that is on lacks its permission. It never asks for a permission itself; Automation shows as "asked per app" because macOS reports it only per target app.
 
 1. **Screen Recording (`kTCCServiceScreenCapture`)** — **Required for Capture**:
    - Required by Apple's `ScreenCaptureKit` to capture displays, coordinate marquee crops, and sample RGB pixels in the loupe magnifier.
@@ -254,6 +258,10 @@ Zenith is designed with privacy-first principles and minimal permission requirem
 
 4. **Calendars** — **Optional**:
    - Only for the island's "Next calendar event" widget. macOS asks when you turn the widget on in Settings → Dynamic Island, never before. Without it the widget shows how to allow it. (A build run with `swift run` has no Info.plist, so it cannot ask; use the bundled `Zenith.app`.)
+
+5. **Microphone** — **Optional**:
+   - Only for the microphone in screen recordings. macOS asks the first time you record with Microphone turned on in the recording bar, never before. Without it recordings carry the Mac's own sound only. (Like Calendars, a `swift run` build cannot ask.)
+   - Scrolling capture uses Accessibility to post scroll-wheel events; without it you scroll by hand.
 
 ---
 

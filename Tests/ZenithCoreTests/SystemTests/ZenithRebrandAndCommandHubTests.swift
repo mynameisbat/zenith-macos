@@ -53,7 +53,7 @@ struct ZenithRebrandAndCommandHubTests {
 
         // When onStatusItemClick is nil, menu is directly attached to statusItem
         #expect(statusItem.menu != nil)
-        #expect(statusItem.menu?.items.count == 12)
+        #expect(statusItem.menu?.items.count == 14)  // includes Record Screen… and Scrolling Capture
 
         controller.teardown(statusBar: statusBar)
     }

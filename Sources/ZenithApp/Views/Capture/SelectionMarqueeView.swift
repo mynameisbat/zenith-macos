@@ -80,6 +80,11 @@ public final class SelectionMarqueeView: NSView {
         }
     }
 
+    /// A line of help at the top of the screen (recording and scrolling capture say what to do).
+    public var hintText: String? {
+        didSet { needsDisplay = true }
+    }
+
     private var badgeHostingView: NSHostingView<DimensionBadgeView>?
     private var loupeHostingView: NSHostingView<LoupeMagnifierView>?
     private let badgeSize = CGSize(width: 220, height: 28)
@@ -109,6 +114,7 @@ public final class SelectionMarqueeView: NSView {
         // 1. Draw 40% black dimming mask over entire view
         NSColor.black.withAlphaComponent(0.40).setFill()
         bounds.fill()
+        defer { drawHint() }
 
         // 2. Punch transparent cutout if there is an active selection intersecting this screen
         guard let globalRect = currentSelectionRect else { return }
@@ -149,6 +155,26 @@ public final class SelectionMarqueeView: NSView {
             context.fillPath()
         }
         context.restoreGState()
+    }
+
+    /// Draws `hintText` in a dark pill near the top of this screen.
+    private func drawHint() {
+        guard let hintText, !hintText.isEmpty else { return }
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 13, weight: .medium),
+            .foregroundColor: NSColor.white
+        ]
+        let text = NSAttributedString(string: hintText, attributes: attributes)
+        let size = text.size()
+        let pill = CGRect(
+            x: (bounds.width - size.width) / 2 - 14,
+            y: bounds.height - 90 - size.height,
+            width: size.width + 28,
+            height: size.height + 12
+        )
+        NSColor.black.withAlphaComponent(0.72).setFill()
+        NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2).fill()
+        text.draw(at: CGPoint(x: pill.minX + 14, y: pill.minY + 6))
     }
 
     // MARK: - Dimension Badge Management
@@ -271,6 +297,9 @@ public final class SelectionMarqueeView: NSView {
     override public func keyDown(with event: NSEvent) {
         if event.keyCode == 53 {
             CaptureOverlayController.shared.cancelCapture()
+            return
+        }
+        if CaptureOverlayController.shared.handleSelectionKey(event) {
             return
         }
         super.keyDown(with: event)

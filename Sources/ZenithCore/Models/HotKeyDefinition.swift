@@ -56,6 +56,8 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
     public static let captureOCRId = "capture.ocr"
     public static let cleaningModeId = "cleaning.mode"
     public static let snippetsMenuId = "snippets.menu"
+    public static let recordScreenId = "capture.record"
+    public static let scrollingCaptureId = "capture.scrolling"
 
     // MARK: - Built-in Default Shortcut Configurations
 
@@ -135,6 +137,24 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
         keyEquivalent: "⌃⌥S"
     )
 
+    /// Screen recording: ⌃⌥R (Keycode 15: 'R'). Starts the selector; pressed while recording, it stops.
+    public static let defaultRecordScreen = HotKeyDefinition(
+        id: recordScreenId,
+        name: "Record Screen",
+        keyCode: 15, // kVK_ANSI_R
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue,
+        keyEquivalent: "⌃⌥R"
+    )
+
+    /// Scrolling capture: ⌃⌥L (Keycode 37: 'L', "long screenshot").
+    public static let defaultScrollingCapture = HotKeyDefinition(
+        id: scrollingCaptureId,
+        name: "Scrolling Capture",
+        keyCode: 37, // kVK_ANSI_L
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue,
+        keyEquivalent: "⌃⌥L"
+    )
+
     /// Key codes (with ⌘⇧) of macOS's screenshot shortcuts: 3, 4, 5 and 6. A Zenith shortcut on one of these fires
     /// together with the system's.
     public static let macOSScreenshotShortcuts: [(keyCode: UInt32, carbonModifiers: UInt32)] = {
@@ -167,6 +187,8 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
         case captureOCRId: return defaultOCR
         case cleaningModeId: return defaultCleaningMode
         case snippetsMenuId: return defaultSnippetsMenu
+        case recordScreenId: return defaultRecordScreen
+        case scrollingCaptureId: return defaultScrollingCapture
         default: return nil
         }
     }

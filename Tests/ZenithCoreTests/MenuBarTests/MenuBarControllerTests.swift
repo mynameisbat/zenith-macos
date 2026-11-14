@@ -33,13 +33,13 @@ struct MenuBarControllerTests {
         #expect(controller.menu == nil)
     }
 
-    @Test("MB-02: 12-Item Menu Hierarchy and Identifiers")
+    @Test("MB-02: 14-Item Menu Hierarchy and Identifiers")
     @MainActor
     func testMenuHierarchy() {
         let controller = MenuBarController()
         let menu = controller.buildMenu()
 
-        #expect(menu.items.count == 12)
+        #expect(menu.items.count == 14)
 
         // Item 0: Clipboard History
         let item0 = menu.items[0]
@@ -59,46 +59,52 @@ struct MenuBarControllerTests {
         #expect(item2.tag == MenuBarItemTag.captureFullscreen.rawValue)
         #expect(item2.identifier == MenuBarItemIdentifier.captureFullscreen)
 
-        // Item 3: Separator
-        #expect(menu.items[3].isSeparatorItem == true)
+        // Items 3 and 4: Record Screen, Scrolling Capture
+        #expect(menu.items[3].identifier == MenuBarItemIdentifier.recordScreen)
+        #expect(menu.items[3].tag == MenuBarItemTag.recordScreen.rawValue)
+        #expect(menu.items[4].identifier == MenuBarItemIdentifier.scrollingCapture)
+        #expect(menu.items[4].tag == MenuBarItemTag.scrollingCapture.rawValue)
 
-        // Item 4: Live Statistics
-        let item4 = menu.items[4]
+        // Item 5: Separator
+        #expect(menu.items[5].isSeparatorItem == true)
+
+        // Item 6: Live Statistics
+        let item4 = menu.items[6]
         #expect(item4.tag == MenuBarItemTag.liveStatistics.rawValue)
         #expect(item4.identifier == MenuBarItemIdentifier.liveStatistics)
         #expect(item4.isEnabled == false)
 
-        // Item 5: Clear History
-        let item5 = menu.items[5]
+        // Item 7: Clear History
+        let item5 = menu.items[7]
         #expect(item5.title == "Clear History")
         #expect(item5.tag == MenuBarItemTag.clearHistory.rawValue)
         #expect(item5.identifier == MenuBarItemIdentifier.clearHistory)
 
-        // Item 6: Separator
-        #expect(menu.items[6].isSeparatorItem == true)
+        // Item 8: Separator
+        #expect(menu.items[8].isSeparatorItem == true)
 
-        // Item 7: Privacy Shield Toggle
-        let item7 = menu.items[7]
+        // Item 9: Privacy Shield Toggle
+        let item7 = menu.items[9]
         #expect(item7.tag == MenuBarItemTag.privacyShieldToggle.rawValue)
         #expect(item7.identifier == MenuBarItemIdentifier.privacyShieldToggle)
 
-        // Item 8: Privacy Shield Dynamic Telemetry Row
-        let item8 = menu.items[8]
+        // Item 10: Privacy Shield Dynamic Telemetry Row
+        let item8 = menu.items[10]
         #expect(item8.tag == MenuBarItemTag.privacyShieldStats.rawValue)
         #expect(item8.identifier == MenuBarItemIdentifier.privacyShieldStats)
         #expect(item8.isEnabled == false)
 
-        // Item 9: Separator
-        #expect(menu.items[9].isSeparatorItem == true)
+        // Item 11: Separator
+        #expect(menu.items[11].isSeparatorItem == true)
 
-        // Item 10: Preferences...
-        let item10 = menu.items[10]
+        // Item 12: Preferences...
+        let item10 = menu.items[12]
         #expect(item10.title == "Preferences...")
         #expect(item10.tag == MenuBarItemTag.preferences.rawValue)
         #expect(item10.identifier == MenuBarItemIdentifier.preferences)
 
-        // Item 11: Quit Zenith
-        let item11 = menu.items[11]
+        // Item 13: Quit Zenith
+        let item11 = menu.items[13]
         #expect(item11.title == "Quit Zenith")
         #expect(item11.tag == MenuBarItemTag.quit.rawValue)
         #expect(item11.identifier == MenuBarItemIdentifier.quit)
@@ -126,17 +132,17 @@ struct MenuBarControllerTests {
         #expect(captureFullscreenItem.keyEquivalentModifierMask == [.command, .shift])
 
         // ⌘⌥P
-        let privacyShieldItem = menu.items[7]
+        let privacyShieldItem = menu.items[9]
         #expect(privacyShieldItem.keyEquivalent == "p")
         #expect(privacyShieldItem.keyEquivalentModifierMask == [.command, .option])
 
         // ⌘,
-        let preferencesItem = menu.items[10]
+        let preferencesItem = menu.items[12]
         #expect(preferencesItem.keyEquivalent == ",")
         #expect(preferencesItem.keyEquivalentModifierMask == [.command])
 
         // ⌘Q
-        let quitItem = menu.items[11]
+        let quitItem = menu.items[13]
         #expect(quitItem.keyEquivalent == "q")
         #expect(quitItem.keyEquivalentModifierMask == [.command])
     }

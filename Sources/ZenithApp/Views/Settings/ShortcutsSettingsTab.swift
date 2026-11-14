@@ -64,6 +64,24 @@ public struct ShortcutsSettingsTab: View {
                     defaultPreset: HotKeyDefinition.defaultSnippetsMenu,
                     altPreset: nil
                 )
+                ZenithSettingsDivider(inset: 44)
+                shortcutRow(
+                    id: HotKeyDefinition.recordScreenId,
+                    title: String(localized: "Record Screen"),
+                    symbol: "record.circle",
+                    tint: Color(nsColor: .systemRed),
+                    defaultPreset: HotKeyDefinition.defaultRecordScreen,
+                    altPreset: nil
+                )
+                ZenithSettingsDivider(inset: 44)
+                shortcutRow(
+                    id: HotKeyDefinition.scrollingCaptureId,
+                    title: String(localized: "Scrolling Capture"),
+                    symbol: "arrow.up.and.down.text.horizontal",
+                    tint: ZenithTint.capture,
+                    defaultPreset: HotKeyDefinition.defaultScrollingCapture,
+                    altPreset: nil
+                )
             }
         }
     }

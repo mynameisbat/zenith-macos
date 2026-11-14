@@ -87,6 +87,7 @@ public struct GeneralSettingsTab: View {
             ClipboardPrivacySettingsSection()
 
             KeepAwakeSettingsSection()
+            ScreenRecordingSettingsSection()
 
             HStack {
                 Spacer()
@@ -98,6 +99,7 @@ public struct GeneralSettingsTab: View {
                         UpdateSettings.shared.resetToDefaults()
                         KeepAwakeSettings.shared.resetToDefaults()
                         KeepAwakeHotKeyController.shared.apply()
+                        ScreenRecordingSettings.shared.resetToDefaults()
                     }
                 }
                 .help("Put every setting, shortcut, sound and island widget back the way Zenith ships")

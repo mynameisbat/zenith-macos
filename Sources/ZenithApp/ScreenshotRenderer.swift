@@ -264,6 +264,7 @@ private struct ScreenshotPermissions: PermissionsServiceProtocol {
     func openScreenRecordingSettings() -> Bool { false }
     func openAccessibilitySettings() -> Bool { false }
     func calendarAccess() -> CalendarAccessState { .granted }
+    func microphoneAccess() -> MicrophoneAccess { .notDetermined }
 }
 
 private struct ScreenshotLoginItem: LaunchAtLoginServiceProtocol {

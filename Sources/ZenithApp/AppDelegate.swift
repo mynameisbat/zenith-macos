@@ -68,6 +68,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // A running recording is finished and saved first; an unfinished file would not play.
+        if ScreenRecorder.shared.state.isRecording {
+            Task { @MainActor in
+                await ScreenRecorder.shared.stop()
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        }
         // Allow clean termination when requested by user (⌘Q, Quit menu) or macOS System Settings ("Quit & Reopen")
         return .terminateNow
     }
@@ -93,6 +101,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let image = image else { return }
                 AnnotationWindowController.shared.present(image: image)
             }
+        }
+
+        menuBar.onRecordScreen = {
+            ScreenRecordingCoordinator.shared.toggle()
+        }
+
+        menuBar.onScrollingCapture = {
+            ScrollingCaptureCoordinator.shared.toggle()
         }
 
         menuBar.onClearHistory = {
@@ -160,6 +176,18 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             (HotKeyDefinition.defaultSnippetsMenu, {
                 Task { @MainActor in
                     SnippetPanelController.shared.toggle()
+                }
+            }),
+            // Screen recording: start choosing, or stop the running recording
+            (HotKeyDefinition.defaultRecordScreen, {
+                Task { @MainActor in
+                    ScreenRecordingCoordinator.shared.toggle()
+                }
+            }),
+            // Scrolling capture: start, or finish the running one
+            (HotKeyDefinition.defaultScrollingCapture, {
+                Task { @MainActor in
+                    ScrollingCaptureCoordinator.shared.toggle()
                 }
             })
         ])

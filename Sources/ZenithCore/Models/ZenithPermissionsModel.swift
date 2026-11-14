@@ -11,6 +11,7 @@ public enum ZenithPermissionKind: String, CaseIterable, Sendable, Identifiable {
     case accessibility
     case automation
     case calendar
+    case microphone
 
     public var id: String { rawValue }
 
@@ -20,6 +21,7 @@ public enum ZenithPermissionKind: String, CaseIterable, Sendable, Identifiable {
         case .accessibility: return String(localized: "Accessibility")
         case .automation: return String(localized: "Automation")
         case .calendar: return String(localized: "Calendars")
+        case .microphone: return String(localized: "Microphone")
         }
     }
 
@@ -27,13 +29,15 @@ public enum ZenithPermissionKind: String, CaseIterable, Sendable, Identifiable {
     public var purpose: String {
         switch self {
         case .screenRecording:
-            return String(localized: "Lets Zenith capture the screen and read text from it.")
+            return String(localized: "Lets Zenith capture and record the screen and read text from it.")
         case .accessibility:
             return String(localized: "Lets Zenith press keys for you: \u{2318}V to paste, and media keys.")
         case .automation:
             return String(localized: "Lets Zenith tell other apps what to do: Music, Spotify and Finder.")
         case .calendar:
             return String(localized: "Lets Zenith read your events to show the next one in the island.")
+        case .microphone:
+            return String(localized: "Lets Zenith record your voice with a screen recording.")
         }
     }
 
@@ -48,6 +52,8 @@ public enum ZenithPermissionKind: String, CaseIterable, Sendable, Identifiable {
             return String(localized: "Without it, the island still shows what is playing, and other players can still be controlled. Music and Spotify controls, Music artwork and moving protected leftovers to the Trash do not work.")
         case .calendar:
             return String(localized: "Without it, the island simply has no calendar widget. Nothing else changes.")
+        case .microphone:
+            return String(localized: "Without it, screen recordings have only the Mac's own sound. Nothing else changes.")
         }
     }
 
@@ -58,6 +64,7 @@ public enum ZenithPermissionKind: String, CaseIterable, Sendable, Identifiable {
         case .accessibility: return SystemPermissions.accessibilitySettingsURL
         case .automation: return SystemPermissions.automationSettingsURL
         case .calendar: return SystemPermissions.calendarSettingsURL
+        case .microphone: return SystemPermissions.microphoneSettingsURL
         }
     }
 }
@@ -75,16 +82,19 @@ public enum ZenithPermissionFeature: String, CaseIterable, Sendable, Identifiabl
     case calendarWidget
     case cleaningMode
     case snippetExpansion
+    case screenRecording
+    case scrollingCapture
+    case recordingMicrophone
 
     public var id: String { rawValue }
 
     public var permission: ZenithPermissionKind {
         switch self {
-        case .areaCapture, .fullScreenCapture, .screenText: return .screenRecording
-        case .autoPaste, .mediaKeyFallback, .cleaningMode: return .accessibility
+        case .areaCapture, .fullScreenCapture, .screenText, .screenRecording: return .screenRecording
+        case .autoPaste, .mediaKeyFallback, .cleaningMode, .snippetExpansion, .scrollingCapture: return .accessibility
         case .playerControls, .musicArtwork, .leftoversTrash: return .automation
         case .calendarWidget: return .calendar
-        case .snippetExpansion: return .accessibility
+        case .recordingMicrophone: return .microphone
         }
     }
 
@@ -101,6 +111,9 @@ public enum ZenithPermissionFeature: String, CaseIterable, Sendable, Identifiabl
         case .calendarWidget: return String(localized: "Next calendar event in the island")
         case .cleaningMode: return String(localized: "Cleaning Mode: block the keyboard and trackpad")
         case .snippetExpansion: return String(localized: "Expand text snippets as you type")
+        case .screenRecording: return String(localized: "Record the screen")
+        case .scrollingCapture: return String(localized: "Scroll for you during a scrolling capture")
+        case .recordingMicrophone: return String(localized: "Microphone in screen recordings")
         }
     }
 }
@@ -260,11 +273,18 @@ public struct LiveFeatureActivity: ZenithFeatureActivityProviding {
     private let widgets: IslandWidgetSettings
     private let cleaningMode: CleaningModeSettings
     private let snippets: SnippetSettings
+    private let recording: ScreenRecordingSettings
 
-    public init(widgets: IslandWidgetSettings = .shared, cleaningMode: CleaningModeSettings = .shared, snippets: SnippetSettings = .shared) {
+    public init(
+        widgets: IslandWidgetSettings = .shared,
+        cleaningMode: CleaningModeSettings = .shared,
+        snippets: SnippetSettings = .shared,
+        recording: ScreenRecordingSettings = .shared
+    ) {
         self.widgets = widgets
         self.cleaningMode = cleaningMode
         self.snippets = snippets
+        self.recording = recording
     }
 
     public func activity(for feature: ZenithPermissionFeature) -> ZenithFeatureActivity {
@@ -273,6 +293,7 @@ public struct LiveFeatureActivity: ZenithFeatureActivityProviding {
         // Cleaning Mode can always be started from the hub; its global shortcut is the switch.
         case .cleaningMode: return cleaningMode.hotKeyEnabled ? .on : .alwaysAvailable
         case .snippetExpansion: return snippets.isTypedExpansionEnabled ? .on : .off
+        case .recordingMicrophone: return recording.microphone ? .on : .off
         default: return .alwaysAvailable
         }
     }
@@ -358,6 +379,12 @@ public final class ZenithPermissionsModel: ObservableObject {
         case .denied: states[.calendar] = .notGranted
         case .notDetermined: states[.calendar] = .notDetermined
         case .unavailable: states[.calendar] = .unavailable
+        }
+        switch permissions.microphoneAccess() {
+        case .granted: states[.microphone] = .granted
+        case .denied: states[.microphone] = .notGranted
+        case .notDetermined: states[.microphone] = .notDetermined
+        case .unavailable: states[.microphone] = .unavailable
         }
         var features: [ZenithPermissionFeature: ZenithFeatureActivity] = [:]
         for feature in ZenithPermissionFeature.allCases {

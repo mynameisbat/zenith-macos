@@ -26,6 +26,7 @@ public struct StylingToolbarView: View {
                 toolButton(tool: .rectangle, icon: "rectangle", label: String(localized: "Rectangle"), shortcut: "R")
                 toolButton(tool: .text, icon: "textformat", label: String(localized: "Text"), shortcut: "T")
                 toolButton(tool: .blur, icon: "checkerboard.rectangle", label: String(localized: "Pixelate"), shortcut: "B")
+                toolButton(tool: .redact, icon: "rectangle.fill", label: String(localized: "Redact"), shortcut: "X")
                 toolButton(tool: .crop, icon: "crop", label: String(localized: "Crop"), shortcut: "C")
             }
 
