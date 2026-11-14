@@ -5,10 +5,13 @@ import Foundation
 @Suite("Zenith Command Hub State & Action Hub Test Suite")
 struct ZenithCommandHubTests {
 
-    @Test("HUB-01: ZenithHubAction has 5 quick actions with correct titles, icons, and shortcuts")
+    @Test("HUB-01: ZenithHubAction has 6 quick actions with correct titles, icons, and shortcuts")
     func testZenithHubActionsExclusivity() {
         let allActions = ZenithHubAction.allCases
-        #expect(allActions == [.area, .screen, .ocr, .clipboard, .cleaning])
+        #expect(allActions == [.area, .screen, .record, .ocr, .clipboard, .cleaning])
+        #expect(ZenithHubAction.record.hotKeyId == HotKeyDefinition.recordScreenId)
+        #expect(ZenithHubAction.record.shortcut == HotKeyDefinition.defaultRecordScreen.keyEquivalent)
+        #expect(ZenithHubAction.record.matches(query: "video"))
 
         // Verify Area action metadata
         let area = ZenithHubAction.area

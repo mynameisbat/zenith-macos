@@ -6,6 +6,7 @@ import Darwin
 public enum ZenithHubAction: String, CaseIterable, Sendable {
     case area = "area"
     case screen = "screen"
+    case record = "record"
     case ocr = "ocr"
     case clipboard = "clipboard"
     case cleaning = "cleaning"
@@ -14,6 +15,7 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
         switch self {
         case .area: return String(localized: "Capture Area")
         case .screen: return String(localized: "Capture Screen")
+        case .record: return String(localized: "Record Screen")
         case .ocr: return String(localized: "Copy Text")
         case .clipboard: return String(localized: "Clipboard")
         case .cleaning: return String(localized: "Cleaning Mode")
@@ -25,6 +27,7 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
         switch self {
         case .area: return String(localized: "Capture part of the screen and annotate it")
         case .screen: return String(localized: "Capture the whole screen and annotate it")
+        case .record: return String(localized: "Record the screen")
         case .ocr: return String(localized: "Select an area and copy its text, QR code or barcode")
         case .clipboard: return String(localized: "Open clipboard history")
         case .cleaning: return String(localized: "Block the keyboard and trackpad for a moment to wipe them")
@@ -35,6 +38,7 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
         switch self {
         case .area: return "crop"
         case .screen: return "macwindow"
+        case .record: return "record.circle"
         case .ocr: return "text.viewfinder"
         case .clipboard: return "list.clipboard"
         case .cleaning: return "keyboard"
@@ -47,6 +51,7 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
         switch self {
         case .area: return "⌘⇧2"
         case .screen: return "⌘⇧1"
+        case .record: return HotKeyDefinition.defaultRecordScreen.keyEquivalent
         case .ocr: return HotKeyDefinition.defaultOCR.keyEquivalent
         case .clipboard: return HotKeyDefinition.defaultClipboard.keyEquivalent
         case .cleaning: return HotKeyDefinition.defaultCleaningMode.keyEquivalent
@@ -58,6 +63,7 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
         switch self {
         case .area: return HotKeyDefinition.captureAreaId
         case .screen: return HotKeyDefinition.captureFullscreenId
+        case .record: return HotKeyDefinition.recordScreenId
         case .ocr: return HotKeyDefinition.captureOCRId
         case .clipboard: return HotKeyDefinition.clipboardToggleId
         case .cleaning: return HotKeyDefinition.cleaningModeId
@@ -70,6 +76,8 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
             return ["area", "capture", "snip", "snipping", "crop", "selection", "region", "box", "partial"]
         case .screen:
             return ["screen", "capture", "fullscreen", "full", "window", "display", "monitor", "screenshot", "desktop", "whole"]
+        case .record:
+            return ["record", "recording", "video", "movie", "screencast", "gif", "capture", "screen"]
         case .ocr:
             return ["ocr", "text", "recognize", "recognise", "read", "extract", "qr", "barcode", "vision"]
         case .clipboard:

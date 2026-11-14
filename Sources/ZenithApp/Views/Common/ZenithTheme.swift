@@ -154,6 +154,7 @@ public enum ZenithTint {
     public static let calendar = Color(nsColor: .systemRed)
     public static let network = Color(nsColor: .systemCyan)
     public static let snippets = Color(nsColor: .systemYellow)
+    public static let recording = Color(nsColor: .systemRed)
 }
 
 // MARK: - Section Header
