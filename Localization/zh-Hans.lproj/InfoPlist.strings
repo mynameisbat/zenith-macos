@@ -1,0 +1,5 @@
+/* Zenith, Simplified Chinese (zh-Hans): the texts macOS shows when it asks for a permission. */
+"NSAppleEventsUsageDescription" = "Zenith 使用 Apple 事件来了解“音乐”和 Spotify 正在播放的内容、从灵动岛控制播放，并请求访达将 macOS 不允许其他 App 移动的残留文件夹移到废纸篓。";
+"NSCalendarsFullAccessUsageDescription" = "打开“日历”小组件后，Zenith 会在灵动岛中显示你的下一个日历日程。日程仅在这台 Mac 上读取。";
+"NSCalendarsUsageDescription" = "打开“日历”小组件后，Zenith 会在灵动岛中显示你的下一个日历日程。日程仅在这台 Mac 上读取。";
+"NSMicrophoneUsageDescription" = "仅当你在录制控制条中打开“麦克风”时，Zenith 才会将麦克风声音录入屏幕录制。";
