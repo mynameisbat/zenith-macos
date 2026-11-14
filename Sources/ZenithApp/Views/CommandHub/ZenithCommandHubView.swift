@@ -251,6 +251,8 @@ public struct ZenithCommandHubView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
+                        // German and Japanese titles run a little longer than the tile: shrink before truncating.
+                        .minimumScaleFactor(0.8)
                     Text(shortcutText(for: action))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)

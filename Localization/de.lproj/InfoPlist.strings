@@ -1,0 +1,5 @@
+/* Zenith, German: the texts macOS shows when it asks for a permission. */
+"NSAppleEventsUsageDescription" = "Zenith verwendet Apple Events, um zu sehen, was in Musik und Spotify läuft, um die Wiedergabe über die Dynamic Island zu steuern und um den Finder zu bitten, übrig gebliebene Ordner in den Papierkorb zu legen, die macOS von anderen Apps nicht bewegen lässt.";
+"NSCalendarsFullAccessUsageDescription" = "Zenith zeigt dein nächstes Kalenderereignis in der Dynamic Island, wenn du das Kalender-Widget einschaltest. Ereignisse werden nur auf diesem Mac gelesen.";
+"NSCalendarsUsageDescription" = "Zenith zeigt dein nächstes Kalenderereignis in der Dynamic Island, wenn du das Kalender-Widget einschaltest. Ereignisse werden nur auf diesem Mac gelesen.";
+"NSMicrophoneUsageDescription" = "Zenith nimmt dein Mikrofon in einer Bildschirmaufnahme auf, nur wenn du in der Aufnahmeleiste „Mikrofon“ einschaltest.";

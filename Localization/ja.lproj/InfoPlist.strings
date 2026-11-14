@@ -1,0 +1,5 @@
+/* Zenith, Japanese: the texts macOS shows when it asks for a permission. */
+"NSAppleEventsUsageDescription" = "Zenithは、ミュージックとSpotifyで再生中の曲を知り、Dynamic Islandから再生を操作するため、またmacOSがほかのアプリに移動を許可しない残留フォルダをFinderにゴミ箱へ移動してもらうためにApple Eventsを使用します。";
+"NSCalendarsFullAccessUsageDescription" = "カレンダーウィジェットをオンにすると、Zenithは今後のカレンダーイベントをDynamic Islandに表示します。イベントはこのMac上でのみ読み取られます。";
+"NSCalendarsUsageDescription" = "カレンダーウィジェットをオンにすると、Zenithは今後のカレンダーイベントをDynamic Islandに表示します。イベントはこのMac上でのみ読み取られます。";
+"NSMicrophoneUsageDescription" = "Zenithは、収録バーで「マイク」をオンにしたときだけ、画面収録にマイクの音声を録音します。";

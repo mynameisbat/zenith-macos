@@ -1,0 +1,5 @@
+/* Zenith, Spanish: the texts macOS shows when it asks for a permission. */
+"NSAppleEventsUsageDescription" = "Zenith usa Apple Events para saber qué suena en Música y Spotify, controlar la reproducción desde la Dynamic Island y pedir al Finder que traslade a la Papelera carpetas sobrantes que macOS no deja mover a otras apps.";
+"NSCalendarsFullAccessUsageDescription" = "Zenith muestra tu próximo evento del calendario en la Dynamic Island cuando activas el widget Calendario. Los eventos solo se leen en este Mac.";
+"NSCalendarsUsageDescription" = "Zenith muestra tu próximo evento del calendario en la Dynamic Island cuando activas el widget Calendario. Los eventos solo se leen en este Mac.";
+"NSMicrophoneUsageDescription" = "Zenith graba tu micrófono en una grabación de pantalla, solo cuando activas Micrófono en la barra de grabación.";

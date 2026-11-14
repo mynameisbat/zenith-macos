@@ -74,6 +74,12 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <array>
         <string>en</string>
         <string>vi</string>
+        <string>zh-Hans</string>
+        <string>ja</string>
+        <string>ko</string>
+        <string>fr</string>
+        <string>de</string>
+        <string>es</string>
     </array>
     <key>CFBundleIdentifier</key>
     <string>com.zenith.workspace</string>

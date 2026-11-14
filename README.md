@@ -16,7 +16,7 @@ Zenith lives in your Menu Bar as a lightweight accessory app (no Dock icon), bri
 5. **Disk cleaner, app uninstaller and process monitor (Mole-inspired)**, with a confirmation before anything is deleted.
 6. **Privacy Shield**: a local proxy that looks names up over DNS-over-HTTPS and splits the TLS handshake in two. It is not a VPN and does not hide your IP address.
 
-🗣 **Languages and accessibility:** English and Vietnamese (Zenith follows the language set in macOS). Controls have VoiceOver labels, and alerts on the island are read aloud.
+🗣 **Languages and accessibility:** English, Vietnamese, Simplified Chinese, Japanese, Korean, French, German and Spanish (Zenith follows the language set in macOS). Controls have VoiceOver labels, and alerts on the island are read aloud.
 
 🌐 **Visit the official website:** [https://mynameisbat.github.io/zenith-macos/](https://mynameisbat.github.io/zenith-macos/)
 
