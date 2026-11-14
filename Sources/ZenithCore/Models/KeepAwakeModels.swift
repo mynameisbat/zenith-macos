@@ -120,14 +120,17 @@ public struct KeepAwakeSnapshot: Sendable, Equatable {
 public enum IslandCompactActivity: Sendable, Equatable {
     case focusTimer
     case nowPlaying
+    case aiAgent
     case keepAwake
 }
 
 public extension ZenithIslandState {
-    /// The compact activity to draw: a running timer first, then playing media, then keep awake.
+    /// The compact activity to draw: a running timer first, then playing media, then a coding agent at work, then
+    /// keep awake.
     var compactActivity: IslandCompactActivity? {
         if focusTimer != nil { return .focusTimer }
         if nowPlayingTrack?.isPlaying == true { return .nowPlaying }
+        if workingAIAgent != nil { return .aiAgent }
         if keepAwake != nil { return .keepAwake }
         return nil
     }
@@ -137,7 +140,7 @@ public extension ZenithIslandState {
         switch compactActivity {
         case .focusTimer: return true
         case .keepAwake: return keepAwake?.remaining != nil
-        case .nowPlaying, nil: return false
+        case .nowPlaying, .aiAgent, nil: return false
         }
     }
 }
