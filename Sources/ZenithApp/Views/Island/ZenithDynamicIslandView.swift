@@ -42,7 +42,7 @@ public struct ZenithDynamicIslandView: View {
             return geometry.alertWidth
         } else if islandState.isExpanded {
             return geometry.expandedWidth
-        } else if islandState.focusTimer != nil {
+        } else if islandState.compactActivityUsesWideWings {
             return geometry.timerIdleWidth
         } else if isNowPlayingActive {
             return geometry.nowPlayingIdleWidth
@@ -153,8 +153,11 @@ public struct ZenithDynamicIslandView: View {
                     .accessibilityAddTraits(.isButton)
                     .accessibilityHint("Opens the timer")
                     .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
-            } else if isNowPlayingActive, let track = islandState.nowPlayingTrack {
+            } else if islandState.compactActivity == .nowPlaying, let track = islandState.nowPlayingTrack {
                 nowPlayingIdleCapsule(track)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+            } else if islandState.compactActivity == .keepAwake, let awake = islandState.keepAwake {
+                IslandKeepAwakeCompactWings(snapshot: awake, geometry: geometry)
                     .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
             }
         }
@@ -168,6 +171,7 @@ public struct ZenithDynamicIslandView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.activeAlert)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isNowPlayingActive)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.focusTimer == nil)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.compactActivityUsesWideWings)
         .animation(.spring(response: 0.32, dampingFraction: 0.8), value: islandState.isDropTargeted)
         .onValueChange(of: islandState.isDropTargeted) { targeted in
             if targeted {

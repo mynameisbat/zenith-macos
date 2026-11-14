@@ -86,6 +86,8 @@ public struct GeneralSettingsTab: View {
 
             ClipboardPrivacySettingsSection()
 
+            KeepAwakeSettingsSection()
+
             HStack {
                 Spacer()
                 Button("Restore All Defaults") {
@@ -94,6 +96,8 @@ public struct GeneralSettingsTab: View {
                         IslandWidgetSettings.shared.resetToDefaults()
                         ClipboardPrivacySettings.shared.resetToDefaults()
                         UpdateSettings.shared.resetToDefaults()
+                        KeepAwakeSettings.shared.resetToDefaults()
+                        KeepAwakeHotKeyController.shared.apply()
                     }
                 }
                 .help("Put every setting, shortcut, sound and island widget back the way Zenith ships")
