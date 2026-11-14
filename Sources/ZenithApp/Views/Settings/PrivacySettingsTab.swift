@@ -79,6 +79,52 @@ public struct PrivacySettingsTab: View {
 
     // MARK: - Tracker blocking
 
+    /// The second layer: a resolver that blocks ads itself (AdGuard DNS, a NextDNS profile). Zenith turns its
+    /// `0.0.0.0` answers into the same 403 as its own list, and asks an unfiltered resolver for Never Block names.
+    @ViewBuilder
+    private var dnsFilteringRow: some View {
+        let provider = controller.statistics.selectedProvider
+        if provider.blocksAdsItself {
+            Label {
+                Text("\(provider.displayName) also blocks ads and trackers, with a list it keeps up to date. Its blocks are counted here, and Never Block applies to it too.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: "checkmark.shield")
+                    .foregroundColor(.green)
+            }
+        } else if case .custom = provider {
+            // A custom resolver may be the user's own filter (AdGuard Home, Pi-hole): no AdGuard offer over it.
+            Label {
+                Text("If your custom resolver filters ads, its blocks are counted here too, and Never Block applies to it.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: "shield")
+                    .foregroundColor(.secondary)
+            }
+        } else {
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Block More with AdGuard DNS")
+                        .font(.system(size: 12, weight: .medium))
+                    Text("AdGuard DNS answers ad and tracker names with nothing, from a long list it keeps up to date, so nothing has to be downloaded here. Like any resolver, it sees the names you look up.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Button("Use AdGuard DNS") {
+                    controller.updateProvider(.adguard)
+                    syncFromCurrentProvider()
+                }
+                .controlSize(.small)
+            }
+        }
+    }
+
     private var trackerCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZenithSettingsHeader("Tracker Blocking")
@@ -88,7 +134,7 @@ public struct PrivacySettingsTab: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Block Ads and Trackers")
                             .font(.system(size: 12, weight: .medium))
-                        Text("Refuses connections to known advertising and tracking domains before any lookup is made for them. It applies to apps that use the system proxy, and only while Privacy Shield is on.")
+                        Text("Refuses connections to the domains on your lists before any lookup is made for them, and to the ones a filtering resolver blocks. It applies to apps that use the system proxy, and only while Privacy Shield is on.")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -121,6 +167,19 @@ public struct PrivacySettingsTab: View {
                             .foregroundColor(.orange)
                     }
 
+                    if blocking.activeDomainCount == 0,
+                       !controller.statistics.selectedProvider.blocksAdsItself,
+                       !isCustomProvider(controller.statistics.selectedProvider) {
+                        // Since the built-in list went away, a switch that is on can block nothing at all.
+                        Label("Nothing is blocked: your lists are empty and this resolver does not filter ads. Use AdGuard DNS below, or import a list.", systemImage: "exclamationmark.triangle")
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    divider
+                    dnsFilteringRow
+
                     divider
 
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -133,7 +192,7 @@ public struct PrivacySettingsTab: View {
                                     .foregroundColor(.secondary)
                                     .lineLimit(1)
                             } else {
-                                Text("Built-in list only. Import a hosts file for more.")
+                                Text("No list imported. Import a hosts file, or use a filtering resolver.")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }
@@ -161,24 +220,44 @@ public struct PrivacySettingsTab: View {
                         remove: { blocking.removeCustomDomain($0) }
                     )
 
-                    domainListEditor(
-                        title: "Never Block",
-                        placeholder: "example.com",
-                        text: $tabModel.newAllowedDomain,
-                        domains: blocking.allowedDomains,
-                        add: { addDomain(tabModel.newAllowedDomain, allow: true) },
-                        remove: { blocking.removeAllowedDomain($0) }
-                    )
-
-                    if let message = tabModel.trackerMessage {
-                        Text(verbatim: message)
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    neverBlockEditor
+                    trackerMessageText
+                } else if controller.statistics.selectedProvider.blocksAdsItself {
+                    // The switch is off, but the resolver still filters: show that, and the override for it.
+                    divider
+                    dnsFilteringRow
+                    neverBlockEditor
+                    trackerMessageText
                 }
             }
             .zenithSettingsCard(cornerRadius: 10, padding: 12)
+        }
+    }
+
+    private func isCustomProvider(_ provider: DoHProvider) -> Bool {
+        if case .custom = provider { return true }
+        return false
+    }
+
+    /// Never Block also wins over a filtering resolver, so it is shown whenever one is in use, switch on or off.
+    private var neverBlockEditor: some View {
+        domainListEditor(
+            title: "Never Block",
+            placeholder: "example.com",
+            text: $tabModel.newAllowedDomain,
+            domains: blocking.allowedDomains,
+            add: { addDomain(tabModel.newAllowedDomain, allow: true) },
+            remove: { blocking.removeAllowedDomain($0) }
+        )
+    }
+
+    @ViewBuilder
+    private var trackerMessageText: some View {
+        if let message = tabModel.trackerMessage {
+            Text(verbatim: message)
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -236,7 +315,9 @@ public struct PrivacySettingsTab: View {
     }
 
     private func domainCountText(_ count: Int) -> String {
-        count == 1 ? String(localized: "1 domain blocked") : String(localized: "\(count) domains blocked")
+        // With no list of its own, a "0 domains blocked" headline reads as broken while a filtering resolver blocks.
+        if count == 0 { return String(localized: "No domains on your lists") }
+        return count == 1 ? String(localized: "1 domain blocked") : String(localized: "\(count) domains blocked")
     }
 
     private func importedListText(name: String, count: Int) -> String {

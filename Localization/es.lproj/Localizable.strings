@@ -539,7 +539,7 @@
 "BLOCKED" = "BLOQUEADO";
 "Block Ads and Trackers" = "Bloquear anuncios y rastreadores";
 "Blocked Requests" = "Solicitudes bloqueadas";
-"Built-in list only. Import a hosts file for more." = "Solo la lista integrada. Importa un archivo hosts para bloquear más.";
+"No list imported. Import a hosts file, or use a filtering resolver." = "No hay ninguna lista importada. Importa un archivo hosts o usa un resolutor con filtrado.";
 "Choose a hosts file or a list of domains" = "Elige un archivo hosts o una lista de dominios";
 "Domain List" = "Lista de dominios";
 "Download" = "Descarga";
@@ -554,7 +554,7 @@
 "Network speed: download and upload" = "Velocidad de red: descarga y subida";
 "Never Block" = "No bloquear nunca";
 "No domain names were found in that file. Zenith reads hosts files, plain lists with one domain per line, and ad-blocker rules such as ||ads.example.com^." = "No se han encontrado nombres de dominio en ese archivo. Zenith lee archivos hosts, listas simples con un dominio por línea y reglas de bloqueadores de anuncios como ||ads.example.com^.";
-"Refuses connections to known advertising and tracking domains before any lookup is made for them. It applies to apps that use the system proxy, and only while Privacy Shield is on." = "Rechaza las conexiones a dominios conocidos de publicidad y rastreo antes de buscar su dirección. Se aplica a las apps que usan el proxy del sistema, y solo mientras Privacy Shield está activado.";
+"Refuses connections to the domains on your lists before any lookup is made for them, and to the ones a filtering resolver blocks. It applies to apps that use the system proxy, and only while Privacy Shield is on." = "Rechaza las conexiones a los dominios de tus listas antes de consultarlos, y a los que bloquea un resolutor con filtrado. Se aplica a las apps que usan el proxy del sistema, y solo mientras Privacy Shield está activado.";
 "Remove %@" = "Quitar %@";
 "That file is too large for a domain list (over 50 MB)." = "Ese archivo es demasiado grande para una lista de dominios (más de 50 MB).";
 "That is not a domain name Zenith can block. Use a name such as ads.example.com." = "Ese no es un nombre de dominio que Zenith pueda bloquear. Usa un nombre como ads.example.com.";
@@ -1055,3 +1055,13 @@
 "Working state, tokens, model and plan limits with their reset time." = "Estado de trabajo, tokens, modelo y límites del plan con su hora de restablecimiento.";
 "Zenith reads only the token counts, times, model names and project folder names in the logs these tools keep on this Mac. Prompts and replies are never read, and nothing leaves your Mac." = "Zenith solo lee los recuentos de tokens, las horas, los nombres de modelo y los nombres de las carpetas de proyecto de los registros que estas herramientas guardan en este Mac. Nunca se leen las instrucciones ni las respuestas, y nada sale de tu Mac.";
 "resets %@" = "se restablece %@";
+
+/* Tracker blocking: filtering resolver (Settings › Privacy Shield) */
+"%@ also blocks ads and trackers, with a list it keeps up to date. Its blocks are counted here, and Never Block applies to it too." = "%@ también bloquea anuncios y rastreadores, con una lista que mantiene al día. Esos bloqueos se cuentan aquí, y «No bloquear nunca» también se aplica a él.";
+"Block More with AdGuard DNS" = "Bloquear más con AdGuard DNS";
+"AdGuard DNS answers ad and tracker names with nothing, from a long list it keeps up to date, so nothing has to be downloaded here. Like any resolver, it sees the names you look up." = "AdGuard DNS no devuelve ninguna dirección para los nombres de anuncios y rastreadores, según una larga lista que mantiene al día, así que aquí no hay que descargar nada. Como cualquier resolutor, ve los nombres que consultas.";
+"Use AdGuard DNS" = "Usar AdGuard DNS";
+"No domains on your lists" = "No hay dominios en tus listas";
+"If your custom resolver filters ads, its blocks are counted here too, and Never Block applies to it." = "Si tu resolutor personalizado filtra anuncios, sus bloqueos también se cuentan aquí, y «No bloquear nunca» se aplica a él.";
+"Nothing is blocked: your lists are empty and this resolver does not filter ads. Use AdGuard DNS below, or import a list." = "No se bloquea nada: tus listas están vacías y este resolutor no filtra anuncios. Usa AdGuard DNS más abajo o importa una lista.";
+"Ad blocking has no list: choose AdGuard DNS in Settings › Privacy Shield, or import a list." = "El bloqueo de anuncios no tiene lista: elige AdGuard DNS en Ajustes › Privacy Shield o importa una lista.";

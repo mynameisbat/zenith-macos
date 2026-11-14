@@ -58,25 +58,41 @@ public final class TrackerBlocklist: @unchecked Sendable {
 
     /// Whether a connection to `host` should be refused.
     public func isBlocked(host: String) -> Bool {
-        let name = host.trimmingCharacters(in: CharacterSet(charactersIn: "[] .")).lowercased()
-        // Addresses and one-word names (`localhost`, a printer) are never ad domains.
-        guard name.contains("."), !Self.looksLikeAddress(name) else { return false }
-
+        let keys = Self.selfAndParents(of: host)   // outside the lock: the proxy's threads all call this
         lock.lock()
         defer { lock.unlock() }
         guard !blocked.isEmpty else { return false }
-
-        // The host itself first, then each parent, stopping before the last label (`com`).
-        var candidate = Substring(name)
         var matchedBlock = false
-        while candidate.contains(".") {
-            let key = String(candidate)
+        for key in keys {
             if allowed.contains(key) { return false }
             if blocked.contains(key) { matchedBlock = true }
+        }
+        return matchedBlock
+    }
+
+    /// Whether `host` (or a domain it is under) is on the never-block list. The proxy asks an unfiltered resolver for
+    /// such a name, so a filtering resolver cannot block it either.
+    public func isNeverBlocked(host: String) -> Bool {
+        let keys = Self.selfAndParents(of: host)
+        lock.lock()
+        defer { lock.unlock() }
+        guard !allowed.isEmpty else { return false }
+        return keys.contains { allowed.contains($0) }
+    }
+
+    /// The host, then each parent domain, stopping before the last label (`a.b.example.com`, `b.example.com`,
+    /// `example.com`). Empty for addresses and one-word names (`localhost`, a printer), which are never matched.
+    private static func selfAndParents(of host: String) -> [String] {
+        let name = host.trimmingCharacters(in: CharacterSet(charactersIn: "[] .")).lowercased()
+        guard name.contains("."), !looksLikeAddress(name) else { return [] }
+        var result: [String] = []
+        var candidate = Substring(name)
+        while candidate.contains(".") {
+            result.append(String(candidate))
             guard let dot = candidate.firstIndex(of: ".") else { break }
             candidate = candidate[candidate.index(after: dot)...]
         }
-        return matchedBlock
+        return result
     }
 
     // MARK: - Domain names
@@ -163,32 +179,4 @@ public final class TrackerBlocklist: @unchecked Sendable {
         }
         return result
     }
-}
-
-// MARK: - Built-in list
-
-public extension TrackerBlocklist {
-    /// A small starting list: advertising networks, ad exchanges and analytics endpoints that exist to serve ads or
-    /// follow people between sites. Nothing on it is a site people visit, and it leaves out the hosts that sites need
-    /// to work (CDNs, sign-in, payment, tag managers). Import a larger list from Settings for more.
-    static let builtInDomains: [String] = [
-        // Google advertising and analytics
-        "doubleclick.net", "googlesyndication.com", "googleadservices.com", "google-analytics.com",
-        "adservice.google.com", "2mdn.net", "app-measurement.com",
-        // Ad exchanges and networks
-        "adnxs.com", "adsrvr.org", "rubiconproject.com", "pubmatic.com", "openx.net", "casalemedia.com",
-        "criteo.com", "criteo.net", "taboola.com", "outbrain.com", "amazon-adsystem.com", "adform.net",
-        "smartadserver.com", "advertising.com", "yieldmo.com", "sharethrough.com", "teads.tv", "33across.com",
-        "indexww.com", "bidswitch.net", "contextweb.com", "lijit.com", "zedo.com", "revcontent.com", "mgid.com",
-        "serving-sys.com", "mookie1.com", "moatads.com", "adsymptotic.com",
-        // Audience measurement and data brokers
-        "scorecardresearch.com", "quantserve.com", "demdex.net", "omtrdc.net", "everesttech.net", "2o7.net",
-        "krxd.net", "rlcdn.com", "bluekai.com", "mathtag.com", "tapad.com", "agkn.com",
-        // Social-network ad and pixel endpoints
-        "ads-twitter.com", "analytics.tiktok.com", "px.ads.linkedin.com", "snap.licdn.com", "ct.pinterest.com",
-        "an.facebook.com", "ads.yahoo.com", "analytics.yahoo.com", "bat.bing.com", "clarity.ms",
-        // Session recording and product analytics endpoints
-        "static.hotjar.com", "script.hotjar.com", "vars.hotjar.com", "insights.hotjar.com",
-        "rs.fullstory.com", "edge.fullstory.com", "api.mixpanel.com", "api-js.mixpanel.com"
-    ]
 }

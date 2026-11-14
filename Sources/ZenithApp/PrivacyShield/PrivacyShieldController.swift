@@ -111,6 +111,25 @@ public final class PrivacyShieldController: ObservableObject {
             message: "Privacy Shield: Protected",
             icon: SymbolName.shieldProtected
         )
+        noticeIfBlockingIsEmpty()
+    }
+
+    /// Version 2.6 dropped the built-in list: someone who had blocking on with an unfiltered resolver and no list of
+    /// their own now blocks nothing. Say so once, the first time the shield starts in that state.
+    private func noticeIfBlockingIsEmpty() {
+        let key = "zenith_tracker_blocking_empty_notice_shown"
+        let blocking = TrackerBlockingSettings.shared
+        let provider = statistics.selectedProvider
+        if case .custom = provider { return }
+        guard blocking.isEnabled, blocking.activeDomainCount == 0, !provider.blocksAdsItself,
+              !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            ToastHUDController.shared.show(
+                message: "Ad blocking has no list: choose AdGuard DNS in Settings › Privacy Shield, or import a list.",
+                icon: "exclamationmark.triangle"
+            )
+        }
     }
 
     /// Deactivates proxy engine and cleanly restores macOS network settings asynchronously.

@@ -35,6 +35,56 @@ public final class LocalProxyServer: @unchecked Sendable {
     private var _provider: DoHProvider = .cloudflare
     private var _port: UInt16 = 8080
 
+    private var _resolver: DoHResolverProtocol = DoHResolver.shared
+
+    /// What turns names into addresses. Tests put a fake here; the app uses `DoHResolver.shared`.
+    public var resolver: DoHResolverProtocol {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return _resolver
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            _resolver = newValue
+        }
+    }
+
+    /// A filtering resolver (AdGuard DNS, NextDNS) answers an ad or tracker name with 0.0.0.0 / ::. That is a block,
+    /// answered and counted like one of the list's; connecting there would reach this Mac itself.
+    /// - Returns: Whether the connection was refused.
+    private func refuseIfResolverBlocked(_ resolvedIP: String, host: String, port: UInt16, protocolType: String, clientConn: NWConnection) -> Bool {
+        guard DoHResolver.isBlockingAnswer(resolvedIP) else { return false }
+        Task { @MainActor in
+            PrivacyShieldStatistics.shared.recordBlockedRequest(domain: host, port: port, protocolType: protocolType)
+        }
+        respondAndClose(clientConn, status: "403 Forbidden")
+        return true
+    }
+
+    /// A filtering resolver in NXDOMAIN mode answers a blocked name with no address. From a resolver that filters, that
+    /// is taken as a block (403, counted as blocked); from any other resolver it stays a failed lookup (502). A name
+    /// that really does not exist is then also counted as blocked: the resolver's answer cannot tell the two apart.
+    /// - Returns: Whether the connection was refused.
+    private func refuseIfResolverBlocked(_ error: Error, host: String, port: UInt16, protocolType: String, clientConn: NWConnection) -> Bool {
+        guard DoHResolver.isNoAddressError(error), provider(for: host).blocksAdsItself else { return false }
+        Task { @MainActor in
+            PrivacyShieldStatistics.shared.recordBlockedRequest(domain: host, port: port, protocolType: protocolType)
+        }
+        respondAndClose(clientConn, status: "403 Forbidden")
+        return true
+    }
+
+    /// The resolver to ask for `host`: a name on the never-block list skips a resolver that filters ads itself.
+    func provider(for host: String) -> DoHProvider {
+        let current = provider
+        if blocklist?.isNeverBlocked(host: host) == true {
+            return current.neverBlockResolver
+        }
+        return current
+    }
+
     /// TCP for both sides of the relay, with Nagle's algorithm off. The proxy forwards small writes as they come (the
     /// CONNECT reply, the ClientHello in two pieces for the anti-DPI split); with Nagle on, the second piece waited
     /// for the server's delayed ACK, which added 80–200 ms to every new HTTPS connection through the shield.
@@ -576,8 +626,12 @@ public final class LocalProxyServer: @unchecked Sendable {
             guard let self = self else { return }
             do {
                 let startTime = Date()
-                let resolvedIP = try await DoHResolver.shared.resolve(domain: targetHost, provider: self.provider)
+                let resolvedIP = try await self.resolver.resolve(domain: targetHost, provider: self.provider(for: targetHost))
                 let elapsedMs = Int(Date().timeIntervalSince(startTime) * 1000)
+
+                if self.refuseIfResolverBlocked(resolvedIP, host: targetHost, port: targetPortRaw, protocolType: "HTTPS", clientConn: clientConn) {
+                    return
+                }
 
                 // Post-resolution security validation:
                 guard Self.isPermittedTarget(resolvedIP: resolvedIP, targetPort: targetPortRaw, proxyPort: self.port) else {
@@ -640,6 +694,9 @@ public final class LocalProxyServer: @unchecked Sendable {
 
                 remoteConn.start(queue: self.queue)
             } catch {
+                if self.refuseIfResolverBlocked(error, host: targetHost, port: targetPortRaw, protocolType: "HTTPS", clientConn: clientConn) {
+                    return
+                }
                 // Log the error class only: its description can embed the queried hostname.
                 NSLog("[PrivacyShield] DoH resolution failed (code %d)", (error as NSError).code)
                 Task { @MainActor in
@@ -746,7 +803,11 @@ public final class LocalProxyServer: @unchecked Sendable {
         Task { [weak self] in
             guard let self = self else { return }
             do {
-                let resolvedIP = try await DoHResolver.shared.resolve(domain: host, provider: self.provider)
+                let resolvedIP = try await self.resolver.resolve(domain: host, provider: self.provider(for: host))
+
+                if self.refuseIfResolverBlocked(resolvedIP, host: host, port: resolvedPort, protocolType: "HTTP", clientConn: clientConn) {
+                    return
+                }
 
                 // Post-resolution security validation:
                 guard Self.isPermittedTarget(resolvedIP: resolvedIP, targetPort: resolvedPort, proxyPort: self.port) else {
@@ -804,6 +865,9 @@ public final class LocalProxyServer: @unchecked Sendable {
                 }
                 remoteConn.start(queue: self.queue)
             } catch {
+                if self.refuseIfResolverBlocked(error, host: host, port: resolvedPort, protocolType: "HTTP", clientConn: clientConn) {
+                    return
+                }
                 NSLog("[PrivacyShield] DoH resolution failed (code %d)", (error as NSError).code)
                 Task { @MainActor in
                     PrivacyShieldStatistics.shared.recordFailedRequest(

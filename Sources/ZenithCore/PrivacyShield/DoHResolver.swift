@@ -117,8 +117,14 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
             return cleanDomain
         }
 
-        // 2. Check local in-memory cache
-        if let cachedIP = await cache.get(domain: cleanDomain) {
+        // 2. Check local in-memory cache: the resolvers' own addresses (bootstrap, any provider), then this
+        // provider's answers. Answers are kept per provider because they differ: a filtering resolver answers
+        // `0.0.0.0` for a name another one resolves, and a never-blocked name is asked of an unfiltered one.
+        if let bootstrapIP = await cache.get(domain: cleanDomain) {
+            return bootstrapIP
+        }
+        let cacheKey = provider.id + "|" + cleanDomain
+        if let cachedIP = await cache.get(domain: cacheKey) {
             return cachedIP
         }
 
@@ -126,9 +132,36 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
         let resolvedIP = try await queryDoH(domain: cleanDomain, provider: provider)
 
         // 4. Cache valid resolution for 5 minutes (300 seconds default TTL)
-        await cache.set(domain: cleanDomain, ip: resolvedIP, ttl: 300)
+        await cache.set(domain: cacheKey, ip: resolvedIP, ttl: 300)
 
         return resolvedIP
+    }
+
+    /// Whether resolving failed because the resolver gave no address at all (NXDOMAIN, REFUSED, or an empty answer),
+    /// which is how a filtering resolver in NXDOMAIN mode (a NextDNS option, AdGuard Home) blocks a name.
+    public static func isNoAddressError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == "DoHResolver" && nsError.code == 404
+    }
+
+    /// Whether a resolver's answer means "blocked": filtering resolvers (AdGuard DNS, NextDNS) answer an ad or tracker
+    /// name with the unspecified address, `0.0.0.0` or `::`. Connecting there would reach this Mac itself.
+    public static func isBlockingAnswer(_ address: String) -> Bool {
+        let clean = address.trimmingCharacters(in: CharacterSet(charactersIn: "[] ")).lowercased()
+        var v4 = in_addr()
+        if inet_pton(AF_INET, clean, &v4) == 1 {
+            return v4.s_addr == 0
+        }
+        var v6 = in6_addr()
+        if inet_pton(AF_INET6, clean, &v6) == 1 {
+            // `::`, and `::ffff:0.0.0.0` (the IPv4-mapped form of 0.0.0.0), which reaches this Mac just the same.
+            return withUnsafeBytes(of: &v6) { bytes in
+                bytes.allSatisfy { $0 == 0 }
+                    || (bytes[0..<10].allSatisfy { $0 == 0 } && bytes[10] == 0xff && bytes[11] == 0xff
+                        && bytes[12..<16].allSatisfy { $0 == 0 })
+            }
+        }
+        return false
     }
 
     private func queryDoH(domain: String, provider: DoHProvider) async throws -> String {
