@@ -1055,3 +1055,6 @@
 "AdGuard DNS answers ad and tracker names with nothing, from a long list it keeps up to date, so nothing has to be downloaded here. Like any resolver, it sees the names you look up." = "AdGuard DNS liefert für Werbe- und Tracker-Namen keine Adresse, nach einer langen, stets aktuellen Liste – hier muss also nichts geladen werden. Wie jeder Resolver sieht es die Namen, die du abfragst.";
 "Use AdGuard DNS" = "AdGuard DNS verwenden";
 "No domains on your lists" = "Keine Domains auf deinen Listen";
+"If your custom resolver filters ads, its blocks are counted here too, and Never Block applies to it." = "Wenn dein eigener Resolver Werbung filtert, werden seine Blockierungen hier ebenfalls gezählt, und „Nie blockieren“ gilt auch für ihn.";
+"Nothing is blocked: your lists are empty and this resolver does not filter ads. Use AdGuard DNS below, or import a list." = "Nichts wird blockiert: Deine Listen sind leer und dieser Resolver filtert keine Werbung. Verwende unten AdGuard DNS oder importiere eine Liste.";
+"Ad blocking has no list: choose AdGuard DNS in Settings › Privacy Shield, or import a list." = "Der Werbeblocker hat keine Liste: Wähle AdGuard DNS unter Einstellungen › Privacy Shield oder importiere eine Liste.";

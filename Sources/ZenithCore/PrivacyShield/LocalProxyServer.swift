@@ -63,6 +63,19 @@ public final class LocalProxyServer: @unchecked Sendable {
         return true
     }
 
+    /// A filtering resolver in NXDOMAIN mode answers a blocked name with no address. From a resolver that filters, that
+    /// is taken as a block (403, counted as blocked); from any other resolver it stays a failed lookup (502). A name
+    /// that really does not exist is then also counted as blocked: the resolver's answer cannot tell the two apart.
+    /// - Returns: Whether the connection was refused.
+    private func refuseIfResolverBlocked(_ error: Error, host: String, port: UInt16, protocolType: String, clientConn: NWConnection) -> Bool {
+        guard DoHResolver.isNoAddressError(error), provider(for: host).blocksAdsItself else { return false }
+        Task { @MainActor in
+            PrivacyShieldStatistics.shared.recordBlockedRequest(domain: host, port: port, protocolType: protocolType)
+        }
+        respondAndClose(clientConn, status: "403 Forbidden")
+        return true
+    }
+
     /// The resolver to ask for `host`: a name on the never-block list skips a resolver that filters ads itself.
     func provider(for host: String) -> DoHProvider {
         let current = provider
@@ -672,6 +685,9 @@ public final class LocalProxyServer: @unchecked Sendable {
 
                 remoteConn.start(queue: self.queue)
             } catch {
+                if self.refuseIfResolverBlocked(error, host: targetHost, port: targetPortRaw, protocolType: "HTTPS", clientConn: clientConn) {
+                    return
+                }
                 // Log the error class only: its description can embed the queried hostname.
                 NSLog("[PrivacyShield] DoH resolution failed (code %d)", (error as NSError).code)
                 Task { @MainActor in
@@ -840,6 +856,9 @@ public final class LocalProxyServer: @unchecked Sendable {
                 }
                 remoteConn.start(queue: self.queue)
             } catch {
+                if self.refuseIfResolverBlocked(error, host: host, port: resolvedPort, protocolType: "HTTP", clientConn: clientConn) {
+                    return
+                }
                 NSLog("[PrivacyShield] DoH resolution failed (code %d)", (error as NSError).code)
                 Task { @MainActor in
                     PrivacyShieldStatistics.shared.recordFailedRequest(

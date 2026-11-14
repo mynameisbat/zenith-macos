@@ -137,6 +137,13 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
         return resolvedIP
     }
 
+    /// Whether resolving failed because the resolver gave no address at all (NXDOMAIN, REFUSED, or an empty answer),
+    /// which is how a filtering resolver in NXDOMAIN mode (a NextDNS option, AdGuard Home) blocks a name.
+    public static func isNoAddressError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == "DoHResolver" && nsError.code == 404
+    }
+
     /// Whether a resolver's answer means "blocked": filtering resolvers (AdGuard DNS, NextDNS) answer an ad or tracker
     /// name with the unspecified address, `0.0.0.0` or `::`. Connecting there would reach this Mac itself.
     public static func isBlockingAnswer(_ address: String) -> Bool {

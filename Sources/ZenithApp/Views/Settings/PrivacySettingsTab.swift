@@ -94,6 +94,17 @@ public struct PrivacySettingsTab: View {
                 Image(systemName: "checkmark.shield")
                     .foregroundColor(.green)
             }
+        } else if case .custom = provider {
+            // A custom resolver may be the user's own filter (AdGuard Home, Pi-hole): no AdGuard offer over it.
+            Label {
+                Text("If your custom resolver filters ads, its blocks are counted here too, and Never Block applies to it.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: "shield")
+                    .foregroundColor(.secondary)
+            }
         } else {
             HStack(alignment: .center, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -156,6 +167,16 @@ public struct PrivacySettingsTab: View {
                             .foregroundColor(.orange)
                     }
 
+                    if blocking.activeDomainCount == 0,
+                       !controller.statistics.selectedProvider.blocksAdsItself,
+                       !isCustomProvider(controller.statistics.selectedProvider) {
+                        // Since the built-in list went away, a switch that is on can block nothing at all.
+                        Label("Nothing is blocked: your lists are empty and this resolver does not filter ads. Use AdGuard DNS below, or import a list.", systemImage: "exclamationmark.triangle")
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     divider
                     dnsFilteringRow
 
@@ -211,6 +232,11 @@ public struct PrivacySettingsTab: View {
             }
             .zenithSettingsCard(cornerRadius: 10, padding: 12)
         }
+    }
+
+    private func isCustomProvider(_ provider: DoHProvider) -> Bool {
+        if case .custom = provider { return true }
+        return false
     }
 
     /// Never Block also wins over a filtering resolver, so it is shown whenever one is in use, switch on or off.

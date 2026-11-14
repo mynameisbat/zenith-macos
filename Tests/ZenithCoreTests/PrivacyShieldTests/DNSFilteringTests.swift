@@ -6,10 +6,11 @@ import Darwin
 /// A resolver that answers from a table and remembers which provider each name was asked of. No network.
 private final class FakeResolver: DoHResolverProtocol, @unchecked Sendable {
     private let lock = NSLock()
-    private let answer: @Sendable (String, DoHProvider) -> String
+    private let answer: @Sendable (String, DoHProvider) -> String?
     private var _asked: [(host: String, providerID: String)] = []
 
-    init(answer: @escaping @Sendable (String, DoHProvider) -> String) {
+    /// `answer` returns nil for "no address" (what DoHResolver throws for NXDOMAIN or an empty answer).
+    init(answer: @escaping @Sendable (String, DoHProvider) -> String?) {
         self.answer = answer
     }
 
@@ -21,7 +22,10 @@ private final class FakeResolver: DoHResolverProtocol, @unchecked Sendable {
 
     func resolve(domain: String, provider: DoHProvider) async throws -> String {
         lock.withLock { _asked.append((domain, provider.id)) }
-        return answer(domain, provider)
+        guard let address = answer(domain, provider) else {
+            throw NSError(domain: "DoHResolver", code: 404, userInfo: nil)
+        }
+        return address
     }
 }
 
@@ -172,5 +176,24 @@ struct DNSFilteringTests {
 
         #expect(await connectStatus(port: port, host: "x.ads.listed.example").hasPrefix("HTTP/1.1 403 Forbidden"))
         #expect(resolver.asked.isEmpty)
+    }
+
+    @Test("DNSF-09: No address from a filtering resolver (NXDOMAIN mode) is a block; from an unfiltered one, a failure")
+    func testNoAddressFromFilteringResolver() async throws {
+        let resolver = FakeResolver { _, _ in nil }
+        let (filtering, filteringPort) = try await startProxy(provider: .nextdns(profileID: "abc123"), blocklist: nil, resolver: resolver)
+        defer { filtering.stop() }
+        #expect(await connectStatus(port: filteringPort, host: "ads.filtered.example").hasPrefix("HTTP/1.1 403 Forbidden"))
+
+        let (plain, plainPort) = try await startProxy(provider: .cloudflare, blocklist: nil, resolver: resolver)
+        defer { plain.stop() }
+        #expect(await connectStatus(port: plainPort, host: "no-such-name.example").hasPrefix("HTTP/1.1 502"))
+    }
+
+    @Test("DNSF-10: DoHResolver's no-address error is recognised; other errors are not")
+    func testNoAddressError() {
+        #expect(DoHResolver.isNoAddressError(NSError(domain: "DoHResolver", code: 404)))
+        #expect(!DoHResolver.isNoAddressError(URLError(.timedOut)))
+        #expect(!DoHResolver.isNoAddressError(NSError(domain: "DoHResolver", code: 500)))
     }
 }

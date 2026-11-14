@@ -1055,3 +1055,6 @@
 "AdGuard DNS answers ad and tracker names with nothing, from a long list it keeps up to date, so nothing has to be downloaded here. Like any resolver, it sees the names you look up." = "AdGuard DNS 会依据其持续更新的长列表，不为广告和跟踪器域名返回地址，因此这里无需下载任何内容。与任何解析器一样，它能看到你查询的域名。";
 "Use AdGuard DNS" = "使用 AdGuard DNS";
 "No domains on your lists" = "你的列表中没有域名";
+"If your custom resolver filters ads, its blocks are counted here too, and Never Block applies to it." = "如果你的自定义解析器会过滤广告，它的拦截也会计入此处，“永不拦截”也对它生效。";
+"Nothing is blocked: your lists are empty and this resolver does not filter ads. Use AdGuard DNS below, or import a list." = "没有拦截任何内容：你的列表为空，且此解析器不过滤广告。请使用下方的 AdGuard DNS，或导入列表。";
+"Ad blocking has no list: choose AdGuard DNS in Settings › Privacy Shield, or import a list." = "广告拦截没有列表：请在“设置 › 隐私护盾”中选择 AdGuard DNS，或导入列表。";
