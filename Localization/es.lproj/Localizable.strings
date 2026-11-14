@@ -539,7 +539,7 @@
 "BLOCKED" = "BLOQUEADO";
 "Block Ads and Trackers" = "Bloquear anuncios y rastreadores";
 "Blocked Requests" = "Solicitudes bloqueadas";
-"Built-in list only. Import a hosts file for more." = "Solo la lista integrada. Importa un archivo hosts para bloquear más.";
+"No list imported. Import a hosts file, or use a filtering resolver." = "No hay ninguna lista importada. Importa un archivo hosts o usa un resolutor con filtrado.";
 "Choose a hosts file or a list of domains" = "Elige un archivo hosts o una lista de dominios";
 "Domain List" = "Lista de dominios";
 "Download" = "Descarga";
@@ -554,7 +554,7 @@
 "Network speed: download and upload" = "Velocidad de red: descarga y subida";
 "Never Block" = "No bloquear nunca";
 "No domain names were found in that file. Zenith reads hosts files, plain lists with one domain per line, and ad-blocker rules such as ||ads.example.com^." = "No se han encontrado nombres de dominio en ese archivo. Zenith lee archivos hosts, listas simples con un dominio por línea y reglas de bloqueadores de anuncios como ||ads.example.com^.";
-"Refuses connections to known advertising and tracking domains before any lookup is made for them. It applies to apps that use the system proxy, and only while Privacy Shield is on." = "Rechaza las conexiones a dominios conocidos de publicidad y rastreo antes de buscar su dirección. Se aplica a las apps que usan el proxy del sistema, y solo mientras Privacy Shield está activado.";
+"Refuses connections to the domains on your lists before any lookup is made for them, and to the ones a filtering resolver blocks. It applies to apps that use the system proxy, and only while Privacy Shield is on." = "Rechaza las conexiones a los dominios de tus listas antes de consultarlos, y a los que bloquea un resolutor con filtrado. Se aplica a las apps que usan el proxy del sistema, y solo mientras Privacy Shield está activado.";
 "Remove %@" = "Quitar %@";
 "That file is too large for a domain list (over 50 MB)." = "Ese archivo es demasiado grande para una lista de dominios (más de 50 MB).";
 "That is not a domain name Zenith can block. Use a name such as ads.example.com." = "Ese no es un nombre de dominio que Zenith pueda bloquear. Usa un nombre como ads.example.com.";

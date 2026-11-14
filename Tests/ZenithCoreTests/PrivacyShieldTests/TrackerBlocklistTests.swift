@@ -146,29 +146,6 @@ struct TrackerBlocklistTests {
         #expect(Date().timeIntervalSince(started) < 30)
     }
 
-    // MARK: Built-in list
-
-    @Test("TB-10: Every built-in entry is a valid domain, with no duplicates, and common sites are not on it")
-    func testBuiltInList() {
-        let builtIn = TrackerBlocklist.builtInDomains
-        #expect(builtIn.count > 50)
-        for domain in builtIn {
-            #expect(TrackerBlocklist.normalize(domain) == domain, "\(domain)")
-        }
-        #expect(Set(builtIn).count == builtIn.count)
-
-        let list = TrackerBlocklist(blocked: builtIn)
-        #expect(list.isBlocked(host: "securepubads.g.doubleclick.net"))
-        #expect(list.isBlocked(host: "www.google-analytics.com"))
-        // Things sites need to work must not be here.
-        for host in ["google.com", "www.google.com", "accounts.google.com", "gstatic.com", "fonts.googleapis.com",
-                     "apple.com", "icloud.com", "github.com", "cloudflare.com", "cdnjs.cloudflare.com", "stripe.com",
-                     "paypal.com", "facebook.com", "twitter.com", "linkedin.com", "youtube.com", "ytimg.com",
-                     "googletagmanager.com", "amazon.com", "microsoft.com", "bing.com", "yahoo.com", "pinterest.com"] {
-            #expect(!list.isBlocked(host: host), "\(host)")
-        }
-    }
-
     // MARK: The proxy
 
     private func startProxy(blocklist: TrackerBlocklist?) async throws -> (LocalProxyServer, UInt16) {
@@ -216,7 +193,7 @@ struct TrackerBlocklistTests {
             Sock.send(fd, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK")
         }
         defer { origin.stop() }
-        let (server, proxyPort) = try await startProxy(blocklist: TrackerBlocklist(blocked: TrackerBlocklist.builtInDomains))
+        let (server, proxyPort) = try await startProxy(blocklist: TrackerBlocklist(blocked: ["doubleclick.net", "ads.test-tracker.example"]))
         defer { server.stop() }
         let originPort = origin.port
 
@@ -270,7 +247,7 @@ struct TrackerBlockingSettingsTests {
         return url
     }
 
-    @Test("TS-01: Blocking is off until the user turns it on, and the list is empty while it is off")
+    @Test("TS-01: Blocking is off until the user turns it on, starts with no list, and is empty while it is off")
     func testOffByDefault() throws {
         let (settings, _, _) = try makeSettings(suite: "ts01")
         #expect(!settings.isEnabled)
@@ -278,7 +255,11 @@ struct TrackerBlockingSettingsTests {
         #expect(!settings.blocklist.isBlocked(host: "ads.doubleclick.net"))
 
         settings.isEnabled = true
-        #expect(settings.activeDomainCount == settings.builtInDomainCount)
+        // There is no built-in list: only what the user imports or adds is blocked here (a filtering resolver does the rest).
+        #expect(settings.activeDomainCount == 0)
+        #expect(!settings.blocklist.isBlocked(host: "ads.doubleclick.net"))
+        settings.addCustomDomain("doubleclick.net")
+        #expect(settings.activeDomainCount == 1)
         #expect(settings.blocklist.isBlocked(host: "ads.doubleclick.net"))
 
         settings.isEnabled = false
@@ -302,10 +283,11 @@ struct TrackerBlockingSettingsTests {
         #expect(!settings.blocklist.isBlocked(host: "img.annoying.example.org"))
     }
 
-    @Test("TS-03: A never-block domain frees a built-in entry")
+    @Test("TS-03: A never-block domain frees a blocked entry")
     func testAllowedDomains() throws {
         let (settings, _, _) = try makeSettings(suite: "ts03")
         settings.isEnabled = true
+        settings.addCustomDomain("bing.com")
         #expect(settings.blocklist.isBlocked(host: "bat.bing.com"))
         #expect(settings.addAllowedDomain("bat.bing.com") == .added("bat.bing.com"))
         #expect(!settings.blocklist.isBlocked(host: "bat.bing.com"))

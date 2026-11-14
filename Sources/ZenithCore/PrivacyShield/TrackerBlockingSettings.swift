@@ -23,7 +23,7 @@ public enum TrackerDomainEntryResult: Equatable, Sendable {
     case invalid
 }
 
-/// Whether Privacy Shield blocks trackers, and the lists it uses: the built-in one, one the user imported, domains
+/// Whether Privacy Shield blocks trackers, and the lists it uses: one the user imported, domains
 /// they added, and domains they never want blocked. Saved in `UserDefaults` (the lists of names) and in a text file
 /// (an imported list, which can have hundreds of thousands of entries).
 ///
@@ -94,8 +94,6 @@ public final class TrackerBlockingSettings: ObservableObject {
     /// How many domains are blocked right now: zero while blocking is off.
     public var activeDomainCount: Int { blocklist.blockedCount }
 
-    /// How many domains the built-in list has.
-    public var builtInDomainCount: Int { TrackerBlocklist.builtInDomains.count }
 
     // MARK: - Domains the user typed
 
@@ -179,10 +177,10 @@ public final class TrackerBlockingSettings: ObservableObject {
 
     private func applyToBlocklist() {
         if isEnabled {
-            // Every part is already normalized: the built-in list is checked by a test, the imported one when it was
+            // Every part is already normalized: the imported list when it was
             // read, and the user's entries when they were added. Nothing here is cleaned again.
             blocklist.replace(
-                normalizedBlocked: Self.builtInSet.union(importedDomains).union(customDomains),
+                normalizedBlocked: importedDomains.union(customDomains),
                 normalizedAllowed: Set(allowedDomains)
             )
         } else {
@@ -192,7 +190,6 @@ public final class TrackerBlockingSettings: ObservableObject {
         }
     }
 
-    private static let builtInSet: Set<String> = Set(TrackerBlocklist.builtInDomains.compactMap(TrackerBlocklist.normalize))
 
     private static func cleaned(_ names: [String]) -> [String] {
         var seen = Set<String>()

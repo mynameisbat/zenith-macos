@@ -123,7 +123,7 @@ public struct PrivacySettingsTab: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Block Ads and Trackers")
                             .font(.system(size: 12, weight: .medium))
-                        Text("Refuses connections to known advertising and tracking domains before any lookup is made for them. It applies to apps that use the system proxy, and only while Privacy Shield is on.")
+                        Text("Refuses connections to the domains on your lists before any lookup is made for them, and to the ones a filtering resolver blocks. It applies to apps that use the system proxy, and only while Privacy Shield is on.")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -171,7 +171,7 @@ public struct PrivacySettingsTab: View {
                                     .foregroundColor(.secondary)
                                     .lineLimit(1)
                             } else {
-                                Text("Built-in list only. Import a hosts file for more.")
+                                Text("No list imported. Import a hosts file, or use a filtering resolver.")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }

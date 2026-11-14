@@ -539,7 +539,7 @@
 "BLOCKED" = "ブロック済み";
 "Block Ads and Trackers" = "広告とトラッカーをブロック";
 "Blocked Requests" = "ブロックしたリクエスト";
-"Built-in list only. Import a hosts file for more." = "内蔵リストのみ。hostsファイルを読み込むと追加できます。";
+"No list imported. Import a hosts file, or use a filtering resolver." = "リストは読み込まれていません。hostsファイルを読み込むか、フィルタリングするリゾルバを使用してください。";
 "Choose a hosts file or a list of domains" = "hostsファイルまたはドメインのリストを選択";
 "Domain List" = "ドメインリスト";
 "Download" = "ダウンロード";
@@ -554,7 +554,7 @@
 "Network speed: download and upload" = "ネットワーク速度: ダウンロードとアップロード";
 "Never Block" = "ブロックしない";
 "No domain names were found in that file. Zenith reads hosts files, plain lists with one domain per line, and ad-blocker rules such as ||ads.example.com^." = "このファイルにドメイン名が見つかりませんでした。Zenithが読み込めるのは、hostsファイル、1行に1ドメインのリスト、||ads.example.com^のような広告ブロッカーのルールです。";
-"Refuses connections to known advertising and tracking domains before any lookup is made for them. It applies to apps that use the system proxy, and only while Privacy Shield is on." = "既知の広告およびトラッキング用ドメインへの接続を、名前解決する前に拒否します。システムプロキシを使うアプリに対して、Privacy Shieldがオンのときだけ働きます。";
+"Refuses connections to the domains on your lists before any lookup is made for them, and to the ones a filtering resolver blocks. It applies to apps that use the system proxy, and only while Privacy Shield is on." = "リストにあるドメインへの接続を問い合わせ前に拒否し、フィルタリングするリゾルバがブロックしたドメインへの接続も拒否します。システムプロキシを使うアプリにのみ、Privacy Shieldがオンのときだけ適用されます。";
 "Remove %@" = "%@を削除";
 "That file is too large for a domain list (over 50 MB)." = "このファイルはドメインリストとしては大きすぎます（50 MB超）。";
 "That is not a domain name Zenith can block. Use a name such as ads.example.com." = "Zenithがブロックできるドメイン名ではありません。ads.example.comのような名前を使ってください。";

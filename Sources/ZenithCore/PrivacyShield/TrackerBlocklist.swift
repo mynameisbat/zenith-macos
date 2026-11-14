@@ -182,31 +182,3 @@ public final class TrackerBlocklist: @unchecked Sendable {
         return result
     }
 }
-
-// MARK: - Built-in list
-
-public extension TrackerBlocklist {
-    /// A small starting list: advertising networks, ad exchanges and analytics endpoints that exist to serve ads or
-    /// follow people between sites. Nothing on it is a site people visit, and it leaves out the hosts that sites need
-    /// to work (CDNs, sign-in, payment, tag managers). Import a larger list from Settings for more.
-    static let builtInDomains: [String] = [
-        // Google advertising and analytics
-        "doubleclick.net", "googlesyndication.com", "googleadservices.com", "google-analytics.com",
-        "adservice.google.com", "2mdn.net", "app-measurement.com",
-        // Ad exchanges and networks
-        "adnxs.com", "adsrvr.org", "rubiconproject.com", "pubmatic.com", "openx.net", "casalemedia.com",
-        "criteo.com", "criteo.net", "taboola.com", "outbrain.com", "amazon-adsystem.com", "adform.net",
-        "smartadserver.com", "advertising.com", "yieldmo.com", "sharethrough.com", "teads.tv", "33across.com",
-        "indexww.com", "bidswitch.net", "contextweb.com", "lijit.com", "zedo.com", "revcontent.com", "mgid.com",
-        "serving-sys.com", "mookie1.com", "moatads.com", "adsymptotic.com",
-        // Audience measurement and data brokers
-        "scorecardresearch.com", "quantserve.com", "demdex.net", "omtrdc.net", "everesttech.net", "2o7.net",
-        "krxd.net", "rlcdn.com", "bluekai.com", "mathtag.com", "tapad.com", "agkn.com",
-        // Social-network ad and pixel endpoints
-        "ads-twitter.com", "analytics.tiktok.com", "px.ads.linkedin.com", "snap.licdn.com", "ct.pinterest.com",
-        "an.facebook.com", "ads.yahoo.com", "analytics.yahoo.com", "bat.bing.com", "clarity.ms",
-        // Session recording and product analytics endpoints
-        "static.hotjar.com", "script.hotjar.com", "vars.hotjar.com", "insights.hotjar.com",
-        "rs.fullstory.com", "edge.fullstory.com", "api.mixpanel.com", "api-js.mixpanel.com"
-    ]
-}

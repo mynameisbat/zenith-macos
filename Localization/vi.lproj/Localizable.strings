@@ -539,7 +539,7 @@
 "BLOCKED" = "ĐÃ CHẶN";
 "Block Ads and Trackers" = "Chặn quảng cáo và trình theo dõi";
 "Blocked Requests" = "Yêu cầu đã bị chặn";
-"Built-in list only. Import a hosts file for more." = "Chỉ dùng danh sách có sẵn. Nhập tệp hosts để chặn thêm.";
+"No list imported. Import a hosts file, or use a filtering resolver." = "Chưa nhập danh sách. Hãy nhập file hosts, hoặc dùng resolver có lọc.";
 "Choose a hosts file or a list of domains" = "Chọn tệp hosts hoặc danh sách tên miền";
 "Domain List" = "Danh sách tên miền";
 "Download" = "Tải xuống";
@@ -554,7 +554,7 @@
 "Network speed: download and upload" = "Tốc độ mạng: tải xuống và tải lên";
 "Never Block" = "Không bao giờ chặn";
 "No domain names were found in that file. Zenith reads hosts files, plain lists with one domain per line, and ad-blocker rules such as ||ads.example.com^." = "Không tìm thấy tên miền nào trong tệp này. Zenith đọc được tệp hosts, danh sách mỗi dòng một tên miền và quy tắc chặn quảng cáo dạng ||ads.example.com^.";
-"Refuses connections to known advertising and tracking domains before any lookup is made for them. It applies to apps that use the system proxy, and only while Privacy Shield is on." = "Từ chối kết nối tới các tên miền quảng cáo và theo dõi đã biết, trước khi tra cứu bất kỳ địa chỉ nào cho chúng. Chỉ áp dụng cho ứng dụng dùng proxy hệ thống và chỉ khi Privacy Shield đang bật.";
+"Refuses connections to the domains on your lists before any lookup is made for them, and to the ones a filtering resolver blocks. It applies to apps that use the system proxy, and only while Privacy Shield is on." = "Từ chối kết nối tới các tên miền trong danh sách của bạn trước khi tra cứu, và tới những tên miền resolver lọc chặn. Chỉ áp dụng cho ứng dụng dùng proxy hệ thống, và chỉ khi Privacy Shield đang bật.";
 "Remove %@" = "Bỏ %@";
 "That file is too large for a domain list (over 50 MB)." = "Tệp này quá lớn để làm danh sách tên miền (trên 50 MB).";
 "That is not a domain name Zenith can block. Use a name such as ads.example.com." = "Đây không phải tên miền mà Zenith có thể chặn. Hãy dùng tên như ads.example.com.";

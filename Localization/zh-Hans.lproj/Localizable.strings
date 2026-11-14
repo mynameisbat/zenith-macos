@@ -539,7 +539,7 @@
 "BLOCKED" = "已拦截";
 "Block Ads and Trackers" = "拦截广告和跟踪器";
 "Blocked Requests" = "已拦截的请求";
-"Built-in list only. Import a hosts file for more." = "仅使用内建列表。导入 hosts 文件可拦截更多。";
+"No list imported. Import a hosts file, or use a filtering resolver." = "未导入列表。请导入 hosts 文件，或使用过滤型解析器。";
 "Choose a hosts file or a list of domains" = "选取 hosts 文件或域名列表";
 "Domain List" = "域名列表";
 "Download" = "下载";
@@ -554,7 +554,7 @@
 "Network speed: download and upload" = "网络速度：下载和上传";
 "Never Block" = "永不拦截";
 "No domain names were found in that file. Zenith reads hosts files, plain lists with one domain per line, and ad-blocker rules such as ||ads.example.com^." = "该文件中未找到域名。Zenith 可读取 hosts 文件、每行一个域名的纯文本列表，以及 ||ads.example.com^ 这类广告拦截规则。";
-"Refuses connections to known advertising and tracking domains before any lookup is made for them. It applies to apps that use the system proxy, and only while Privacy Shield is on." = "在查询任何地址之前，就拒绝连接到已知的广告和跟踪域名。仅适用于使用系统代理的 App，且仅在隐私护盾打开时生效。";
+"Refuses connections to the domains on your lists before any lookup is made for them, and to the ones a filtering resolver blocks. It applies to apps that use the system proxy, and only while Privacy Shield is on." = "在查询之前拒绝连接你列表中的域名，并拒绝过滤型解析器拦截的域名。仅适用于使用系统代理的应用，且仅在隐私护盾开启时有效。";
 "Remove %@" = "移除 %@";
 "That file is too large for a domain list (over 50 MB)." = "该文件太大，无法作为域名列表（超过 50 MB）。";
 "That is not a domain name Zenith can block. Use a name such as ads.example.com." = "这不是 Zenith 可以拦截的域名。请使用类似 ads.example.com 的名称。";

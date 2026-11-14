@@ -539,7 +539,7 @@
 "BLOCKED" = "차단됨";
 "Block Ads and Trackers" = "광고 및 추적기 차단";
 "Blocked Requests" = "차단된 요청";
-"Built-in list only. Import a hosts file for more." = "기본 제공 목록만 사용합니다. 더 차단하려면 hosts 파일을 가져오십시오.";
+"No list imported. Import a hosts file, or use a filtering resolver." = "가져온 목록이 없습니다. hosts 파일을 가져오거나 필터링 리졸버를 사용하세요.";
 "Choose a hosts file or a list of domains" = "hosts 파일 또는 도메인 목록 선택";
 "Domain List" = "도메인 목록";
 "Download" = "다운로드";
@@ -554,7 +554,7 @@
 "Network speed: download and upload" = "네트워크 속도: 다운로드 및 업로드";
 "Never Block" = "차단 안 함";
 "No domain names were found in that file. Zenith reads hosts files, plain lists with one domain per line, and ad-blocker rules such as ||ads.example.com^." = "이 파일에서 도메인 이름을 찾지 못했습니다. Zenith는 hosts 파일, 한 줄에 도메인 하나씩 적힌 일반 목록, ||ads.example.com^ 같은 광고 차단 규칙을 읽을 수 있습니다.";
-"Refuses connections to known advertising and tracking domains before any lookup is made for them. It applies to apps that use the system proxy, and only while Privacy Shield is on." = "알려진 광고 및 추적 도메인에 대한 연결을 조회 전에 거부합니다. 시스템 프록시를 사용하는 앱에 적용되며 Privacy Shield가 켜져 있을 때만 작동합니다.";
+"Refuses connections to the domains on your lists before any lookup is made for them, and to the ones a filtering resolver blocks. It applies to apps that use the system proxy, and only while Privacy Shield is on." = "조회하기 전에 목록에 있는 도메인으로의 연결을 거부하고, 필터링 리졸버가 차단한 도메인으로의 연결도 거부합니다. 시스템 프록시를 사용하는 앱에만, Privacy Shield가 켜져 있을 때만 적용됩니다.";
 "Remove %@" = "%@ 제거";
 "That file is too large for a domain list (over 50 MB)." = "도메인 목록으로 사용하기에는 파일이 너무 큽니다(50MB 초과).";
 "That is not a domain name Zenith can block. Use a name such as ads.example.com." = "Zenith가 차단할 수 있는 도메인 이름이 아닙니다. ads.example.com 같은 이름을 사용하십시오.";
