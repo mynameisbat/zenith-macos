@@ -80,6 +80,8 @@ public enum ZenithPermissionFeature: String, CaseIterable, Sendable, Identifiabl
     case musicArtwork
     case leftoversTrash
     case calendarWidget
+    case cleaningMode
+    case snippetExpansion
     case screenRecording
     case scrollingCapture
     case recordingMicrophone
@@ -89,7 +91,7 @@ public enum ZenithPermissionFeature: String, CaseIterable, Sendable, Identifiabl
     public var permission: ZenithPermissionKind {
         switch self {
         case .areaCapture, .fullScreenCapture, .screenText, .screenRecording: return .screenRecording
-        case .autoPaste, .mediaKeyFallback, .scrollingCapture: return .accessibility
+        case .autoPaste, .mediaKeyFallback, .cleaningMode, .snippetExpansion, .scrollingCapture: return .accessibility
         case .playerControls, .musicArtwork, .leftoversTrash: return .automation
         case .calendarWidget: return .calendar
         case .recordingMicrophone: return .microphone
@@ -107,6 +109,8 @@ public enum ZenithPermissionFeature: String, CaseIterable, Sendable, Identifiabl
         case .musicArtwork: return String(localized: "Album art from Music")
         case .leftoversTrash: return String(localized: "Cleaner \u{2192} Leftovers: protected folders")
         case .calendarWidget: return String(localized: "Next calendar event in the island")
+        case .cleaningMode: return String(localized: "Cleaning Mode: block the keyboard and trackpad")
+        case .snippetExpansion: return String(localized: "Expand text snippets as you type")
         case .screenRecording: return String(localized: "Record the screen")
         case .scrollingCapture: return String(localized: "Scroll for you during a scrolling capture")
         case .recordingMicrophone: return String(localized: "Microphone in screen recordings")
@@ -262,20 +266,33 @@ public protocol ZenithFeatureActivityProviding {
     func activity(for feature: ZenithPermissionFeature) -> ZenithFeatureActivity
 }
 
-/// Reads the settings Zenith really has. Only the calendar widget has a switch; the rest are always available.
+/// Reads the settings Zenith really has. The calendar widget, the Cleaning Mode shortcut and typed snippet expansion
+/// have switches; the rest are always available.
 @MainActor
 public struct LiveFeatureActivity: ZenithFeatureActivityProviding {
     private let widgets: IslandWidgetSettings
+    private let cleaningMode: CleaningModeSettings
+    private let snippets: SnippetSettings
     private let recording: ScreenRecordingSettings
 
-    public init(widgets: IslandWidgetSettings = .shared, recording: ScreenRecordingSettings = .shared) {
+    public init(
+        widgets: IslandWidgetSettings = .shared,
+        cleaningMode: CleaningModeSettings = .shared,
+        snippets: SnippetSettings = .shared,
+        recording: ScreenRecordingSettings = .shared
+    ) {
         self.widgets = widgets
+        self.cleaningMode = cleaningMode
+        self.snippets = snippets
         self.recording = recording
     }
 
     public func activity(for feature: ZenithPermissionFeature) -> ZenithFeatureActivity {
         switch feature {
         case .calendarWidget: return widgets.showCalendar ? .on : .off
+        // Cleaning Mode can always be started from the hub; its global shortcut is the switch.
+        case .cleaningMode: return cleaningMode.hotKeyEnabled ? .on : .alwaysAvailable
+        case .snippetExpansion: return snippets.isTypedExpansionEnabled ? .on : .off
         case .recordingMicrophone: return recording.microphone ? .on : .off
         default: return .alwaysAvailable
         }

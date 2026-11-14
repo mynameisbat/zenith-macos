@@ -54,6 +54,8 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
     public static let captureAreaId = "capture.area"
     public static let captureFullscreenId = "capture.fullscreen"
     public static let captureOCRId = "capture.ocr"
+    public static let cleaningModeId = "cleaning.mode"
+    public static let snippetsMenuId = "snippets.menu"
     public static let recordScreenId = "capture.record"
     public static let scrollingCaptureId = "capture.scrolling"
 
@@ -116,6 +118,25 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
         keyEquivalent: "⌃⌥T"
     )
 
+    /// Cleaning Mode: ⌃⌥⇧K ("K for keyboard"). Registered only while Settings turns its shortcut on (off by default),
+    /// and deliberately without ⌘, so the keys that start it are not the ⌃⌥⌘ that end it. Not in `defaultDictionary`.
+    public static let defaultCleaningMode = HotKeyDefinition(
+        id: cleaningModeId,
+        name: "Cleaning Mode",
+        keyCode: 40, // kVK_ANSI_K
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue | CarbonModifierFlags.shift.rawValue,
+        keyEquivalent: "⌃⌥⇧K"
+    )
+
+    /// The snippet menu: ⌃⌥S (Keycode 1: 'S'). Like `defaultOCR`, not part of `defaultDictionary`.
+    public static let defaultSnippetsMenu = HotKeyDefinition(
+        id: snippetsMenuId,
+        name: "Insert Snippet",
+        keyCode: 1, // kVK_ANSI_S
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue,
+        keyEquivalent: "⌃⌥S"
+    )
+
     /// Screen recording: ⌃⌥R (Keycode 15: 'R'). Starts the selector; pressed while recording, it stops.
     public static let defaultRecordScreen = HotKeyDefinition(
         id: recordScreenId,
@@ -161,7 +182,15 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
 
     /// The built-in shortcut of an action, if it has one.
     public static func builtIn(for id: String) -> HotKeyDefinition? {
-        defaultDictionary[id] ?? [captureOCRId: defaultOCR, recordScreenId: defaultRecordScreen, scrollingCaptureId: defaultScrollingCapture][id]
+        if let definition = defaultDictionary[id] { return definition }
+        switch id {
+        case captureOCRId: return defaultOCR
+        case cleaningModeId: return defaultCleaningMode
+        case snippetsMenuId: return defaultSnippetsMenu
+        case recordScreenId: return defaultRecordScreen
+        case scrollingCaptureId: return defaultScrollingCapture
+        default: return nil
+        }
     }
 
     /// Default dictionary containing all standard shortcut presets.

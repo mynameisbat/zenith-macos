@@ -47,6 +47,8 @@ public struct GeneralSettingsTab: View {
 
             UpdatesSettingsSection()
 
+            CleaningModeSettingsSection(viewModel: viewModel)
+
             ZenithSettingsSection(
                 "Clipboard",
                 footer: "When the history is full, the oldest unpinned item makes room for the next one. Pinned items always stay."
@@ -84,6 +86,7 @@ public struct GeneralSettingsTab: View {
 
             ClipboardPrivacySettingsSection()
 
+            KeepAwakeSettingsSection()
             ScreenRecordingSettingsSection()
 
             HStack {
@@ -94,6 +97,8 @@ public struct GeneralSettingsTab: View {
                         IslandWidgetSettings.shared.resetToDefaults()
                         ClipboardPrivacySettings.shared.resetToDefaults()
                         UpdateSettings.shared.resetToDefaults()
+                        KeepAwakeSettings.shared.resetToDefaults()
+                        KeepAwakeHotKeyController.shared.apply()
                         ScreenRecordingSettings.shared.resetToDefaults()
                     }
                 }
