@@ -1,0 +1,5 @@
+/* Zenith, Korean: the texts macOS shows when it asks for a permission. */
+"NSAppleEventsUsageDescription" = "Zenith는 Apple Events를 사용하여 음악과 Spotify에서 재생 중인 항목을 확인하고, Dynamic Island에서 재생을 제어하며, macOS가 다른 앱의 이동을 허용하지 않는 잔여 폴더를 Finder를 통해 휴지통으로 옮깁니다.";
+"NSCalendarsFullAccessUsageDescription" = "캘린더 위젯을 켜면 Zenith가 다가오는 캘린더 이벤트를 Dynamic Island에 표시합니다. 이벤트는 이 Mac에서만 읽습니다.";
+"NSCalendarsUsageDescription" = "캘린더 위젯을 켜면 Zenith가 다가오는 캘린더 이벤트를 Dynamic Island에 표시합니다. 이벤트는 이 Mac에서만 읽습니다.";
+"NSMicrophoneUsageDescription" = "녹화 막대에서 마이크를 켠 경우에만 Zenith가 화면 녹화에 마이크 소리를 녹음합니다.";
