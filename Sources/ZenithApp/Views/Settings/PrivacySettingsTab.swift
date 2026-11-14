@@ -199,24 +199,39 @@ public struct PrivacySettingsTab: View {
                         remove: { blocking.removeCustomDomain($0) }
                     )
 
-                    domainListEditor(
-                        title: "Never Block",
-                        placeholder: "example.com",
-                        text: $tabModel.newAllowedDomain,
-                        domains: blocking.allowedDomains,
-                        add: { addDomain(tabModel.newAllowedDomain, allow: true) },
-                        remove: { blocking.removeAllowedDomain($0) }
-                    )
-
-                    if let message = tabModel.trackerMessage {
-                        Text(verbatim: message)
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    neverBlockEditor
+                    trackerMessageText
+                } else if controller.statistics.selectedProvider.blocksAdsItself {
+                    // The switch is off, but the resolver still filters: show that, and the override for it.
+                    divider
+                    dnsFilteringRow
+                    neverBlockEditor
+                    trackerMessageText
                 }
             }
             .zenithSettingsCard(cornerRadius: 10, padding: 12)
+        }
+    }
+
+    /// Never Block also wins over a filtering resolver, so it is shown whenever one is in use, switch on or off.
+    private var neverBlockEditor: some View {
+        domainListEditor(
+            title: "Never Block",
+            placeholder: "example.com",
+            text: $tabModel.newAllowedDomain,
+            domains: blocking.allowedDomains,
+            add: { addDomain(tabModel.newAllowedDomain, allow: true) },
+            remove: { blocking.removeAllowedDomain($0) }
+        )
+    }
+
+    @ViewBuilder
+    private var trackerMessageText: some View {
+        if let message = tabModel.trackerMessage {
+            Text(verbatim: message)
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -274,7 +289,9 @@ public struct PrivacySettingsTab: View {
     }
 
     private func domainCountText(_ count: Int) -> String {
-        count == 1 ? String(localized: "1 domain blocked") : String(localized: "\(count) domains blocked")
+        // With no list of its own, a "0 domains blocked" headline reads as broken while a filtering resolver blocks.
+        if count == 0 { return String(localized: "No domains on your lists") }
+        return count == 1 ? String(localized: "1 domain blocked") : String(localized: "\(count) domains blocked")
     }
 
     private func importedListText(name: String, count: Int) -> String {

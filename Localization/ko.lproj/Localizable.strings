@@ -1054,3 +1054,4 @@
 "Block More with AdGuard DNS" = "AdGuard DNS로 더 차단하기";
 "AdGuard DNS answers ad and tracker names with nothing, from a long list it keeps up to date, so nothing has to be downloaded here. Like any resolver, it sees the names you look up." = "AdGuard DNS는 계속 업데이트되는 긴 목록에 따라 광고 및 추적기 이름에 주소를 돌려주지 않으므로 여기에서 아무것도 다운로드할 필요가 없습니다. 다른 리졸버처럼 조회한 이름은 AdGuard가 볼 수 있습니다.";
 "Use AdGuard DNS" = "AdGuard DNS 사용";
+"No domains on your lists" = "목록에 도메인이 없습니다";

@@ -1054,3 +1054,4 @@
 "Block More with AdGuard DNS" = "Bloquear más con AdGuard DNS";
 "AdGuard DNS answers ad and tracker names with nothing, from a long list it keeps up to date, so nothing has to be downloaded here. Like any resolver, it sees the names you look up." = "AdGuard DNS no devuelve ninguna dirección para los nombres de anuncios y rastreadores, según una larga lista que mantiene al día, así que aquí no hay que descargar nada. Como cualquier resolutor, ve los nombres que consultas.";
 "Use AdGuard DNS" = "Usar AdGuard DNS";
+"No domains on your lists" = "No hay dominios en tus listas";

@@ -147,7 +147,12 @@ public final class DoHResolver: DoHResolverProtocol, Sendable {
         }
         var v6 = in6_addr()
         if inet_pton(AF_INET6, clean, &v6) == 1 {
-            return withUnsafeBytes(of: &v6) { bytes in bytes.allSatisfy { $0 == 0 } }
+            // `::`, and `::ffff:0.0.0.0` (the IPv4-mapped form of 0.0.0.0), which reaches this Mac just the same.
+            return withUnsafeBytes(of: &v6) { bytes in
+                bytes.allSatisfy { $0 == 0 }
+                    || (bytes[0..<10].allSatisfy { $0 == 0 } && bytes[10] == 0xff && bytes[11] == 0xff
+                        && bytes[12..<16].allSatisfy { $0 == 0 })
+            }
         }
         return false
     }

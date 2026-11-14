@@ -42,15 +42,18 @@ public enum DoHProvider: Identifiable, Sendable, Codable, Equatable, Hashable, C
     }
 
     /// The resolver to ask for a name on the never-block list, so that "Never Block" also wins over a filtering
-    /// resolver. Unfiltered resolvers are asked as they are; AdGuard has an unfiltered twin run by the same company;
-    /// NextDNS and a custom resolver (which may filter) fall back to Cloudflare.
+    /// resolver, without sending the name to a company the user did not choose when there is a choice: unfiltered
+    /// resolvers are asked as they are; AdGuard has an unfiltered twin; NextDNS answers unfiltered without a profile.
+    /// Only a custom resolver (which may filter, and has no known twin) falls back to Cloudflare.
     public var neverBlockResolver: DoHProvider {
         switch self {
         case .cloudflare, .google, .quad9:
             return self
         case .adguard:
             return .custom(url: URL(string: "https://unfiltered.adguard-dns.com/resolve")!, bootstrapIP: "94.140.14.140")
-        case .nextdns, .custom:
+        case .nextdns:
+            return .nextdns(profileID: "")
+        case .custom:
             return .cloudflare
         }
     }

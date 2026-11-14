@@ -58,23 +58,14 @@ public final class TrackerBlocklist: @unchecked Sendable {
 
     /// Whether a connection to `host` should be refused.
     public func isBlocked(host: String) -> Bool {
-        let name = host.trimmingCharacters(in: CharacterSet(charactersIn: "[] .")).lowercased()
-        // Addresses and one-word names (`localhost`, a printer) are never ad domains.
-        guard name.contains("."), !Self.looksLikeAddress(name) else { return false }
-
+        let keys = Self.selfAndParents(of: host)   // outside the lock: the proxy's threads all call this
         lock.lock()
         defer { lock.unlock() }
         guard !blocked.isEmpty else { return false }
-
-        // The host itself first, then each parent, stopping before the last label (`com`).
-        var candidate = Substring(name)
         var matchedBlock = false
-        while candidate.contains(".") {
-            let key = String(candidate)
+        for key in keys {
             if allowed.contains(key) { return false }
             if blocked.contains(key) { matchedBlock = true }
-            guard let dot = candidate.firstIndex(of: ".") else { break }
-            candidate = candidate[candidate.index(after: dot)...]
         }
         return matchedBlock
     }
@@ -82,19 +73,26 @@ public final class TrackerBlocklist: @unchecked Sendable {
     /// Whether `host` (or a domain it is under) is on the never-block list. The proxy asks an unfiltered resolver for
     /// such a name, so a filtering resolver cannot block it either.
     public func isNeverBlocked(host: String) -> Bool {
-        let name = host.trimmingCharacters(in: CharacterSet(charactersIn: "[] .")).lowercased()
-        guard name.contains("."), !Self.looksLikeAddress(name) else { return false }
-
+        let keys = Self.selfAndParents(of: host)
         lock.lock()
         defer { lock.unlock() }
         guard !allowed.isEmpty else { return false }
+        return keys.contains { allowed.contains($0) }
+    }
+
+    /// The host, then each parent domain, stopping before the last label (`a.b.example.com`, `b.example.com`,
+    /// `example.com`). Empty for addresses and one-word names (`localhost`, a printer), which are never matched.
+    private static func selfAndParents(of host: String) -> [String] {
+        let name = host.trimmingCharacters(in: CharacterSet(charactersIn: "[] .")).lowercased()
+        guard name.contains("."), !looksLikeAddress(name) else { return [] }
+        var result: [String] = []
         var candidate = Substring(name)
         while candidate.contains(".") {
-            if allowed.contains(String(candidate)) { return true }
+            result.append(String(candidate))
             guard let dot = candidate.firstIndex(of: ".") else { break }
             candidate = candidate[candidate.index(after: dot)...]
         }
-        return false
+        return result
     }
 
     // MARK: - Domain names

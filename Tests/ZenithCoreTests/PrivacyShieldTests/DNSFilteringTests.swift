@@ -30,10 +30,10 @@ struct DNSFilteringTests {
 
     @Test("DNSF-01: 0.0.0.0 and :: (in any spelling) are blocking answers; real and loopback addresses are not")
     func testBlockingAnswer() {
-        for blocked in ["0.0.0.0", "::", "0:0:0:0:0:0:0:0", "[::]", " 0.0.0.0 "] {
+        for blocked in ["0.0.0.0", "::", "0:0:0:0:0:0:0:0", "[::]", " 0.0.0.0 ", "::ffff:0.0.0.0"] {
             #expect(DoHResolver.isBlockingAnswer(blocked), "\(blocked)")
         }
-        for address in ["127.0.0.1", "1.1.1.1", "::1", "2606:4700::1111", "0.0.0.1", "", "not an address"] {
+        for address in ["127.0.0.1", "1.1.1.1", "::1", "2606:4700::1111", "0.0.0.1", "::ffff:1.1.1.1", "", "not an address"] {
             #expect(!DoHResolver.isBlockingAnswer(address), "\(address)")
         }
     }
@@ -51,11 +51,13 @@ struct DNSFilteringTests {
         #expect(DoHProvider.cloudflare.neverBlockResolver == .cloudflare)
         #expect(DoHProvider.google.neverBlockResolver == .google)
         #expect(DoHProvider.quad9.neverBlockResolver == .quad9)
-        // AdGuard has an unfiltered twin; NextDNS and a custom resolver fall back to Cloudflare.
+        // AdGuard has an unfiltered twin, NextDNS answers unfiltered without a profile; only a custom resolver falls
+        // back to Cloudflare.
         let unfiltered = DoHProvider.adguard.neverBlockResolver
         #expect(unfiltered.endpointURL.host == "unfiltered.adguard-dns.com")
         #expect(!unfiltered.blocksAdsItself)
-        #expect(DoHProvider.nextdns(profileID: "abc123").neverBlockResolver == .cloudflare)
+        #expect(DoHProvider.nextdns(profileID: "abc123").neverBlockResolver == .nextdns(profileID: ""))
+        #expect(!DoHProvider.nextdns(profileID: "abc123").neverBlockResolver.blocksAdsItself)
         let custom = DoHProvider.custom(url: URL(string: "https://dns.example.net/dns-query")!, bootstrapIP: nil)
         #expect(custom.neverBlockResolver == .cloudflare)
     }
