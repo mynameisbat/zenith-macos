@@ -74,6 +74,7 @@ public enum ZenithPermissionFeature: String, CaseIterable, Sendable, Identifiabl
     case leftoversTrash
     case calendarWidget
     case cleaningMode
+    case snippetExpansion
 
     public var id: String { rawValue }
 
@@ -83,6 +84,7 @@ public enum ZenithPermissionFeature: String, CaseIterable, Sendable, Identifiabl
         case .autoPaste, .mediaKeyFallback, .cleaningMode: return .accessibility
         case .playerControls, .musicArtwork, .leftoversTrash: return .automation
         case .calendarWidget: return .calendar
+        case .snippetExpansion: return .accessibility
         }
     }
 
@@ -98,6 +100,7 @@ public enum ZenithPermissionFeature: String, CaseIterable, Sendable, Identifiabl
         case .leftoversTrash: return String(localized: "Cleaner \u{2192} Leftovers: protected folders")
         case .calendarWidget: return String(localized: "Next calendar event in the island")
         case .cleaningMode: return String(localized: "Cleaning Mode: block the keyboard and trackpad")
+        case .snippetExpansion: return String(localized: "Expand text snippets as you type")
         }
     }
 }
@@ -250,16 +253,18 @@ public protocol ZenithFeatureActivityProviding {
     func activity(for feature: ZenithPermissionFeature) -> ZenithFeatureActivity
 }
 
-/// Reads the settings Zenith really has. The calendar widget and the Cleaning Mode shortcut have switches; the rest are
-/// always available.
+/// Reads the settings Zenith really has. The calendar widget, the Cleaning Mode shortcut and typed snippet expansion
+/// have switches; the rest are always available.
 @MainActor
 public struct LiveFeatureActivity: ZenithFeatureActivityProviding {
     private let widgets: IslandWidgetSettings
     private let cleaningMode: CleaningModeSettings
+    private let snippets: SnippetSettings
 
-    public init(widgets: IslandWidgetSettings = .shared, cleaningMode: CleaningModeSettings = .shared) {
+    public init(widgets: IslandWidgetSettings = .shared, cleaningMode: CleaningModeSettings = .shared, snippets: SnippetSettings = .shared) {
         self.widgets = widgets
         self.cleaningMode = cleaningMode
+        self.snippets = snippets
     }
 
     public func activity(for feature: ZenithPermissionFeature) -> ZenithFeatureActivity {
@@ -267,6 +272,7 @@ public struct LiveFeatureActivity: ZenithFeatureActivityProviding {
         case .calendarWidget: return widgets.showCalendar ? .on : .off
         // Cleaning Mode can always be started from the hub; its global shortcut is the switch.
         case .cleaningMode: return cleaningMode.hotKeyEnabled ? .on : .alwaysAvailable
+        case .snippetExpansion: return snippets.isTypedExpansionEnabled ? .on : .off
         default: return .alwaysAvailable
         }
     }

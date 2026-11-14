@@ -45,6 +45,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         UpdateController.start()  // daily update check: on by default, installs only after the user's click
         KeepAwakeHotKeyController.shared.apply()  // keep awake's shortcut: off by default
         CleaningModeCoordinator.shared.configure()  // full-screen windows, and the shortcut if Settings turned it on
+        SnippetExpansionService.shared.refresh()  // typed snippet expansion: off by default, needs Accessibility
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
@@ -59,6 +60,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardStore.shared.stopMonitoring()
         MenuBarController.shared.teardown()
         HotKeyManager.shared.unregisterAll()
+        SnippetExpansionService.shared.stop()
     }
 
     public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -152,6 +154,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             (HotKeyDefinition.defaultOCR, {
                 Task { @MainActor in
                     ScreenOCRCoordinator.shared.startAreaOCR()
+                }
+            }),
+            // Snippet menu
+            (HotKeyDefinition.defaultSnippetsMenu, {
+                Task { @MainActor in
+                    SnippetPanelController.shared.toggle()
                 }
             })
         ])

@@ -152,6 +152,15 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
         notifyChange(newCount)
     }
 
+    /// Marks a pasteboard write made elsewhere in Zenith (a snippet, and putting the user's clipboard back after
+    /// it) as Zenith's own, so the history does not record it as a copy.
+    public func markOwnWrite(changeCount: Int) {
+        lock.withLock {
+            lastSuppressedChangeCount = changeCount
+            lastObservedChangeCount = changeCount
+        }
+    }
+
     public func clear() {
         lock.lock()
         defer { lock.unlock() }

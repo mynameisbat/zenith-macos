@@ -28,6 +28,7 @@ extension SettingsTab {
         case .shortcuts: return ZenithTint.shortcuts
         case .audio: return ZenithTint.audio
         case .island: return ZenithTint.island
+        case .snippets: return ZenithTint.snippets
         case .privacy: return ZenithTint.privacy
         case .ports: return ZenithTint.network
         case .cleaner: return ZenithTint.cleaner
@@ -238,6 +239,8 @@ public struct ZenithPreferencesView: View {
                     AudioSettingsTab(viewModel: viewModel)
                 case .island:
                     IslandSettingsTab()
+                case .snippets:
+                    SnippetsSettingsTab()
                 case .privacy:
                     PrivacySettingsTab()
                 case .ports:

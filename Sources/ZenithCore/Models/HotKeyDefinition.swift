@@ -55,6 +55,7 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
     public static let captureFullscreenId = "capture.fullscreen"
     public static let captureOCRId = "capture.ocr"
     public static let cleaningModeId = "cleaning.mode"
+    public static let snippetsMenuId = "snippets.menu"
 
     // MARK: - Built-in Default Shortcut Configurations
 
@@ -125,6 +126,15 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
         keyEquivalent: "⌃⌥⇧K"
     )
 
+    /// The snippet menu: ⌃⌥S (Keycode 1: 'S'). Like `defaultOCR`, not part of `defaultDictionary`.
+    public static let defaultSnippetsMenu = HotKeyDefinition(
+        id: snippetsMenuId,
+        name: "Insert Snippet",
+        keyCode: 1, // kVK_ANSI_S
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue,
+        keyEquivalent: "⌃⌥S"
+    )
+
     /// Key codes (with ⌘⇧) of macOS's screenshot shortcuts: 3, 4, 5 and 6. A Zenith shortcut on one of these fires
     /// together with the system's.
     public static let macOSScreenshotShortcuts: [(keyCode: UInt32, carbonModifiers: UInt32)] = {
@@ -152,7 +162,13 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
 
     /// The built-in shortcut of an action, if it has one.
     public static func builtIn(for id: String) -> HotKeyDefinition? {
-        defaultDictionary[id] ?? [captureOCRId: defaultOCR, cleaningModeId: defaultCleaningMode][id]
+        if let definition = defaultDictionary[id] { return definition }
+        switch id {
+        case captureOCRId: return defaultOCR
+        case cleaningModeId: return defaultCleaningMode
+        case snippetsMenuId: return defaultSnippetsMenu
+        default: return nil
+        }
     }
 
     /// Default dictionary containing all standard shortcut presets.
