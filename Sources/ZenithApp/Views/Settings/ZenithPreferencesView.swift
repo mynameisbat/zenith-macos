@@ -28,7 +28,9 @@ extension SettingsTab {
         case .shortcuts: return ZenithTint.shortcuts
         case .audio: return ZenithTint.audio
         case .island: return ZenithTint.island
+        case .snippets: return ZenithTint.snippets
         case .privacy: return ZenithTint.privacy
+        case .ports: return ZenithTint.network
         case .cleaner: return ZenithTint.cleaner
         case .homebrew: return HomebrewSettingsTab.tint
         case .permissions: return ZenithTint.permissions
@@ -61,10 +63,22 @@ public struct ZenithPreferencesView: View {
         }
         .frame(minWidth: SettingsWindowController.defaultWidth, maxWidth: .infinity, minHeight: SettingsWindowController.defaultHeight, maxHeight: .infinity)
         .ignoresSafeArea()
-        .onAppear { if HomebrewSettingsLink.takePending() { viewModel.selectedTab = .homebrew } }
+        .onAppear {
+            takePendingTab()
+            if HomebrewSettingsLink.takePending() { viewModel.selectedTab = .homebrew }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .zenithSelectSettingsTab)) { _ in takePendingTab() }
         .onReceive(NotificationCenter.default.publisher(for: HomebrewSettingsLink.notification)) { _ in
             _ = HomebrewSettingsLink.takePending()
             viewModel.selectedTab = .homebrew
+        }
+    }
+
+    /// Shows the tab another part of the app asked for (`SettingsTab.requestSelection`).
+    private func takePendingTab() {
+        if let tab = SettingsTab.pendingSelection {
+            SettingsTab.pendingSelection = nil
+            viewModel.selectedTab = tab
         }
     }
 
@@ -233,8 +247,12 @@ public struct ZenithPreferencesView: View {
                     AudioSettingsTab(viewModel: viewModel)
                 case .island:
                     IslandSettingsTab()
+                case .snippets:
+                    SnippetsSettingsTab()
                 case .privacy:
                     PrivacySettingsTab()
+                case .ports:
+                    PortsSettingsTab()
                 case .cleaner:
                     CleanerSettingsTab()
                 case .homebrew:

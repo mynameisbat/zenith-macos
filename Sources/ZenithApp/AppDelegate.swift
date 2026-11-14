@@ -43,18 +43,24 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         ScheduledCleanerScanController.start()  // Cleaner's scheduled scan: off by default, scans only, never deletes
         UpdateController.start()  // daily update check: on by default, installs only after the user's click
+        KeepAwakeHotKeyController.shared.apply()  // keep awake's shortcut: off by default
+        CleaningModeCoordinator.shared.configure()  // full-screen windows, and the shortcut if Settings turned it on
+        SnippetExpansionService.shared.refresh()  // typed snippet expansion: off by default, needs Accessibility
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
         NSLog("[Zenith] Application will terminate. Releasing resources.")
+        CleaningModeController.shared.end(.appQuit)  // releases the event tap
         if SystemProxyManager.shared.hasPendingRestore {
             _ = SystemProxyManager.shared.disableProxySynchronously()
         }
         LocalProxyServer.shared.stop()
+        KeepAwakeService.shared.stop()  // release the power assertion; the Mac may sleep again
         ZenithIslandWindowController.shared.teardown()
         ClipboardStore.shared.stopMonitoring()
         MenuBarController.shared.teardown()
         HotKeyManager.shared.unregisterAll()
+        SnippetExpansionService.shared.stop()
     }
 
     public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -62,6 +68,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // A running recording is finished and saved first; an unfinished file would not play.
+        if ScreenRecorder.shared.state.isRecording {
+            Task { @MainActor in
+                await ScreenRecorder.shared.stop()
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        }
         // Allow clean termination when requested by user (⌘Q, Quit menu) or macOS System Settings ("Quit & Reopen")
         return .terminateNow
     }
@@ -87,6 +101,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let image = image else { return }
                 AnnotationWindowController.shared.present(image: image)
             }
+        }
+
+        menuBar.onRecordScreen = {
+            ScreenRecordingCoordinator.shared.toggle()
+        }
+
+        menuBar.onScrollingCapture = {
+            ScrollingCaptureCoordinator.shared.toggle()
         }
 
         menuBar.onClearHistory = {
@@ -148,6 +170,24 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             (HotKeyDefinition.defaultOCR, {
                 Task { @MainActor in
                     ScreenOCRCoordinator.shared.startAreaOCR()
+                }
+            }),
+            // Snippet menu
+            (HotKeyDefinition.defaultSnippetsMenu, {
+                Task { @MainActor in
+                    SnippetPanelController.shared.toggle()
+                }
+            }),
+            // Screen recording: start choosing, or stop the running recording
+            (HotKeyDefinition.defaultRecordScreen, {
+                Task { @MainActor in
+                    ScreenRecordingCoordinator.shared.toggle()
+                }
+            }),
+            // Scrolling capture: start, or finish the running one
+            (HotKeyDefinition.defaultScrollingCapture, {
+                Task { @MainActor in
+                    ScrollingCaptureCoordinator.shared.toggle()
                 }
             })
         ])

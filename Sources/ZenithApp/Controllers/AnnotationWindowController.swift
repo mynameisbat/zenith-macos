@@ -211,6 +211,9 @@ public final class AnnotationWindowController: NSObject, NSWindowDelegate, Annot
         case "b":
             vm.selectedTool = .blur
             return true
+        case "x":
+            vm.selectedTool = .redact
+            return true
         case "c":
             vm.selectedTool = .crop
             return true

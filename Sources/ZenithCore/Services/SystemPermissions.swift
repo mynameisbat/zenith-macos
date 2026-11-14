@@ -26,6 +26,11 @@ public struct SystemPermissions {
         string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars"
     )!
 
+    /// Deep link to macOS System Settings -> Privacy & Security -> Microphone.
+    public static let microphoneSettingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+    )!
+
     /// Checks whether Zenith currently has permission to record/capture the screen.
     /// Does not present a dialog if permission is denied or not yet requested.
     public static func checkScreenRecordingPermission() -> Bool {
@@ -100,5 +105,10 @@ public final class SystemPermissionsService: PermissionsServiceProtocol, Sendabl
     /// Reading the status never prompts; the provider only reports `.unavailable` outside an app bundle.
     public func calendarAccess() -> CalendarAccessState {
         EventKitUpcomingEventProvider().accessState()
+    }
+
+    /// Reading never prompts; `.unavailable` outside an app bundle that declares the microphone.
+    public func microphoneAccess() -> MicrophoneAccess {
+        AVMicrophoneAuthorizer().currentAccess()
     }
 }

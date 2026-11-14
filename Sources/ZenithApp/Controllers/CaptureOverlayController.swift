@@ -1,6 +1,23 @@
 import AppKit
 import ZenithCore
 
+/// What the selector is choosing for.
+public enum CaptureSelectionPurpose: Equatable {
+    case screenshot
+    /// Drag for an area, click a window, Return for the whole screen.
+    case recording
+    /// Drag for an area.
+    case scrolling
+}
+
+/// What the user chose in the selector (for recording and scrolling capture).
+public enum CaptureSelection {
+    /// An area in global AppKit coordinates, on `screen`.
+    case region(CGRect, screen: NSScreen)
+    case window(OnScreenWindowInfo, screen: NSScreen)
+    case display(NSScreen)
+}
+
 /// Main orchestrator managing full-screen capture overlays, marquee drag interaction, and loupe magnifier.
 @MainActor
 public final class CaptureOverlayController: NSObject {
@@ -20,6 +37,11 @@ public final class CaptureOverlayController: NSObject {
     // State
     private let marqueeEngine = MarqueeSelectionEngine()
     private var activeCompletion: ((CGImage?) -> Void)?
+    private var purpose: CaptureSelectionPurpose = .screenshot
+    private var selectionCompletion: ((CaptureSelection?) -> Void)?
+    /// On-screen windows when the selector opened, front to back (recording picks one by clicking).
+    private var windowCandidates: [OnScreenWindowInfo] = []
+    private var hoveredWindow: OnScreenWindowInfo?
     private var cachedScreenImages: [CGDirectDisplayID: CGImage] = [:]
     private var cachedScreenImage: CGImage? {
         get { cachedScreenImages[CGMainDisplayID()] ?? cachedScreenImages.values.first }
@@ -75,12 +97,50 @@ public final class CaptureOverlayController: NSObject {
         }
 
         self.activeCompletion = completion
+        self.purpose = .screenshot
+        self.selectionCompletion = nil
+        presentOverlay(hint: nil)
+    }
+
+    /// Opens the selector for a recording or a scrolling capture: it hands back what was chosen instead of a picture.
+    public func startSelection(purpose: CaptureSelectionPurpose, completion: @escaping (CaptureSelection?) -> Void) {
+        guard !isOverlayActive else {
+            completion(nil)
+            return
+        }
+        guard screenCaptureService.hasScreenRecordingPermission else {
+            _ = SystemPermissions.requestScreenRecordingPermission()
+            ToastHUDController.shared.show(message: "Permission Required: Screen Recording", icon: "lock.shield")
+            completion(nil)
+            return
+        }
+        self.activeCompletion = nil
+        self.purpose = purpose
+        self.selectionCompletion = completion
+        hoveredWindow = nil
+        windowCandidates = purpose == .recording ? Self.onScreenWindows() : []
+        let hint: String
+        switch purpose {
+        case .recording:
+            hint = String(localized: "Drag to record an area, click a window, or press Return for the whole screen. Esc cancels.")
+        case .scrolling:
+            hint = String(localized: "Drag over the content to capture while it scrolls. Esc cancels.")
+        case .screenshot:
+            hint = ""
+        }
+        presentOverlay(hint: hint)
+    }
+
+    private func presentOverlay(hint: String?) {
         marqueeEngine.reset()
 
         // Cache full-screen image for instantaneous loupe sampling across all screens (HIGH-20)
         refreshCachedScreenImages()
 
         buildOverlayPanels()
+        for view in overlayViews {
+            view.hintText = hint
+        }
         installMonitors()
         if !isCrosshairCursorPushed {
             NSCursor.crosshair.push()
@@ -132,6 +192,48 @@ public final class CaptureOverlayController: NSObject {
         let completion = activeCompletion
         activeCompletion = nil
         completion?(nil)
+        let selection = selectionCompletion
+        selectionCompletion = nil
+        selection?(nil)
+    }
+
+    /// Return or Space while choosing what to record: the whole screen under the pointer.
+    public func handleSelectionKey(_ event: NSEvent) -> Bool {
+        guard purpose == .recording, selectionCompletion != nil else { return false }
+        guard event.keyCode == 36 || event.keyCode == 76 || event.keyCode == 49 else { return false }  // Return, Enter, Space
+        let mouse = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main else { return false }
+        finishSelection(.display(screen))
+        return true
+    }
+
+    private func finishSelection(_ selection: CaptureSelection?) {
+        for panel in overlayPanels {
+            panel.orderOut(nil)
+        }
+        let completion = selectionCompletion
+        selectionCompletion = nil
+        teardownOverlays()
+        completion?(selection)
+    }
+
+    /// Visible windows, front to back, from `CGWindowListCopyWindowInfo` (no permission needed for the bounds).
+    private static func onScreenWindows() -> [OnScreenWindowInfo] {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+            return []
+        }
+        return list.compactMap(OnScreenWindowInfo.init(dictionary:))
+    }
+
+    /// The window under an AppKit point, and its frame in AppKit coordinates.
+    private func window(atAppKitPoint point: CGPoint) -> (OnScreenWindowInfo, CGRect)? {
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        let cgPoint = CGPoint(x: point.x, y: primaryHeight - point.y)
+        guard let info = WindowPicker.window(at: cgPoint, in: windowCandidates, excludingPID: ProcessInfo.processInfo.processIdentifier) else {
+            return nil
+        }
+        let b = info.bounds
+        return (info, CGRect(x: b.minX, y: primaryHeight - b.maxY, width: b.width, height: b.height))
     }
 
     // MARK: - Panel Hierarchy Setup & Teardown
@@ -220,12 +322,31 @@ public final class CaptureOverlayController: NSObject {
     public func handleMouseDragged(event: NSEvent) {
         let globalLocation = NSEvent.mouseLocation
         marqueeEngine.updateDrag(to: globalLocation)
+        hoveredWindow = nil
         broadcastSelectionRect(marqueeEngine.normalizedRect)
         broadcastCursorLocation(globalLocation)
-        updateLoupeData(cursor: globalLocation)
+        if purpose == .screenshot {
+            updateLoupeData(cursor: globalLocation)
+        }
     }
 
     public func handleMouseUp(event: NSEvent) {
+        if selectionCompletion != nil {
+            let finalRect = marqueeEngine.endDrag(minimumDimension: 4.0)
+            let mouse = NSEvent.mouseLocation
+            if let rect = finalRect {
+                let center = CGPoint(x: rect.midX, y: rect.midY)
+                if let screen = NSScreen.screens.first(where: { $0.frame.contains(center) }) ?? NSScreen.main {
+                    finishSelection(.region(rect.intersection(screen.frame), screen: screen))
+                }
+            } else if purpose == .recording, let (info, _) = window(atAppKitPoint: mouse),
+                      let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main {
+                finishSelection(.window(info, screen: screen))
+            } else {
+                broadcastSelectionRect(nil)
+            }
+            return
+        }
         guard let finalRect = marqueeEngine.endDrag(minimumDimension: 4.0) else {
             // Drag was smaller than threshold; reset to idle
             broadcastSelectionRect(nil)
@@ -281,6 +402,15 @@ public final class CaptureOverlayController: NSObject {
     public func handleMouseMoved(event: NSEvent) {
         let globalLocation = NSEvent.mouseLocation
         broadcastCursorLocation(globalLocation)
+        if purpose == .recording {
+            // Outline the window a click would record.
+            let hovered = window(atAppKitPoint: globalLocation)
+            if hovered?.0 != hoveredWindow {
+                hoveredWindow = hovered?.0
+                broadcastSelectionRect(hovered?.1)
+            }
+            return
+        }
         updateLoupeData(cursor: globalLocation)
     }
 

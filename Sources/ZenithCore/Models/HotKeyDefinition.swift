@@ -54,6 +54,10 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
     public static let captureAreaId = "capture.area"
     public static let captureFullscreenId = "capture.fullscreen"
     public static let captureOCRId = "capture.ocr"
+    public static let cleaningModeId = "cleaning.mode"
+    public static let snippetsMenuId = "snippets.menu"
+    public static let recordScreenId = "capture.record"
+    public static let scrollingCaptureId = "capture.scrolling"
 
     // MARK: - Built-in Default Shortcut Configurations
 
@@ -114,6 +118,43 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
         keyEquivalent: "⌃⌥T"
     )
 
+    /// Cleaning Mode: ⌃⌥⇧K ("K for keyboard"). Registered only while Settings turns its shortcut on (off by default),
+    /// and deliberately without ⌘, so the keys that start it are not the ⌃⌥⌘ that end it. Not in `defaultDictionary`.
+    public static let defaultCleaningMode = HotKeyDefinition(
+        id: cleaningModeId,
+        name: "Cleaning Mode",
+        keyCode: 40, // kVK_ANSI_K
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue | CarbonModifierFlags.shift.rawValue,
+        keyEquivalent: "⌃⌥⇧K"
+    )
+
+    /// The snippet menu: ⌃⌥S (Keycode 1: 'S'). Like `defaultOCR`, not part of `defaultDictionary`.
+    public static let defaultSnippetsMenu = HotKeyDefinition(
+        id: snippetsMenuId,
+        name: "Insert Snippet",
+        keyCode: 1, // kVK_ANSI_S
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue,
+        keyEquivalent: "⌃⌥S"
+    )
+
+    /// Screen recording: ⌃⌥R (Keycode 15: 'R'). Starts the selector; pressed while recording, it stops.
+    public static let defaultRecordScreen = HotKeyDefinition(
+        id: recordScreenId,
+        name: "Record Screen",
+        keyCode: 15, // kVK_ANSI_R
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue,
+        keyEquivalent: "⌃⌥R"
+    )
+
+    /// Scrolling capture: ⌃⌥L (Keycode 37: 'L', "long screenshot").
+    public static let defaultScrollingCapture = HotKeyDefinition(
+        id: scrollingCaptureId,
+        name: "Scrolling Capture",
+        keyCode: 37, // kVK_ANSI_L
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue,
+        keyEquivalent: "⌃⌥L"
+    )
+
     /// Key codes (with ⌘⇧) of macOS's screenshot shortcuts: 3, 4, 5 and 6. A Zenith shortcut on one of these fires
     /// together with the system's.
     public static let macOSScreenshotShortcuts: [(keyCode: UInt32, carbonModifiers: UInt32)] = {
@@ -141,7 +182,15 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
 
     /// The built-in shortcut of an action, if it has one.
     public static func builtIn(for id: String) -> HotKeyDefinition? {
-        defaultDictionary[id] ?? (id == captureOCRId ? defaultOCR : nil)
+        if let definition = defaultDictionary[id] { return definition }
+        switch id {
+        case captureOCRId: return defaultOCR
+        case cleaningModeId: return defaultCleaningMode
+        case snippetsMenuId: return defaultSnippetsMenu
+        case recordScreenId: return defaultRecordScreen
+        case scrollingCaptureId: return defaultScrollingCapture
+        default: return nil
+        }
     }
 
     /// Default dictionary containing all standard shortcut presets.

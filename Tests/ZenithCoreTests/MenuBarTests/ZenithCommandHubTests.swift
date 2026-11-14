@@ -5,10 +5,10 @@ import Foundation
 @Suite("Zenith Command Hub State & Action Hub Test Suite")
 struct ZenithCommandHubTests {
 
-    @Test("HUB-01: ZenithHubAction has 4 quick actions with correct titles, icons, and shortcuts")
+    @Test("HUB-01: ZenithHubAction has 5 quick actions with correct titles, icons, and shortcuts")
     func testZenithHubActionsExclusivity() {
         let allActions = ZenithHubAction.allCases
-        #expect(allActions == [.area, .screen, .ocr, .clipboard])
+        #expect(allActions == [.area, .screen, .ocr, .clipboard, .cleaning])
 
         // Verify Area action metadata
         let area = ZenithHubAction.area

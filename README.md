@@ -95,9 +95,11 @@ The certificate that signs a release is what installed copies trust for automati
   - **Capture Screen** (`⇧⌘1`).
   - **Copy Text** (`⌃⌥T`): OCR, QR codes and barcodes.
   - **Clipboard** (`⇧⌘V`).
+  - **Cleaning Mode**: blocks the keyboard, trackpad and mouse (media and brightness keys too) so you can wipe them, behind a black or dimmed screen with a countdown. It always ends by itself (60 s by default, 15 s to 5 min in Settings → General), or early when you hold `⌃⌥⌘` for 2 seconds. Needs Accessibility; its global shortcut (`⌃⌥⇧K`) is off until you turn it on.
 - **Running apps**: the heaviest user processes with their app icons, memory and CPU; quit one (after a confirmation) with its ✕ or `⌘1`–`⌘4` (`SIGTERM`, then `SIGKILL` if needed).
 - **Meters**: CPU, memory, free storage and battery, plus Bluetooth accessories' battery, and the download and upload speed of your Wi-Fi or Ethernet connection. The speed is measured only while the hub is open.
 - **Switches**: Privacy Shield on/off, Scan/Clean system junk (asks first) and Boost; **Settings…** and **Quit Zenith** at the bottom, as in a menu.
+- **Keep Awake**: stops the Mac from sleeping (an IOKit power assertion, optionally keeping the display on too) for 15 min to 5 h or a custom time, until turned off, while chosen apps run, or while on the power adapter; a cup with the time left sits beside the notch, settings and an optional shortcut (`⌃⌥K`) are in Settings → General. It ends when Zenith quits; keeping the Mac awake with the lid closed is not supported (it needs administrator rights).
 
 ### 2. 🔍 Native Screen OCR & Barcode/QR Extractor (`⌃⌥T`)
 - **On-Device Vision**: Uses the Apple Vision framework (`VNRecognizeTextRequest`, `VNDetectBarcodesRequest`); nothing leaves your Mac.
@@ -116,6 +118,7 @@ The certificate that signs a release is what installed copies trust for automati
 - **Paste as plain text**: `⇧↵` in the clipboard panel, **Paste as Plain Text** in an item's right-click menu, or the button in the preview pane for rich text. The item in the history keeps its formatting.
 - **Clean links**: **Paste Clean Link** in the right-click menu removes tracking parameters (`utm_*`, `fbclid`, `gclid` and similar; `si` only on YouTube and Spotify links; `ref_src` and `ref_url` only on twitter.com and x.com). Optionally (**Clean Links When I Copy Them**, off by default) Zenith rewrites the clipboard when you copy exactly one `http(s)` link that has such parameters, and the history then stores the cleaned link. A copy that carries rich text, HTML, files, images or an app's private types is never rewritten.
 - **Item Pinning (`⌘P`)**: Pinned items are permanently preserved from FIFO eviction.
+- **Text snippets** (Settings → Snippets): a name, a trigger such as `;sig` and text with `{clipboard}`, `{date}`, `{time}`, `{datetime}` (optional format, e.g. `{date:yyyy-MM-dd}`) and `{cursor}`. Typing a trigger replaces it (off by default, needs Accessibility; never in password fields, the clipboard's ignored apps or apps you exclude), and `⌃⌥S` opens a searchable snippet menu. Snippets are pasted and your clipboard is put back, without entering the history; they are saved as JSON in Application Support and can be imported and exported.
 - **Keyboard-Driven Workflow**: a click selects, a double-click or Return pastes; `⇧↵` pastes as plain text, `⌘1`–`⌘9` instant paste, `⌘⌫` delete, `Ctrl+N` / `Ctrl+P` Emacs navigation. Right-click an item for Paste, Paste as Plain Text, Paste Clean Link (for links), Pin and Delete.
 
 ### 4. 📸 Precision Screen Capture & Annotation Editor (`⌘⇧2`)
@@ -124,7 +127,7 @@ The certificate that signs a release is what installed copies trust for automati
   - Swept-wing vector arrows (`A`).
   - Solid and hollow rectangles (`R`).
   - Typography text callouts (`T`).
-  - Pixelated / blur redaction tool (`B`) for sensitive tokens.
+  - Pixelated / blur redaction tool (`B`) for sensitive tokens, and a solid black Redact box (`X`) that hides them for good.
   - Crop (`C`).
 - **100% Retina Fidelity**: Exports annotations directly at native physical display backing resolution (PNG & JPEG) with zero downsampling.
 - **Rapid Keyboard Workflow**:
@@ -132,6 +135,8 @@ The certificate that signs a release is what installed copies trust for automati
   - `⌘S`: Export high-resolution image to disk.
   - `⌘Z` / `⇧⌘Z`: Full undo/redo command stack.
   - `Esc`: Dismiss editor safely.
+- **Screen Recording (`⌃⌥R`)**: drag for an area, click a window, or press Return for the whole screen, then set system audio, microphone, pointer, click rings, 30/60 fps and a 3-2-1 countdown in the bar that appears. ScreenCaptureKit records into H.264 or HEVC `.mov`/`.mp4` (Settings → General → Screen Recording; saved to Movies, Desktop or a folder you choose); the system sound and the microphone (`AVAudioEngine`, on every supported macOS) are mixed into one track. Zenith's own windows are left out. A red stop button with the elapsed time sits in the menu bar (or press `⌃⌥R` again); afterwards the clip opens with Show in Finder, Trim (a trimmed copy is saved beside it) and Export as GIF (capped width and frame rate).
+- **Scrolling Capture (`⌃⌥L`)**: drag over a page; with Accessibility allowed Zenith scrolls it for you, otherwise you scroll by hand. Frames are joined by finding their vertical overlap (a fixed toolbar or footer appears once), until the end of the page or 30,000 px, and the tall picture opens in the annotation editor.
 
 ### 5. 🏝 Dynamic Island, Now Playing & Battery HUD
 - **Hardware-Aware Notch Integration**: Seamlessly integrates into MacBook display camera notches as well as external monitors with zero Mini-LED light bleed (`#06070a`).
@@ -175,6 +180,7 @@ Nothing here deletes without asking: each action shows what will go (the largest
 **Elsewhere in the app**
 - **Boost** in the Command Hub purges inactive memory and flushes the DNS cache, and tells you honestly which step failed.
 - **Process monitor** in the Command Hub (see section 1).
+- **Port manager** (Settings → Ports, and in the Command Hub: type a port such as `3000` or `:5432`): lists the TCP ports your processes listen on (UDP optionally) with address, PID and app, and stops one after a confirmation (`SIGTERM`, then **Force Quit** if it is still running a few seconds later). Read with `lsof` when shown, never polled. Processes of other users and of macOS are not listed or cannot be stopped.
 - **App Uninstaller and Slimmer**: drop an `.app` on the island shelf. *Deep Uninstall* moves the app and its leftovers to the Trash (leftovers are matched by bundle identifier, and Apple-owned entries are never touched). *Slim* removes unused CPU architectures from a copy, verifies the code signature, swaps it in atomically and sends the original to the Trash.
 - **Homebrew** (Settings → Homebrew): lists installed formulae and casks with version, description and size, what is outdated, and searches Homebrew. Install, uninstall (asks first), upgrade one or all (lists them and asks) and `brew update` run one at a time, with auto-update off, a live log and a Cancel button. A cask that needs your administrator password fails with the command to copy into Terminal. Zenith never installs Homebrew itself; without it the page links to brew.sh. The Command Hub shows a Homebrew line when updates are waiting.
 
@@ -199,6 +205,8 @@ Nothing here deletes without asking: each action shows what will go (the largest
 | `⌘⇧2` | Global | Start Area Screen Capture &amp; Loupe Magnifier (Preset alt: `⌘⇧X`) |
 | `⌃⌥T` | Global | Screen OCR &amp; Barcode / QR Code Recognition (not `⌘⇧3`: macOS uses that for its own screenshot) |
 | `⌘⇧1` | Global | Capture Entire Active Display |
+| `⌃⌥R` | Global | Record the screen (press again to stop) |
+| `⌃⌥L` | Global | Scrolling capture (press again to finish) |
 | `⌘⇧V` | Global | Open Clipboard History Manager (Preset alt: `⌥V`) |
 | **Clipboard History Hub** | | *(Floating Panel &amp; Menu Bar)* |
 | `↑` / `↓` | Clipboard Hub | Navigate up / down |
@@ -232,7 +240,7 @@ Nothing here deletes without asking: each action shows what will go (the largest
 
 ## 🔒 System Permissions Guide
 
-Zenith is designed with privacy-first principles and minimal permission requirements. Settings → Permissions shows one card per permission (Screen Recording, Accessibility, Automation, Calendars): its state, what it is for, what still works without it and which features use it. It warns when a permission is granted but nothing you turned on uses it (today only Calendars can show that, because it is the only feature with a switch), and hints when a feature that is on lacks its permission. It never asks for a permission itself; Automation shows as "asked per app" because macOS reports it only per target app.
+Zenith is designed with privacy-first principles and minimal permission requirements. Settings → Permissions shows one card per permission (Screen Recording, Accessibility, Automation, Calendars, Microphone): its state, what it is for, what still works without it and which features use it. It warns when a permission is granted but nothing you turned on uses it (today Calendars and Microphone can show that: they are the features with a switch), and hints when a feature that is on lacks its permission. It never asks for a permission itself; Automation shows as "asked per app" because macOS reports it only per target app.
 
 1. **Screen Recording (`kTCCServiceScreenCapture`)** — **Required for Capture**:
    - Required by Apple's `ScreenCaptureKit` to capture displays, coordinate marquee crops, and sample RGB pixels in the loupe magnifier.
@@ -251,6 +259,10 @@ Zenith is designed with privacy-first principles and minimal permission requirem
 
 4. **Calendars** — **Optional**:
    - Only for the island's "Next calendar event" widget. macOS asks when you turn the widget on in Settings → Dynamic Island, never before. Without it the widget shows how to allow it. (A build run with `swift run` has no Info.plist, so it cannot ask; use the bundled `Zenith.app`.)
+
+5. **Microphone** — **Optional**:
+   - Only for the microphone in screen recordings. macOS asks the first time you record with Microphone turned on in the recording bar, never before. Without it recordings carry the Mac's own sound only. (Like Calendars, a `swift run` build cannot ask.)
+   - Scrolling capture uses Accessibility to post scroll-wheel events; without it you scroll by hand.
 
 ---
 

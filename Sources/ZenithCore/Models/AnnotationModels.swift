@@ -11,6 +11,8 @@ public enum AnnotationTool: String, CaseIterable, Identifiable, Sendable {
     case rectangle
     case text
     case blur
+    /// A solid black box: unlike pixelation, nothing of what is under it can be recovered.
+    case redact
     case crop
 
     public var id: String { rawValue }
@@ -262,6 +264,13 @@ public struct RectangleAnnotationCommand: AnnotationCommand, Sendable, Identifia
         }
 
         context.restoreGState()
+    }
+}
+
+public extension RectangleAnnotationCommand {
+    /// The redact tool's box: opaque black, square corners.
+    static func redaction(_ rect: CGRect) -> RectangleAnnotationCommand {
+        RectangleAnnotationCommand(rect: rect, color: CGColor(red: 0, green: 0, blue: 0, alpha: 1), strokeWidth: 0, isFilled: true)
     }
 }
 
