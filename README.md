@@ -95,9 +95,11 @@ The certificate that signs a release is what installed copies trust for automati
   - **Capture Screen** (`⇧⌘1`).
   - **Copy Text** (`⌃⌥T`): OCR, QR codes and barcodes.
   - **Clipboard** (`⇧⌘V`).
+  - **Cleaning Mode**: blocks the keyboard, trackpad and mouse (media and brightness keys too) so you can wipe them, behind a black or dimmed screen with a countdown. It always ends by itself (60 s by default, 15 s to 5 min in Settings → General), or early when you hold `⌃⌥⌘` for 2 seconds. Needs Accessibility; its global shortcut (`⌃⌥⇧K`) is off until you turn it on.
 - **Running apps**: the heaviest user processes with their app icons, memory and CPU; quit one (after a confirmation) with its ✕ or `⌘1`–`⌘4` (`SIGTERM`, then `SIGKILL` if needed).
 - **Meters**: CPU, memory, free storage and battery, plus Bluetooth accessories' battery, and the download and upload speed of your Wi-Fi or Ethernet connection. The speed is measured only while the hub is open.
 - **Switches**: Privacy Shield on/off, Scan/Clean system junk (asks first) and Boost; **Settings…** and **Quit Zenith** at the bottom, as in a menu.
+- **Keep Awake**: stops the Mac from sleeping (an IOKit power assertion, optionally keeping the display on too) for 15 min to 5 h or a custom time, until turned off, while chosen apps run, or while on the power adapter; a cup with the time left sits beside the notch, settings and an optional shortcut (`⌃⌥K`) are in Settings → General. It ends when Zenith quits; keeping the Mac awake with the lid closed is not supported (it needs administrator rights).
 
 ### 2. 🔍 Native Screen OCR & Barcode/QR Extractor (`⌃⌥T`)
 - **On-Device Vision**: Uses the Apple Vision framework (`VNRecognizeTextRequest`, `VNDetectBarcodesRequest`); nothing leaves your Mac.
@@ -176,6 +178,7 @@ Nothing here deletes without asking: each action shows what will go (the largest
 **Elsewhere in the app**
 - **Boost** in the Command Hub purges inactive memory and flushes the DNS cache, and tells you honestly which step failed.
 - **Process monitor** in the Command Hub (see section 1).
+- **Port manager** (Settings → Ports, and in the Command Hub: type a port such as `3000` or `:5432`): lists the TCP ports your processes listen on (UDP optionally) with address, PID and app, and stops one after a confirmation (`SIGTERM`, then **Force Quit** if it is still running a few seconds later). Read with `lsof` when shown, never polled. Processes of other users and of macOS are not listed or cannot be stopped.
 - **App Uninstaller and Slimmer**: drop an `.app` on the island shelf. *Deep Uninstall* moves the app and its leftovers to the Trash (leftovers are matched by bundle identifier, and Apple-owned entries are never touched). *Slim* removes unused CPU architectures from a copy, verifies the code signature, swaps it in atomically and sends the original to the Trash.
 
 ### 7. 🛡 Privacy Shield (DoH + Anti-DPI Local Proxy)

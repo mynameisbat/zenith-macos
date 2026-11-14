@@ -183,9 +183,9 @@ public extension ZenithIslandState {
         return tabs.first ?? .shelf
     }
 
-    /// Something to show next to the notch while the island is closed: a running timer or playing media.
+    /// Something to show next to the notch while the island is closed: a running timer, playing media or keep awake.
     var hasCompactActivity: Bool {
-        focusTimer != nil || nowPlayingTrack?.isPlaying == true
+        compactActivity != nil
     }
 }
 

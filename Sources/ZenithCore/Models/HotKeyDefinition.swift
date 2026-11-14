@@ -54,6 +54,7 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
     public static let captureAreaId = "capture.area"
     public static let captureFullscreenId = "capture.fullscreen"
     public static let captureOCRId = "capture.ocr"
+    public static let cleaningModeId = "cleaning.mode"
     public static let snippetsMenuId = "snippets.menu"
 
     // MARK: - Built-in Default Shortcut Configurations
@@ -115,6 +116,16 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
         keyEquivalent: "⌃⌥T"
     )
 
+    /// Cleaning Mode: ⌃⌥⇧K ("K for keyboard"). Registered only while Settings turns its shortcut on (off by default),
+    /// and deliberately without ⌘, so the keys that start it are not the ⌃⌥⌘ that end it. Not in `defaultDictionary`.
+    public static let defaultCleaningMode = HotKeyDefinition(
+        id: cleaningModeId,
+        name: "Cleaning Mode",
+        keyCode: 40, // kVK_ANSI_K
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue | CarbonModifierFlags.shift.rawValue,
+        keyEquivalent: "⌃⌥⇧K"
+    )
+
     /// The snippet menu: ⌃⌥S (Keycode 1: 'S'). Like `defaultOCR`, not part of `defaultDictionary`.
     public static let defaultSnippetsMenu = HotKeyDefinition(
         id: snippetsMenuId,
@@ -154,6 +165,7 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
         if let definition = defaultDictionary[id] { return definition }
         switch id {
         case captureOCRId: return defaultOCR
+        case cleaningModeId: return defaultCleaningMode
         case snippetsMenuId: return defaultSnippetsMenu
         default: return nil
         }

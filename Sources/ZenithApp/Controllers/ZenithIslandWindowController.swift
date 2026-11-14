@@ -118,7 +118,7 @@ public final class ZenithIslandHostingView: NSHostingView<ZenithDynamicIslandVie
 
     private var nowPlayingHitRect: NSRect {
         let geom = ZenithIslandWindowController.shared.currentGeometry
-        let w = ZenithIslandState.shared.focusTimer != nil ? geom.timerIdleWidth : geom.nowPlayingIdleWidth
+        let w = ZenithIslandState.shared.compactActivityUsesWideWings ? geom.timerIdleWidth : geom.nowPlayingIdleWidth
         let h = geom.nowPlayingIdleHeight
         let x = (bounds.width - w) / 2
         let y = isFlipped ? 0 : (bounds.height - h)
@@ -510,7 +510,7 @@ public final class ZenithIslandWindowController: NSObject {
         } else if state.activeAlert != nil {
             return geometry.alertFrame
         } else if state.hasCompactActivity {
-            return geometry.compactActivityFrame(showsTimer: state.focusTimer != nil)
+            return geometry.compactActivityFrame(showsTimer: state.compactActivityUsesWideWings)
         } else {
             return geometry.idleFrame
         }

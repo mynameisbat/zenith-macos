@@ -149,9 +149,20 @@ struct LocalProxyServerBehaviorTests {
     private func startProxy(configure: (LocalProxyServer) -> Void = { _ in }) async throws -> (LocalProxyServer, UInt16) {
         let server = LocalProxyServer()
         configure(server)
-        let port = Sock.freePort()
-        try await server.startAndAwaitReady(port: port, provider: .cloudflare)
-        return (server, port)
+        // `freePort()` closes its socket before the server binds, so a test running in parallel can take that port
+        // in between (CI saw EADDRINUSE). Try a few fresh ports before giving up.
+        var lastError: Error?
+        for _ in 0..<5 {
+            let port = Sock.freePort()
+            do {
+                try await server.startAndAwaitReady(port: port, provider: .cloudflare)
+                return (server, port)
+            } catch {
+                lastError = error
+                server.stop()
+            }
+        }
+        throw lastError!
     }
 
     private let connectEstablished = "HTTP/1.1 200 Connection Established\r\n\r\n"
