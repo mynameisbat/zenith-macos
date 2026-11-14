@@ -886,7 +886,14 @@
 "Done" = "Terminé";
 "Drag over the content to capture while it scrolls. Esc cancels." = "Faites glisser sur le contenu à capturer pendant qu’il défile. Échap pour annuler.";
 "Drag the yellow handles to keep only part of the recording. A trimmed copy is saved beside it." = "Faites glisser les poignées jaunes pour ne garder qu’une partie de l’enregistrement. Une copie raccourcie est enregistrée à côté.";
-"Drag to record an area, click a window, or press Return for the whole screen. Esc cancels." = "Faites glisser pour enregistrer une zone, cliquez sur une fenêtre ou appuyez sur Retour pour tout l’écran. Échap pour annuler.";
+"Entire Screen" = "Écran entier";
+"Window" = "Fenêtre";
+"Selection" = "Sélection";
+"Record the whole screen" = "Enregistrer tout l’écran";
+"Record one window: click it" = "Enregistrer une fenêtre : cliquez dessus";
+"Record an area: drag over it" = "Enregistrer une zone : faites-la glisser";
+"Drag over the area to record. Return records the whole screen, Esc cancels." = "Faites glisser sur la zone à enregistrer. Retour enregistre tout l’écran, Échap annule.";
+"Click the window to record. Return records the whole screen, Esc cancels." = "Cliquez sur la fenêtre à enregistrer. Retour enregistre tout l’écran, Échap annule.";
 "Export as GIF" = "Exporter en GIF";
 "File Type" = "Type de fichier";
 "Frame Rate" = "Fréquence d’images";

@@ -1,10 +1,11 @@
 import AppKit
+import SwiftUI
 import ZenithCore
 
 /// What the selector is choosing for.
 public enum CaptureSelectionPurpose: Equatable {
     case screenshot
-    /// Drag for an area, click a window, Return for the whole screen.
+    /// The bar at the bottom picks Entire Screen, Window (click one) or Selection (drag); Return is the whole screen.
     case recording
     /// Drag for an area.
     case scrolling
@@ -42,6 +43,9 @@ public final class CaptureOverlayController: NSObject {
     /// On-screen windows when the selector opened, front to back (recording picks one by clicking).
     private var windowCandidates: [OnScreenWindowInfo] = []
     private var hoveredWindow: OnScreenWindowInfo?
+    /// The Entire Screen / Window / Selection bar while choosing what to record.
+    private var pickerModel: RecordingPickerModel?
+    private var pickerHost: NSHostingView<RecordingPickerBar>?
     private var cachedScreenImages: [CGDirectDisplayID: CGImage] = [:]
     private var cachedScreenImage: CGImage? {
         get { cachedScreenImages[CGMainDisplayID()] ?? cachedScreenImages.values.first }
@@ -119,16 +123,76 @@ public final class CaptureOverlayController: NSObject {
         self.selectionCompletion = completion
         hoveredWindow = nil
         windowCandidates = purpose == .recording ? Self.onScreenWindows() : []
+        pickerModel = nil
         let hint: String
         switch purpose {
         case .recording:
-            hint = String(localized: "Drag to record an area, click a window, or press Return for the whole screen. Esc cancels.")
+            let model = RecordingPickerModel()
+            model.onModeChange = { [weak self] mode in self?.recordingModeChanged(mode) }
+            model.onEntireScreen = { [weak self] in self?.recordEntireScreen() }
+            model.onCancel = { [weak self] in self?.cancelCapture() }
+            pickerModel = model
+            hint = model.mode.hint
         case .scrolling:
             hint = String(localized: "Drag over the content to capture while it scrolls. Esc cancels.")
         case .screenshot:
             hint = ""
         }
         presentOverlay(hint: hint)
+        installPickerBar()
+    }
+
+    // MARK: - Recording bar
+
+    /// Puts the bar at the bottom centre of the screen under the pointer.
+    private func installPickerBar() {
+        pickerHost?.removeFromSuperview()
+        pickerHost = nil
+        guard purpose == .recording, let model = pickerModel else { return }
+        let mouse = NSEvent.mouseLocation
+        let index = overlayPanels.firstIndex(where: { $0.frame.contains(mouse) }) ?? 0
+        guard overlayViews.indices.contains(index) else { return }
+        let view = overlayViews[index]
+        let host = NSHostingView(rootView: RecordingPickerBar(model: model))
+        let size = host.fittingSize
+        host.frame = NSRect(x: (view.bounds.width - size.width) / 2, y: 64, width: size.width, height: size.height)
+        host.autoresizingMask = [.minXMargin, .maxXMargin, .maxYMargin]
+        view.addSubview(host)
+        pickerHost = host
+    }
+
+    private func recordingModeChanged(_ mode: RecordingPickMode) {
+        marqueeEngine.reset()
+        hoveredWindow = nil
+        broadcastSelectionRect(nil)
+        for view in overlayViews {
+            view.hintText = mode.hint
+        }
+        if mode == .window {
+            outlineWindow(at: NSEvent.mouseLocation)
+        }
+    }
+
+    /// Entire Screen on the bar: the screen the bar is on.
+    private func recordEntireScreen() {
+        let screen = pickerHost?.window?.screen
+            ?? NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) })
+            ?? NSScreen.main
+        guard let screen else { return }
+        finishSelection(.display(screen))
+    }
+
+    /// Outlines the window a click would record.
+    private func outlineWindow(at point: CGPoint) {
+        let hovered = window(atAppKitPoint: point)
+        if hovered?.0 != hoveredWindow {
+            hoveredWindow = hovered?.0
+            broadcastSelectionRect(hovered?.1)
+        }
+    }
+
+    private var isPickingWindow: Bool {
+        purpose == .recording && pickerModel?.mode == .window
     }
 
     private func presentOverlay(hint: String?) {
@@ -194,6 +258,7 @@ public final class CaptureOverlayController: NSObject {
         completion?(nil)
         let selection = selectionCompletion
         selectionCompletion = nil
+        pickerModel = nil
         selection?(nil)
     }
 
@@ -213,6 +278,7 @@ public final class CaptureOverlayController: NSObject {
         }
         let completion = selectionCompletion
         selectionCompletion = nil
+        pickerModel = nil
         teardownOverlays()
         completion?(selection)
     }
@@ -256,6 +322,8 @@ public final class CaptureOverlayController: NSObject {
     }
 
     private func teardownOverlays() {
+        pickerHost?.removeFromSuperview()
+        pickerHost = nil
         removeMonitors()
         if isCrosshairCursorPushed {
             NSCursor.pop()
@@ -307,6 +375,10 @@ public final class CaptureOverlayController: NSObject {
             for panel in overlayPanels {
                 panel.orderFrontRegardless()
             }
+            for view in overlayViews {
+                view.hintText = pickerModel?.mode.hint
+            }
+            installPickerBar()
             refreshCachedScreenImages()
         }
     }
@@ -314,12 +386,14 @@ public final class CaptureOverlayController: NSObject {
     // MARK: - Event Dispatch from Overlay Views
 
     public func handleMouseDown(event: NSEvent) {
+        if isPickingWindow { return }  // Window mode: a click picks, nothing is dragged
         let globalLocation = NSEvent.mouseLocation
         marqueeEngine.beginDrag(at: globalLocation)
         broadcastSelectionRect(marqueeEngine.normalizedRect)
     }
 
     public func handleMouseDragged(event: NSEvent) {
+        if isPickingWindow { return }
         let globalLocation = NSEvent.mouseLocation
         marqueeEngine.updateDrag(to: globalLocation)
         hoveredWindow = nil
@@ -332,16 +406,20 @@ public final class CaptureOverlayController: NSObject {
 
     public func handleMouseUp(event: NSEvent) {
         if selectionCompletion != nil {
-            let finalRect = marqueeEngine.endDrag(minimumDimension: 4.0)
             let mouse = NSEvent.mouseLocation
+            if isPickingWindow {
+                if let (info, _) = window(atAppKitPoint: mouse),
+                   let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main {
+                    finishSelection(.window(info, screen: screen))
+                }
+                return
+            }
+            let finalRect = marqueeEngine.endDrag(minimumDimension: 4.0)
             if let rect = finalRect {
                 let center = CGPoint(x: rect.midX, y: rect.midY)
                 if let screen = NSScreen.screens.first(where: { $0.frame.contains(center) }) ?? NSScreen.main {
                     finishSelection(.region(rect.intersection(screen.frame), screen: screen))
                 }
-            } else if purpose == .recording, let (info, _) = window(atAppKitPoint: mouse),
-                      let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main {
-                finishSelection(.window(info, screen: screen))
             } else {
                 broadcastSelectionRect(nil)
             }
@@ -403,12 +481,7 @@ public final class CaptureOverlayController: NSObject {
         let globalLocation = NSEvent.mouseLocation
         broadcastCursorLocation(globalLocation)
         if purpose == .recording {
-            // Outline the window a click would record.
-            let hovered = window(atAppKitPoint: globalLocation)
-            if hovered?.0 != hoveredWindow {
-                hoveredWindow = hovered?.0
-                broadcastSelectionRect(hovered?.1)
-            }
+            if isPickingWindow { outlineWindow(at: globalLocation) }  // Selection mode: nothing until a drag
             return
         }
         updateLoupeData(cursor: globalLocation)

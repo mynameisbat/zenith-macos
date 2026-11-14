@@ -74,6 +74,7 @@ enum ScreenshotRenderer {
         island.focusTimer = nil
         island.showLevel(.volume, level: 0.62)
         save("island-volume", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
+        save("recording-picker", RecordingPickerBar(model: RecordingPickerModel()).padding(20).background(Color.gray))
         island.dismissAlert()
         island.focusTimer = nil
         island.upcomingEvent = nil

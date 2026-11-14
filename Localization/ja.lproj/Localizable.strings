@@ -886,7 +886,14 @@
 "Done" = "完了";
 "Drag over the content to capture while it scrolls. Esc cancels." = "スクロールしながら撮影する内容の上をドラッグします。Escでキャンセル。";
 "Drag the yellow handles to keep only part of the recording. A trimmed copy is saved beside it." = "黄色のハンドルをドラッグして、収録の一部だけを残します。トリミングしたコピーが同じ場所に保存されます。";
-"Drag to record an area, click a window, or press Return for the whole screen. Esc cancels." = "ドラッグして範囲を収録、ウインドウをクリック、またはReturnで画面全体を収録します。Escでキャンセル。";
+"Entire Screen" = "画面全体";
+"Window" = "ウインドウ";
+"Selection" = "選択部分";
+"Record the whole screen" = "画面全体を収録";
+"Record one window: click it" = "ウインドウを収録: クリックして選択";
+"Record an area: drag over it" = "範囲を収録: ドラッグして選択";
+"Drag over the area to record. Return records the whole screen, Esc cancels." = "収録する範囲をドラッグしてください。Returnで画面全体を収録、Escでキャンセルします。";
+"Click the window to record. Return records the whole screen, Esc cancels." = "収録するウインドウをクリックしてください。Returnで画面全体を収録、Escでキャンセルします。";
 "Export as GIF" = "GIFとして書き出す";
 "File Type" = "ファイルの種類";
 "Frame Rate" = "フレームレート";

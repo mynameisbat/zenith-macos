@@ -85,6 +85,15 @@ public final class LocalProxyServer: @unchecked Sendable {
         return current
     }
 
+    /// TCP for both sides of the relay, with Nagle's algorithm off. The proxy forwards small writes as they come (the
+    /// CONNECT reply, the ClientHello in two pieces for the anti-DPI split); with Nagle on, the second piece waited
+    /// for the server's delayed ACK, which added 80–200 ms to every new HTTPS connection through the shield.
+    static func relayTCPParameters() -> NWParameters {
+        let tcp = NWProtocolTCP.Options()
+        tcp.noDelay = true
+        return NWParameters(tls: nil, tcp: tcp)
+    }
+
     public var provider: DoHProvider {
         get {
             lock.lock()
@@ -221,7 +230,7 @@ public final class LocalProxyServer: @unchecked Sendable {
         // A tunnel holds two sockets; the 256 an app launched from Finder is given runs out with a few busy tabs.
         FileDescriptorLimit.raiseSoftLimit()
 
-        let parameters = NWParameters.tcp
+        let parameters = Self.relayTCPParameters()
         parameters.allowLocalEndpointReuse = true
         parameters.requiredInterfaceType = .loopback
 
@@ -644,7 +653,7 @@ public final class LocalProxyServer: @unchecked Sendable {
 
                 // Connect to remote destination bypassing system proxies to prevent infinite loop
                 let remoteEndpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(resolvedIP), port: targetPort)
-                let tcpParams = NWParameters.tcp
+                let tcpParams = Self.relayTCPParameters()
                 tcpParams.preferNoProxies = true
                 let remoteConn = NWConnection(to: remoteEndpoint, using: tcpParams)
                 self.registerConnection(remoteConn)
@@ -815,7 +824,7 @@ public final class LocalProxyServer: @unchecked Sendable {
                 }
 
                 let remoteEndpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(resolvedIP), port: nwPort)
-                let tcpParams = NWParameters.tcp
+                let tcpParams = Self.relayTCPParameters()
                 tcpParams.preferNoProxies = true
                 let remoteConn = NWConnection(to: remoteEndpoint, using: tcpParams)
                 self.registerConnection(remoteConn)

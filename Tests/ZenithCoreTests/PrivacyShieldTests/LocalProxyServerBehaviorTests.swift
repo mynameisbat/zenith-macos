@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import Darwin
+import Network
 @testable import ZenithCore
 
 /// Minimal blocking BSD-socket helpers so the proxy can be driven by a real client and a real local origin
@@ -166,6 +167,14 @@ struct LocalProxyServerBehaviorTests {
     }
 
     private let connectEstablished = "HTTP/1.1 200 Connection Established\r\n\r\n"
+
+    // MARK: - TCP options
+
+    @Test("LP-14: Both sides of the relay turn Nagle off (small writes such as the split ClientHello go out at once)")
+    func testRelayDisablesNagle() {
+        let options = LocalProxyServer.relayTCPParameters().defaultProtocolStack.transportProtocol as? NWProtocolTCP.Options
+        #expect(options?.noDelay == true)
+    }
 
     // MARK: - Request rewriting
 
