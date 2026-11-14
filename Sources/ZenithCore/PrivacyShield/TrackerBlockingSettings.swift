@@ -122,7 +122,7 @@ public final class TrackerBlockingSettings: ObservableObject {
         guard !allowedDomains.contains(domain) else { return .alreadyListed(domain) }
         allowedDomains.append(domain)
         userDefaults.set(allowedDomains, forKey: Keys.allowedDomains)
-        if isEnabled { blocklist.replaceAllowed(normalized: Set(allowedDomains)) }
+        blocklist.replaceAllowed(normalized: Set(allowedDomains))   // also counts while blocking is off (filtering resolvers)
         return .added(domain)
     }
 
@@ -130,7 +130,7 @@ public final class TrackerBlockingSettings: ObservableObject {
         guard let index = allowedDomains.firstIndex(of: domain) else { return }
         allowedDomains.remove(at: index)
         userDefaults.set(allowedDomains, forKey: Keys.allowedDomains)
-        if isEnabled { blocklist.replaceAllowed(normalized: Set(allowedDomains)) }
+        blocklist.replaceAllowed(normalized: Set(allowedDomains))   // also counts while blocking is off (filtering resolvers)
     }
 
     // MARK: - Imported list
@@ -186,7 +186,9 @@ public final class TrackerBlockingSettings: ObservableObject {
                 normalizedAllowed: Set(allowedDomains)
             )
         } else {
-            blocklist.replace(normalizedBlocked: [], normalizedAllowed: [])
+            // Nothing is blocked, but the never-block list still counts: it also keeps a filtering resolver
+            // (AdGuard DNS, NextDNS) from blocking those names.
+            blocklist.replace(normalizedBlocked: [], normalizedAllowed: Set(allowedDomains))
         }
     }
 

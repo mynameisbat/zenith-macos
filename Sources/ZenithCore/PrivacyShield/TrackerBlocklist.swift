@@ -79,6 +79,24 @@ public final class TrackerBlocklist: @unchecked Sendable {
         return matchedBlock
     }
 
+    /// Whether `host` (or a domain it is under) is on the never-block list. The proxy asks an unfiltered resolver for
+    /// such a name, so a filtering resolver cannot block it either.
+    public func isNeverBlocked(host: String) -> Bool {
+        let name = host.trimmingCharacters(in: CharacterSet(charactersIn: "[] .")).lowercased()
+        guard name.contains("."), !Self.looksLikeAddress(name) else { return false }
+
+        lock.lock()
+        defer { lock.unlock() }
+        guard !allowed.isEmpty else { return false }
+        var candidate = Substring(name)
+        while candidate.contains(".") {
+            if allowed.contains(String(candidate)) { return true }
+            guard let dot = candidate.firstIndex(of: ".") else { break }
+            candidate = candidate[candidate.index(after: dot)...]
+        }
+        return false
+    }
+
     // MARK: - Domain names
 
     /// A lowercase, valid domain, or nil. Accepts a leading `*.` or `.` and a trailing dot.

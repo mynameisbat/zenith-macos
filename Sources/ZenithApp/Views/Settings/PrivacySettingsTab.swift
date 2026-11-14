@@ -79,6 +79,41 @@ public struct PrivacySettingsTab: View {
 
     // MARK: - Tracker blocking
 
+    /// The second layer: a resolver that blocks ads itself (AdGuard DNS, a NextDNS profile). Zenith turns its
+    /// `0.0.0.0` answers into the same 403 as its own list, and asks an unfiltered resolver for Never Block names.
+    @ViewBuilder
+    private var dnsFilteringRow: some View {
+        let provider = controller.statistics.selectedProvider
+        if provider.blocksAdsItself {
+            Label {
+                Text("\(provider.displayName) also blocks ads and trackers, with a list it keeps up to date. Its blocks are counted here, and Never Block applies to it too.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: "checkmark.shield")
+                    .foregroundColor(.green)
+            }
+        } else {
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Block More with AdGuard DNS")
+                        .font(.system(size: 12, weight: .medium))
+                    Text("AdGuard DNS answers ad and tracker names with nothing, from a long list it keeps up to date, so nothing has to be downloaded here. Like any resolver, it sees the names you look up.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Button("Use AdGuard DNS") {
+                    controller.updateProvider(.adguard)
+                    syncFromCurrentProvider()
+                }
+                .controlSize(.small)
+            }
+        }
+    }
+
     private var trackerCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZenithSettingsHeader("Tracker Blocking")
@@ -120,6 +155,9 @@ public struct PrivacySettingsTab: View {
                             .font(.system(size: 11))
                             .foregroundColor(.orange)
                     }
+
+                    divider
+                    dnsFilteringRow
 
                     divider
 

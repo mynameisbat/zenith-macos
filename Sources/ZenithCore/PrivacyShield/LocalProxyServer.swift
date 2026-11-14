@@ -35,6 +35,31 @@ public final class LocalProxyServer: @unchecked Sendable {
     private var _provider: DoHProvider = .cloudflare
     private var _port: UInt16 = 8080
 
+    private var _resolver: DoHResolverProtocol = DoHResolver.shared
+
+    /// What turns names into addresses. Tests put a fake here; the app uses `DoHResolver.shared`.
+    public var resolver: DoHResolverProtocol {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return _resolver
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            _resolver = newValue
+        }
+    }
+
+    /// The resolver to ask for `host`: a name on the never-block list skips a resolver that filters ads itself.
+    func provider(for host: String) -> DoHProvider {
+        let current = provider
+        if blocklist?.isNeverBlocked(host: host) == true {
+            return current.neverBlockResolver
+        }
+        return current
+    }
+
     public var provider: DoHProvider {
         get {
             lock.lock()
@@ -567,8 +592,18 @@ public final class LocalProxyServer: @unchecked Sendable {
             guard let self = self else { return }
             do {
                 let startTime = Date()
-                let resolvedIP = try await DoHResolver.shared.resolve(domain: targetHost, provider: self.provider)
+                let resolvedIP = try await self.resolver.resolve(domain: targetHost, provider: self.provider(for: targetHost))
                 let elapsedMs = Int(Date().timeIntervalSince(startTime) * 1000)
+
+                // A filtering resolver (AdGuard DNS, NextDNS) answers an ad or tracker name with 0.0.0.0 / ::. That is a
+                // block, counted like one; connecting there would reach this Mac itself.
+                if DoHResolver.isBlockingAnswer(resolvedIP) {
+                    Task { @MainActor in
+                        PrivacyShieldStatistics.shared.recordBlockedRequest(domain: targetHost, port: targetPortRaw, protocolType: "HTTPS")
+                    }
+                    self.respondAndClose(clientConn, status: "403 Forbidden")
+                    return
+                }
 
                 // Post-resolution security validation:
                 guard Self.isPermittedTarget(resolvedIP: resolvedIP, targetPort: targetPortRaw, proxyPort: self.port) else {
@@ -737,7 +772,17 @@ public final class LocalProxyServer: @unchecked Sendable {
         Task { [weak self] in
             guard let self = self else { return }
             do {
-                let resolvedIP = try await DoHResolver.shared.resolve(domain: host, provider: self.provider)
+                let resolvedIP = try await self.resolver.resolve(domain: host, provider: self.provider(for: host))
+
+                // A filtering resolver (AdGuard DNS, NextDNS) answers an ad or tracker name with 0.0.0.0 / ::. That is a
+                // block, counted like one; connecting there would reach this Mac itself.
+                if DoHResolver.isBlockingAnswer(resolvedIP) {
+                    Task { @MainActor in
+                        PrivacyShieldStatistics.shared.recordBlockedRequest(domain: host, port: resolvedPort, protocolType: "HTTP")
+                    }
+                    self.respondAndClose(clientConn, status: "403 Forbidden")
+                    return
+                }
 
                 // Post-resolution security validation:
                 guard Self.isPermittedTarget(resolvedIP: resolvedIP, targetPort: resolvedPort, proxyPort: self.port) else {

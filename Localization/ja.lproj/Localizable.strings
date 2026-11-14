@@ -1048,3 +1048,9 @@
 "Working state, tokens, model and plan limits with their reset time." = "作業状態、トークン数、モデル、プランの上限とそのリセット時刻。";
 "Zenith reads only the token counts, times, model names and project folder names in the logs these tools keep on this Mac. Prompts and replies are never read, and nothing leaves your Mac." = "Zenithが読み取るのは、これらのツールがこのMacに保存しているログのうち、トークン数、時刻、モデル名、プロジェクトフォルダ名だけです。プロンプトや応答を読むことはなく、何もMacの外に送信されません。";
 "resets %@" = "%@にリセット";
+
+/* Tracker blocking: filtering resolver (Settings › Privacy Shield) */
+"%@ also blocks ads and trackers, with a list it keeps up to date. Its blocks are counted here, and Never Block applies to it too." = "%@ も、常に更新されるリストで広告とトラッカーをブロックします。そのブロックもここで数えられ、「ブロックしない」も適用されます。";
+"Block More with AdGuard DNS" = "AdGuard DNSでさらにブロック";
+"AdGuard DNS answers ad and tracker names with nothing, from a long list it keeps up to date, so nothing has to be downloaded here. Like any resolver, it sees the names you look up." = "AdGuard DNSは、常に更新される長いリストに基づいて広告とトラッカーの名前にアドレスを返さないため、ここで何もダウンロードする必要はありません。ほかのリゾルバと同様に、問い合わせた名前はAdGuardに見えます。";
+"Use AdGuard DNS" = "AdGuard DNSを使用";
