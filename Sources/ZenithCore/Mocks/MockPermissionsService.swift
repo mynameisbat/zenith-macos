@@ -7,6 +7,7 @@ public final class MockPermissionsService: PermissionsServiceProtocol, @unchecke
     public var screenRecordingGranted: Bool
     public var accessibilityGranted: Bool
     public var calendarState: CalendarAccessState = .notDetermined
+    public var microphoneState: MicrophoneAccess = .notDetermined
     public private(set) var requestScreenRecordingCallCount: Int = 0
     public private(set) var requestAccessibilityCallCount: Int = 0
     public private(set) var openScreenRecordingSettingsCallCount: Int = 0
@@ -33,6 +34,12 @@ public final class MockPermissionsService: PermissionsServiceProtocol, @unchecke
         lock.lock()
         defer { lock.unlock() }
         return calendarState
+    }
+
+    public func microphoneAccess() -> MicrophoneAccess {
+        lock.lock()
+        defer { lock.unlock() }
+        return microphoneState
     }
 
     public func requestScreenRecordingPermission() -> Bool {

@@ -101,6 +101,8 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <true/>
     <key>NSAppleEventsUsageDescription</key>
     <string>Zenith uses Apple Events to see what Music and Spotify are playing, to control playback from the Dynamic Island, and to ask Finder to move to the Trash a leftover folder that macOS does not let other apps move.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Zenith records your microphone into a screen recording, only when you turn on Microphone in the recording bar.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>Zenith shows your next calendar event in the Dynamic Island when you turn on the Calendar widget. Events are only read on this Mac.</string>
     <key>NSCalendarsUsageDescription</key>

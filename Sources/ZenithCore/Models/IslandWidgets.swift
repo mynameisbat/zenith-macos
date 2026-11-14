@@ -187,10 +187,10 @@ public extension ZenithIslandState {
         return tabs.first ?? .shelf
     }
 
-    /// Something to show next to the notch while the island is closed: a running timer, playing media or a coding
-    /// agent at work.
+    /// Something to show next to the notch while the island is closed: a running timer, playing media, a coding
+    /// agent at work or keep awake.
     var hasCompactActivity: Bool {
-        focusTimer != nil || nowPlayingTrack?.isPlaying == true || workingAIAgent != nil
+        compactActivity != nil
     }
 
     /// The coding agent at work, if any, while the AI Agents feature is on.

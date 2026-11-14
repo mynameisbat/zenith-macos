@@ -8,8 +8,11 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case shortcuts = "Shortcuts"
     case audio = "Audio"
     case island = "Dynamic Island"
+    case snippets = "Snippets"
     case privacy = "Privacy"
+    case ports = "Ports"
     case cleaner = "Cleaner"
+    case homebrew = "Homebrew"
     case permissions = "Permissions"
 
     public var id: String { rawValue }
@@ -20,8 +23,11 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .shortcuts: return "command"
         case .audio: return "speaker.wave.2.fill"
         case .island: return "capsule.fill"
+        case .snippets: return "text.badge.plus"
         case .privacy: return "lock.shield.fill"
+        case .ports: return "network"
         case .cleaner: return "sparkles"
+        case .homebrew: return "shippingbox.fill"
         case .permissions: return "hand.raised.fill"
         }
     }
@@ -32,8 +38,11 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .shortcuts: return "Global Hotkeys"
         case .audio: return "Sound Feedback"
         case .island: return "Widgets & Timer"
+        case .snippets: return "Text Expansion"
         case .privacy: return "Encrypted DNS"
+        case .ports: return "Listening Processes"
         case .cleaner: return "Caches & Junk"
+        case .homebrew: return "Packages & Updates"
         case .permissions: return "Screen & Access"
         }
     }
@@ -45,8 +54,11 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .shortcuts: return String(localized: "Shortcuts")
         case .audio: return String(localized: "Audio")
         case .island: return String(localized: "Dynamic Island")
+        case .snippets: return String(localized: "Snippets")
         case .privacy: return String(localized: "Privacy Shield")
+        case .ports: return String(localized: "Ports")
         case .cleaner: return String(localized: "Cleaner")
+        case .homebrew: return String(localized: "Homebrew")
         case .permissions: return String(localized: "Permissions")
         }
     }
@@ -58,17 +70,20 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .shortcuts: return ["hotkey", "keyboard", "keys"]
         case .audio: return ["sound", "volume"]
         case .island: return ["notch", "timer", "pomodoro", "focus", "calendar", "event", "widget"]
+        case .snippets: return ["snippet", "text", "expansion", "abbreviation", "trigger", "template"]
         case .privacy: return ["dns", "doh", "proxy", "shield"]
+        case .ports: return ["port", "listen", "lsof", "server", "localhost", "kill", "process"]
         case .cleaner: return ["junk", "cache", "disk", "storage", "uninstall"]
+        case .homebrew: return ["brew", "package", "formula", "cask", "install", "upgrade"]
         case .permissions: return ["accessibility", "screen recording", "automation", "calendar"]
         }
     }
 
     public var sectionTitle: String {
         switch self {
-        case .general, .shortcuts, .audio, .island:
+        case .general, .shortcuts, .audio, .island, .snippets:
             return "WORKSPACE"
-        case .privacy, .cleaner, .permissions:
+        case .privacy, .ports, .cleaner, .homebrew, .permissions:
             return "SYSTEM & SECURITY"
         }
     }
@@ -121,6 +136,27 @@ public final class SettingsViewModel: ObservableObject {
             .store(in: &cancellables)
 
         refreshPermissions()
+
+        if let tab = Self.requestedTab {
+            selectedTab = tab
+            Self.requestedTab = nil
+        }
+        Self.tabRequests
+            .sink { [weak self] tab in
+                self?.selectedTab = tab
+                Self.requestedTab = nil
+            }
+            .store(in: &cancellables)
+    }
+
+    /// A pane another part of the app wants Settings to show (e.g. Permissions, when a feature lacks one).
+    private static var requestedTab: SettingsTab?
+    private static let tabRequests = PassthroughSubject<SettingsTab, Never>()
+
+    /// Makes Settings show `tab`: now if the window exists, else when it is created. Call before showing the window.
+    public static func request(_ tab: SettingsTab) {
+        requestedTab = tab
+        tabRequests.send(tab)
     }
 
     // MARK: - General Tab Bindings

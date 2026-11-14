@@ -41,6 +41,7 @@ public struct PermissionsGuideView: View {
         case .accessibility: return (SymbolName.accessibility, Color(nsColor: .systemBlue))
         case .automation: return ("gearshape.2.fill", ZenithTint.general)
         case .calendar: return ("calendar", ZenithTint.calendar)
+        case .microphone: return ("mic.fill", Color(nsColor: .systemOrange))
         }
     }
 

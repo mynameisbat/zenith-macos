@@ -212,12 +212,13 @@ struct AnnotationModelsTests {
     @Test("AM-14: AnnotationTool enum cases and identifiers conform to contracts")
     func testAnnotationToolCases() {
         let allTools = AnnotationTool.allCases
-        #expect(allTools.count == 6)
+        #expect(allTools.count == 7)
         #expect(AnnotationTool.pen.id == "pen")
         #expect(AnnotationTool.arrow.id == "arrow")
         #expect(AnnotationTool.rectangle.id == "rectangle")
         #expect(AnnotationTool.text.id == "text")
         #expect(AnnotationTool.blur.id == "blur")
+        #expect(AnnotationTool.redact.id == "redact")
         #expect(AnnotationTool.crop.id == "crop")
     }
 

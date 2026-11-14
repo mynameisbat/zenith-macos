@@ -132,6 +132,14 @@ enum ScreenshotRenderer {
         ZenithCommandHubState.shared.snapshotProvider = { sampleSnapshot }
         // Made-up PIDs can belong to real apps on this machine: never draw their icons.
         ProcessIconProvider.symbolsOnly = true
+        // The hub's port count must not read this Mac's sockets either.
+        let ownProcess = { (path: String) in ProcessIdentity(uid: getuid(), executablePath: path, startTime: 0) }
+        PortManagerModel.shared.pin([
+            ListeningPort(pid: 4321, processName: "node", uid: nil, user: nil, proto: .tcp, address: "127.0.0.1", port: 3000, identity: ownProcess("/opt/homebrew/bin/node")),
+            ListeningPort(pid: 4380, processName: "postgres", uid: nil, user: nil, proto: .tcp, address: "127.0.0.1", port: 5432, identity: ownProcess("/opt/homebrew/bin/postgres")),
+            ListeningPort(pid: 4410, processName: "python3", uid: nil, user: nil, proto: .tcp, address: "*", port: 8000, identity: ownProcess("/opt/homebrew/bin/python3")),
+            ListeningPort(pid: 612, processName: "ControlCenter", uid: nil, user: nil, proto: .tcp, address: "*", port: 7000, identity: ownProcess("/System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter")),
+        ])
         ZenithCommandHubState.shared.hardwareSnapshot = sampleSnapshot
         // The clipboard panel, with invented items of every kind, spread over three days.
         let samples: [(text: String, age: TimeInterval, pinned: Bool)] = [
@@ -222,7 +230,7 @@ enum ScreenshotRenderer {
             permissionsService: ScreenshotPermissions()
         )
         for (suffix, scheme) in [("light", ColorScheme.light), ("dark", ColorScheme.dark)] {
-            for tab in [SettingsTab.general, .shortcuts, .island, .permissions] {
+            for tab in [SettingsTab.general, .shortcuts, .island, .ports, .permissions] {
                 settingsModel.selectedTab = tab
                 let name = tab == .island ? "island" : tab.rawValue.lowercased()
                 save("settings-\(name)-\(suffix)",
@@ -292,6 +300,7 @@ private struct ScreenshotPermissions: PermissionsServiceProtocol {
     func openScreenRecordingSettings() -> Bool { false }
     func openAccessibilitySettings() -> Bool { false }
     func calendarAccess() -> CalendarAccessState { .granted }
+    func microphoneAccess() -> MicrophoneAccess { .notDetermined }
 }
 
 private struct ScreenshotLoginItem: LaunchAtLoginServiceProtocol {

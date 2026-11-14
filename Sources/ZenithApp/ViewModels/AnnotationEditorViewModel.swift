@@ -141,6 +141,9 @@ public final class AnnotationEditorViewModel: ObservableObject {
                 pixelSize: 16.0
             )
 
+        case .redact:
+            activePreviewCommand = RectangleAnnotationCommand.redaction(makeNormalizedRect(start: start, end: point))
+
         case .crop:
             activeCropRect = makeNormalizedRect(start: start, end: point)
 
@@ -196,6 +199,13 @@ public final class AnnotationEditorViewModel: ObservableObject {
                     pixelSize: 16.0
                 )
                 commandStack.push(command)
+            }
+            activePreviewCommand = nil
+
+        case .redact:
+            let rect = makeNormalizedRect(start: start, end: point)
+            if rect.width >= 3.0 && rect.height >= 3.0 {
+                commandStack.push(RectangleAnnotationCommand.redaction(rect))
             }
             activePreviewCommand = nil
 

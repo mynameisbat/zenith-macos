@@ -63,14 +63,32 @@ public struct ZenithCommandHubView: View {
                 .padding(.horizontal, 6)
                 .padding(.vertical, 8)
 
+            HubPortsSection(query: trimmedQuery) {
+                SettingsTab.requestSelection(.ports)
+                onClose()
+                onOpenPreferences()
+            }
+            .padding(.horizontal, 6)
+            .padding(.bottom, 8)
+
             sectionDivider
 
             VStack(spacing: 12) {
                 metersRow
-                controlsRow
+                // One grid, so the switches of Privacy Shield and Keep Awake line up whatever the labels' width
+                // (it changes with the language).
+                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 12) {
+                    controlsRow
+                    KeepAwakeHubRow()
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
+
+            HomebrewHubRow {
+                HomebrewSettingsLink.request()
+                onOpenPreferences()
+            }
 
             sectionDivider
 
@@ -85,6 +103,7 @@ public struct ZenithCommandHubView: View {
         .onAppear {
             isSearchFocused = true
             hubState.refreshHardwareSnapshot()
+            PortManagerModel.shared.refresh()
         }
         .onValueChange(of: hubState.presentationID) { _ in
             isSearchFocused = true
@@ -205,12 +224,17 @@ public struct ZenithCommandHubView: View {
         case .screen: return ZenithTint.screen
         case .ocr: return ZenithTint.ocr
         case .clipboard: return ZenithTint.clipboard
+        case .cleaning: return ZenithTint.general
         }
     }
 
     /// The shortcut the action really has (the user may have changed it in Settings), written like a menu.
     private func shortcutText(for action: ZenithHubAction) -> String {
-        settings.effectiveHotkey(for: action.hotKeyId)?.menuStyleKeyEquivalent
+        // Cleaning Mode's shortcut is off unless Settings turns it on.
+        if action == .cleaning, !CleaningModeSettings.shared.hotKeyEnabled {
+            return String(localized: "No shortcut")
+        }
+        return settings.effectiveHotkey(for: action.hotKeyId)?.menuStyleKeyEquivalent
             ?? HotKeyDefinition.menuStyle(action.shortcut)
     }
 
@@ -276,6 +300,8 @@ public struct ZenithCommandHubView: View {
             onScreenOCR()
         case .clipboard:
             onOpenClipboard()
+        case .cleaning:
+            CleaningModeCoordinator.shared.start()
         }
     }
 
@@ -529,50 +555,54 @@ public struct ZenithCommandHubView: View {
         )
     }
 
+    /// Privacy Shield's row of the controls grid: label, switch, then the Clean and Boost buttons at the trailing edge.
     private var controlsRow: some View {
-        HStack(spacing: 8) {
-            Toggle(isOn: shieldBinding) {
-                HStack(spacing: 6) {
-                    ZenithIconTile(systemName: "lock.shield.fill", tint: ZenithTint.privacy, size: 20)
-                    Text("Privacy Shield")
-                        .font(.system(size: 12.5))
-                        .lineLimit(1)
-                        .fixedSize()
-                }
-            }
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            .disabled(privacyController.isTransitioning)
-            .help(privacyController.isRunning
-                    ? "On: sites are looked up over encrypted DNS through a local proxy"
-                    : "Off. Turn on to look sites up over encrypted DNS through a local proxy")
-
-            Spacer(minLength: 4)
-
-            Button {
-                runCleaner()
-            } label: {
-                Label(cleanTitle, systemImage: "sparkles")
-                    .labelStyle(.titleAndIcon)
-                    .monospacedDigit()
+        GridRow {
+            HStack(spacing: 6) {
+                ZenithIconTile(systemName: "lock.shield.fill", tint: ZenithTint.privacy, size: 20)
+                Text("Privacy Shield")
+                    .font(.system(size: 12.5))
                     .lineLimit(1)
                     .fixedSize()
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(cleaner.isCleaning || cleaner.isScanning || (!hasNotScannedJunk && cleaner.selectedJunkSize == 0))
-            .help(cleanHelp)
+            .accessibilityHidden(true)
 
-            Button {
-                runBoost()
-            } label: {
-                Label("Boost", systemImage: "bolt.fill")
-                    .labelStyle(.titleAndIcon)
-                    .fixedSize()
+            Toggle("Privacy Shield", isOn: shieldBinding)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .disabled(privacyController.isTransitioning)
+                .help(privacyController.isRunning
+                        ? "On: sites are looked up over encrypted DNS through a local proxy"
+                        : "Off. Turn on to look sites up over encrypted DNS through a local proxy")
+
+            HStack(spacing: 8) {
+                Button {
+                    runCleaner()
+                } label: {
+                    Label(cleanTitle, systemImage: "sparkles")
+                        .labelStyle(.titleAndIcon)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(cleaner.isCleaning || cleaner.isScanning || (!hasNotScannedJunk && cleaner.selectedJunkSize == 0))
+                .help(cleanHelp)
+
+                Button {
+                    runBoost()
+                } label: {
+                    Label("Boost", systemImage: "bolt.fill")
+                        .labelStyle(.titleAndIcon)
+                        .fixedSize()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Free inactive memory and flush the DNS cache")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .help("Free inactive memory and flush the DNS cache")
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 
