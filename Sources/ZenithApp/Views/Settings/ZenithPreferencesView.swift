@@ -32,6 +32,7 @@ extension SettingsTab {
         case .privacy: return ZenithTint.privacy
         case .ports: return ZenithTint.network
         case .cleaner: return ZenithTint.cleaner
+        case .homebrew: return HomebrewSettingsTab.tint
         case .permissions: return ZenithTint.permissions
         }
     }
@@ -62,8 +63,15 @@ public struct ZenithPreferencesView: View {
         }
         .frame(minWidth: SettingsWindowController.defaultWidth, maxWidth: .infinity, minHeight: SettingsWindowController.defaultHeight, maxHeight: .infinity)
         .ignoresSafeArea()
-        .onAppear(perform: takePendingTab)
+        .onAppear {
+            takePendingTab()
+            if HomebrewSettingsLink.takePending() { viewModel.selectedTab = .homebrew }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .zenithSelectSettingsTab)) { _ in takePendingTab() }
+        .onReceive(NotificationCenter.default.publisher(for: HomebrewSettingsLink.notification)) { _ in
+            _ = HomebrewSettingsLink.takePending()
+            viewModel.selectedTab = .homebrew
+        }
     }
 
     /// Shows the tab another part of the app asked for (`SettingsTab.requestSelection`).
@@ -247,6 +255,8 @@ public struct ZenithPreferencesView: View {
                     PortsSettingsTab()
                 case .cleaner:
                     CleanerSettingsTab()
+                case .homebrew:
+                    HomebrewSettingsTab()
                 case .permissions:
                     PermissionsGuideView(viewModel: viewModel)
                 }

@@ -12,6 +12,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case privacy = "Privacy"
     case ports = "Ports"
     case cleaner = "Cleaner"
+    case homebrew = "Homebrew"
     case permissions = "Permissions"
 
     public var id: String { rawValue }
@@ -26,6 +27,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .privacy: return "lock.shield.fill"
         case .ports: return "network"
         case .cleaner: return "sparkles"
+        case .homebrew: return "shippingbox.fill"
         case .permissions: return "hand.raised.fill"
         }
     }
@@ -40,6 +42,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .privacy: return "Encrypted DNS"
         case .ports: return "Listening Processes"
         case .cleaner: return "Caches & Junk"
+        case .homebrew: return "Packages & Updates"
         case .permissions: return "Screen & Access"
         }
     }
@@ -55,6 +58,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .privacy: return String(localized: "Privacy Shield")
         case .ports: return String(localized: "Ports")
         case .cleaner: return String(localized: "Cleaner")
+        case .homebrew: return String(localized: "Homebrew")
         case .permissions: return String(localized: "Permissions")
         }
     }
@@ -70,6 +74,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .privacy: return ["dns", "doh", "proxy", "shield"]
         case .ports: return ["port", "listen", "lsof", "server", "localhost", "kill", "process"]
         case .cleaner: return ["junk", "cache", "disk", "storage", "uninstall"]
+        case .homebrew: return ["brew", "package", "formula", "cask", "install", "upgrade"]
         case .permissions: return ["accessibility", "screen recording", "automation", "calendar"]
         }
     }
@@ -78,7 +83,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .general, .shortcuts, .audio, .island, .snippets:
             return "WORKSPACE"
-        case .privacy, .ports, .cleaner, .permissions:
+        case .privacy, .ports, .cleaner, .homebrew, .permissions:
             return "SYSTEM & SECURITY"
         }
     }
