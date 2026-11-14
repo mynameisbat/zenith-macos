@@ -528,9 +528,7 @@ struct AIAgentTrackingTests {
 
     @Test("AIA-15: The feature is off by default; tools, notice and length are saved and clamped")
     func testSettings() {
-        let suite = "zenith.ai-agents.tests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = TestDefaults.make("ai-agents.\(UUID().uuidString)")!
 
         let settings = AIAgentSettings(userDefaults: defaults)
         #expect(!settings.isEnabled)

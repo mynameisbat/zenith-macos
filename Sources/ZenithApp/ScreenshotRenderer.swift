@@ -203,7 +203,15 @@ enum ScreenshotRenderer {
         // Permissions and login item are stand-ins, so the picture does not depend on this Mac either.
         // Clipboard privacy is a setting too, but its list of ignored apps is this Mac's: show the built-in defaults
         // from a throwaway store that is never saved and has no pasteboard monitor behind it.
-        let renderDefaultsName = "zenith.render-screenshots.\(UUID().uuidString)"
+        // `removePersistentDomain` below empties the store's file but leaves it in ~/Library/Preferences (cfprefsd
+        // writes it back after this process), so each run first removes what earlier runs left.
+        let renderDefaultsPrefix = "zenith.render-screenshots."
+        let preferences = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences")
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: preferences.path)) ?? []
+        where name.hasPrefix(renderDefaultsPrefix) && name.hasSuffix(".plist") {
+            try? FileManager.default.removeItem(at: preferences.appendingPathComponent(name))
+        }
+        let renderDefaultsName = renderDefaultsPrefix + UUID().uuidString
         let renderDefaults = UserDefaults(suiteName: renderDefaultsName) ?? .standard
         defer { renderDefaults.removePersistentDomain(forName: renderDefaultsName) }
         let renderClipboardPrivacy = ClipboardPrivacySettings(userDefaults: renderDefaults, monitor: nil)
