@@ -89,6 +89,8 @@ struct KeepAwakeModeMenuItems: View {
         Button(KeepAwakeMode.whileOnACPower.title) {
             service.start(.whileOnACPower)
         }
+        Divider()
+        Toggle("Keep the Display On", isOn: $settings.keepsDisplayOn)
         if service.isActive {
             Divider()
             Button("Turn Off") {
