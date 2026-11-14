@@ -219,12 +219,17 @@ public struct ZenithCommandHubView: View {
         case .screen: return ZenithTint.screen
         case .ocr: return ZenithTint.ocr
         case .clipboard: return ZenithTint.clipboard
+        case .cleaning: return ZenithTint.general
         }
     }
 
     /// The shortcut the action really has (the user may have changed it in Settings), written like a menu.
     private func shortcutText(for action: ZenithHubAction) -> String {
-        settings.effectiveHotkey(for: action.hotKeyId)?.menuStyleKeyEquivalent
+        // Cleaning Mode's shortcut is off unless Settings turns it on.
+        if action == .cleaning, !CleaningModeSettings.shared.hotKeyEnabled {
+            return String(localized: "No shortcut")
+        }
+        return settings.effectiveHotkey(for: action.hotKeyId)?.menuStyleKeyEquivalent
             ?? HotKeyDefinition.menuStyle(action.shortcut)
     }
 
@@ -290,6 +295,8 @@ public struct ZenithCommandHubView: View {
             onScreenOCR()
         case .clipboard:
             onOpenClipboard()
+        case .cleaning:
+            CleaningModeCoordinator.shared.start()
         }
     }
 

@@ -54,6 +54,7 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
     public static let captureAreaId = "capture.area"
     public static let captureFullscreenId = "capture.fullscreen"
     public static let captureOCRId = "capture.ocr"
+    public static let cleaningModeId = "cleaning.mode"
 
     // MARK: - Built-in Default Shortcut Configurations
 
@@ -114,6 +115,16 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
         keyEquivalent: "⌃⌥T"
     )
 
+    /// Cleaning Mode: ⌃⌥⇧K ("K for keyboard"). Registered only while Settings turns its shortcut on (off by default),
+    /// and deliberately without ⌘, so the keys that start it are not the ⌃⌥⌘ that end it. Not in `defaultDictionary`.
+    public static let defaultCleaningMode = HotKeyDefinition(
+        id: cleaningModeId,
+        name: "Cleaning Mode",
+        keyCode: 40, // kVK_ANSI_K
+        carbonModifiers: CarbonModifierFlags.control.rawValue | CarbonModifierFlags.option.rawValue | CarbonModifierFlags.shift.rawValue,
+        keyEquivalent: "⌃⌥⇧K"
+    )
+
     /// Key codes (with ⌘⇧) of macOS's screenshot shortcuts: 3, 4, 5 and 6. A Zenith shortcut on one of these fires
     /// together with the system's.
     public static let macOSScreenshotShortcuts: [(keyCode: UInt32, carbonModifiers: UInt32)] = {
@@ -141,7 +152,7 @@ public struct HotKeyDefinition: Identifiable, Sendable, Equatable, Hashable, Cod
 
     /// The built-in shortcut of an action, if it has one.
     public static func builtIn(for id: String) -> HotKeyDefinition? {
-        defaultDictionary[id] ?? (id == captureOCRId ? defaultOCR : nil)
+        defaultDictionary[id] ?? [captureOCRId: defaultOCR, cleaningModeId: defaultCleaningMode][id]
     }
 
     /// Default dictionary containing all standard shortcut presets.
