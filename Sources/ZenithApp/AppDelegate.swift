@@ -46,6 +46,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         KeepAwakeHotKeyController.shared.apply()  // keep awake's shortcut: off by default
         CleaningModeCoordinator.shared.configure()  // full-screen windows, and the shortcut if Settings turned it on
         SnippetExpansionService.shared.refresh()  // typed snippet expansion: off by default, needs Accessibility
+        AIAgentsCoordinator.shared.start()  // AI agents on the island: off by default, reads local logs only
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

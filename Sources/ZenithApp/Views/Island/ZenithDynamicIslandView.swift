@@ -156,6 +156,16 @@ public struct ZenithDynamicIslandView: View {
             } else if islandState.compactActivity == .nowPlaying, let track = islandState.nowPlayingTrack {
                 nowPlayingIdleCapsule(track)
                     .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+            } else if islandState.compactActivity == .aiAgent, let agent = islandState.workingAIAgent {
+                AIAgentCompactWings(agent: agent, geometry: geometry)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        islandState.activeTab = .aiAgents
+                        islandState.open()
+                    }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityHint("Shows the AI agents")
+                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
             } else if islandState.compactActivity == .keepAwake, let awake = islandState.keepAwake {
                 IslandKeepAwakeCompactWings(snapshot: awake, geometry: geometry)
                     .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
@@ -172,6 +182,7 @@ public struct ZenithDynamicIslandView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isNowPlayingActive)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.focusTimer == nil)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.compactActivityUsesWideWings)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.workingAIAgent?.kind)
         .animation(.spring(response: 0.32, dampingFraction: 0.8), value: islandState.isDropTargeted)
         .onValueChange(of: islandState.isDropTargeted) { targeted in
             if targeted {
@@ -291,7 +302,8 @@ public struct ZenithDynamicIslandView: View {
         ZenithIslandState.availableTabs(
             hasTrack: islandState.nowPlayingTrack != nil,
             hasShelfItems: !islandState.droppedItems.isEmpty,
-            showsWidgets: islandState.showsWidgets
+            showsWidgets: islandState.showsWidgets,
+            showsAIAgents: islandState.showsAIAgentsTab
         )
     }
 
@@ -301,6 +313,7 @@ public struct ZenithDynamicIslandView: View {
             hasTrack: islandState.nowPlayingTrack != nil,
             hasShelfItems: !islandState.droppedItems.isEmpty,
             showsWidgets: islandState.showsWidgets,
+            showsAIAgents: islandState.showsAIAgentsTab,
             isDropTargeted: islandState.isDropTargeted
         )
     }
@@ -334,6 +347,8 @@ public struct ZenithDynamicIslandView: View {
                     }
                 case .widgets:
                     IslandWidgetsPanel(islandState: islandState)
+                case .aiAgents:
+                    IslandAIAgentsPanel(islandState: islandState)
                 case .shelf:
                     shelfContent
                 }
@@ -379,6 +394,9 @@ public struct ZenithDynamicIslandView: View {
         case .widgets:
             symbol = islandState.focusTimer != nil ? "timer" : "square.grid.2x2.fill"
             title = String(localized: "Widgets")
+        case .aiAgents:
+            symbol = islandState.workingAIAgent != nil ? "sparkles" : "sparkle"
+            title = String(localized: "AI")
         case .shelf:
             symbol = "tray.and.arrow.down.fill"
             title = String(localized: "Shelf (\(islandState.droppedItems.count))")

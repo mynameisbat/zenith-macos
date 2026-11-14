@@ -160,10 +160,11 @@ public protocol UpcomingEventProviding: AnyObject, Sendable {
 
 public extension ZenithIslandState {
     /// The tabs the expanded island offers, in order.
-    static func availableTabs(hasTrack: Bool, hasShelfItems: Bool, showsWidgets: Bool) -> [IslandExpandedTab] {
+    static func availableTabs(hasTrack: Bool, hasShelfItems: Bool, showsWidgets: Bool, showsAIAgents: Bool = false) -> [IslandExpandedTab] {
         var tabs: [IslandExpandedTab] = []
         if hasTrack { tabs.append(.nowPlaying) }
         if showsWidgets { tabs.append(.widgets) }
+        if showsAIAgents { tabs.append(.aiAgents) }
         if hasShelfItems { tabs.append(.shelf) }
         return tabs
     }
@@ -175,17 +176,27 @@ public extension ZenithIslandState {
         hasTrack: Bool,
         hasShelfItems: Bool,
         showsWidgets: Bool,
+        showsAIAgents: Bool = false,
         isDropTargeted: Bool
     ) -> IslandExpandedTab {
         if isDropTargeted { return .shelf }
-        let tabs = availableTabs(hasTrack: hasTrack, hasShelfItems: hasShelfItems, showsWidgets: showsWidgets)
+        let tabs = availableTabs(
+            hasTrack: hasTrack, hasShelfItems: hasShelfItems, showsWidgets: showsWidgets, showsAIAgents: showsAIAgents
+        )
         if tabs.contains(active) { return active }
         return tabs.first ?? .shelf
     }
 
-    /// Something to show next to the notch while the island is closed: a running timer, playing media or keep awake.
+    /// Something to show next to the notch while the island is closed: a running timer, playing media, a coding
+    /// agent at work or keep awake.
     var hasCompactActivity: Bool {
         compactActivity != nil
+    }
+
+    /// The coding agent at work, if any, while the AI Agents feature is on.
+    var workingAIAgent: AIAgentSnapshot? {
+        guard showsAIAgentsTab else { return nil }
+        return aiAgents.first { $0.isWorking }
     }
 }
 

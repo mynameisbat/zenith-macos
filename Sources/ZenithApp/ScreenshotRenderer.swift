@@ -81,6 +81,37 @@ enum ScreenshotRenderer {
         island.showsCalendarWidget = false
         island.showsNetworkWidget = false
 
+        // The AI tab and the closed island while an agent works: invented sessions, never this Mac's logs.
+        let agentNow = Date()
+        let sampleClaude = AIAgentSnapshot(
+            kind: .claudeCode, isWorking: true, projectName: "example-app", model: "claude-sonnet-5-5",
+            workingSince: agentNow.addingTimeInterval(-260), lastActivity: agentNow.addingTimeInterval(-4),
+            todayUsage: AIAgentTokenUsage(input: 48_000, output: 312_000, cacheRead: 9_400_000, cacheWrite: 1_100_000),
+            sessionUsage: AIAgentTokenUsage(input: 12_000, output: 96_000, cacheRead: 2_800_000, cacheWrite: 340_000),
+            sessionsToday: 3
+        )
+        let sampleCodex = AIAgentSnapshot(
+            kind: .codex, projectName: "website", model: "gpt-5-codex", lastActivity: agentNow.addingTimeInterval(-1_500),
+            todayUsage: AIAgentTokenUsage(input: 410_000, output: 52_000, cacheRead: 1_900_000),
+            sessionUsage: AIAgentTokenUsage(input: 120_000, output: 18_000, cacheRead: 640_000),
+            rateLimits: [
+                AIAgentRateLimit(windowMinutes: 300, usedPercent: 38, resetsAt: agentNow.addingTimeInterval(7_400)),
+                AIAgentRateLimit(windowMinutes: 10_080, usedPercent: 12, resetsAt: agentNow.addingTimeInterval(4 * 86_400))
+            ],
+            sessionsToday: 1
+        )
+        island.nowPlayingTrack = nil
+        AIAgentMonitor.shared.pin([sampleClaude, sampleCodex], now: agentNow)
+        island.activeTab = .aiAgents
+        island.isExpanded = true
+        save("island-ai-agents", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
+        AIAgentMonitor.shared.pin([sampleCodex], now: agentNow)
+        save("island-ai-agent-single", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
+        AIAgentMonitor.shared.pin([sampleClaude, sampleCodex], now: agentNow)
+        island.isExpanded = false
+        save("island-ai-working", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: 40))
+        AIAgentMonitor.shared.stop()
+
         // The Command Hub, with an invented process list.
         let hogs = [
             ProcessTelemetry(pid: 4101, name: "Video Editor", cpuPercent: 38.5, memoryBytes: 2_400_000_000),
@@ -176,6 +207,11 @@ enum ScreenshotRenderer {
         defer { renderDefaults.removePersistentDomain(forName: renderDefaultsName) }
         let renderClipboardPrivacy = ClipboardPrivacySettings(userDefaults: renderDefaults, monitor: nil)
         ClipboardPrivacySettingsSection.settingsProvider = { renderClipboardPrivacy }
+        // AI agents: switched on in the throwaway store, with invented "found" states instead of this Mac's tools.
+        let renderAIAgents = AIAgentSettings(userDefaults: renderDefaults)
+        renderAIAgents.isEnabled = true
+        AIAgentsSettingsSection.settingsProvider = { renderAIAgents }
+        AIAgentsSettingsSection.installedProvider = { $0 != .antigravity }
         // Updates: a made-up newer release, a feed and an installer that never touch the network or this Mac, and
         // settings in the throwaway store (so "Check Automatically" shows its default).
         let renderUpdater = ZenithUpdater(

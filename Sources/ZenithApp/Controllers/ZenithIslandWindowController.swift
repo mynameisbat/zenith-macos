@@ -364,6 +364,20 @@ public final class ZenithIslandWindowController: NSObject {
             }
             .store(in: &cancellables)
 
+        // An agent starting or ending work shows or hides the indicator next to the notch.
+        ZenithIslandState.shared.$aiAgents
+            .combineLatest(ZenithIslandState.shared.$showsAIAgentsTab)
+            .map { agents, isOn in isOn && agents.contains { $0.isWorking } }
+            .removeDuplicates()
+            .sink { [weak self] isWorking in
+                guard let self = self else { return }
+                self.handleMouseMoved(screenPoint: NSEvent.mouseLocation)
+                if isWorking {
+                    self.panel?.orderFrontRegardless()
+                }
+            }
+            .store(in: &cancellables)
+
         // Observe drop shelf preview item state changes
         ZenithIslandState.shared.$previewItem
             .removeDuplicates()
