@@ -573,10 +573,7 @@
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "Nếu ổ đó bị tháo ra khi Privacy Shield đang bật, Zenith sẽ thoát và mạng của bạn có thể mất cho đến khi bạn mở lại Zenith. Hãy kéo Zenith vào thư mục Applications rồi mở từ đó.";
 "Turn On Anyway" = "Vẫn bật";
 "Playback position" = "Vị trí phát";
-"Brightness" = "Độ sáng";
 "Behavior" = "Hành vi";
-"Volume and Brightness" = "Âm lượng và độ sáng";
-"Show the level on the island when you change it." = "Hiện mức trên island khi bạn thay đổi.";
 "Swipe Gestures" = "Cử chỉ vuốt";
 "Swipe down on the island to open it, up to close it, and sideways to change track." = "Vuốt xuống trên island để mở, vuốt lên để đóng, vuốt ngang để chuyển bài.";
 "Hide in Full-Screen Apps" = "Ẩn khi ứng dụng toàn màn hình";

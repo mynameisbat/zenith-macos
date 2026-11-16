@@ -477,7 +477,6 @@ public final class ZenithIslandWindowController: NSObject {
         NowPlayingService.shared.startMonitoring()
         PowerSourceMonitorService.shared.startMonitoring()
         IslandWidgetsCoordinator.shared.start()
-        IslandLevelHUDService.shared.start()
 
         // Step aside for a full-screen app. A Space change is reported as it starts, so look again once it has landed;
         // an app that covers the screen with its own window (a game) often does so a moment after it comes forward,
@@ -899,7 +898,6 @@ public final class ZenithIslandWindowController: NSObject {
         cancellables.removeAll()
         fullscreenObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         fullscreenObservers.removeAll()
-        IslandLevelHUDService.shared.stop()
         NowPlayingService.shared.stopMonitoring()
         PowerSourceMonitorService.shared.stopMonitoring()
         IslandPreviewWindowController.shared.dismiss()

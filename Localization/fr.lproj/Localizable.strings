@@ -573,10 +573,7 @@
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "Si ce volume est éjecté pendant que Privacy Shield est activé, Zenith quitte et votre connexion Internet peut s’interrompre jusqu’à ce que vous rouvriez Zenith. Faites glisser Zenith dans le dossier Applications et ouvrez-le depuis celui-ci.";
 "Turn On Anyway" = "Activer quand même";
 "Playback position" = "Position de lecture";
-"Brightness" = "Luminosité";
 "Behavior" = "Comportement";
-"Volume and Brightness" = "Volume et luminosité";
-"Show the level on the island when you change it." = "Afficher le niveau dans la Dynamic Island quand vous le modifiez.";
 "Swipe Gestures" = "Gestes de balayage";
 "Swipe down on the island to open it, up to close it, and sideways to change track." = "Balayez vers le bas sur la Dynamic Island pour l’ouvrir, vers le haut pour la fermer, et sur le côté pour changer de morceau.";
 "Hide in Full-Screen Apps" = "Masquer dans les apps en plein écran";

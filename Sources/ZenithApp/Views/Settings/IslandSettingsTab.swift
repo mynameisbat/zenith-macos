@@ -102,19 +102,6 @@ public struct IslandSettingsTab: View {
                 ZenithSettingsDivider(inset: 44)
 
                 ZenithSettingsRow(
-                    "Volume and Brightness",
-                    subtitle: "Show the level on the island when you change it.",
-                    symbol: "speaker.wave.2.fill",
-                    tint: ZenithTint.audio
-                ) {
-                    Toggle("Volume and Brightness", isOn: $settings.showLevelHUD)
-                        .toggleStyle(.switch)
-                        .labelsHidden()
-                }
-
-                ZenithSettingsDivider(inset: 44)
-
-                ZenithSettingsRow(
                     "Hover Delay",
                     subtitle: "How long the pointer rests on the closed island before it opens. A click opens it at once.",
                     symbol: "cursorarrow.rays",

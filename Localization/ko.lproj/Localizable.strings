@@ -573,10 +573,7 @@
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "Privacy Shield가 켜져 있는 동안 해당 볼륨이 추출되면 Zenith가 종료되고 Zenith를 다시 열 때까지 인터넷이 끊길 수 있습니다. Zenith를 응용 프로그램 폴더로 드래그한 다음 그곳에서 여십시오.";
 "Turn On Anyway" = "그래도 켜기";
 "Playback position" = "재생 위치";
-"Brightness" = "밝기";
 "Behavior" = "동작";
-"Volume and Brightness" = "음량 및 밝기";
-"Show the level on the island when you change it." = "변경할 때 Island에 수준을 표시합니다.";
 "Swipe Gestures" = "쓸어넘기기 제스처";
 "Swipe down on the island to open it, up to close it, and sideways to change track." = "Island에서 아래로 쓸어넘기면 열리고, 위로 쓸어넘기면 닫히며, 옆으로 쓸어넘기면 트랙이 바뀝니다.";
 "Hide in Full-Screen Apps" = "전체 화면 앱에서 가리기";

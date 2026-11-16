@@ -225,7 +225,6 @@ public final class IslandWidgetSettings: ObservableObject {
         public static let showNetwork = "zenith_island_show_network"
         public static let focusMinutes = "zenith_island_focus_minutes"
         public static let breakMinutes = "zenith_island_break_minutes"
-        public static let showLevelHUD = "zenith_island_show_level_hud"
         public static let hideInFullscreen = "zenith_island_hide_in_fullscreen"
         public static let scrollGestures = "zenith_island_scroll_gestures"
         public static let hoverOpenDelay = "zenith_island_hover_open_delay"
@@ -292,11 +291,6 @@ public final class IslandWidgetSettings: ObservableObject {
         Self.needsMenuBarIcon(wantsIcon: showMenuBarIcon, showsTools: showTools)
     }
 
-    /// Volume and brightness changes appear on the island.
-    @Published public var showLevelHUD: Bool {
-        didSet { save(showLevelHUD, Keys.showLevelHUD); syncIsland() }
-    }
-
     /// The island is taken away while a full-screen app has the display.
     @Published public var hideInFullscreen: Bool {
         didSet { save(hideInFullscreen, Keys.hideInFullscreen); syncIsland() }
@@ -345,7 +339,6 @@ public final class IslandWidgetSettings: ObservableObject {
         self.showTools = userDefaults.object(forKey: Keys.showTools) as? Bool ?? true
         self.showMenuBarIcon = userDefaults.object(forKey: Keys.showMenuBarIcon) as? Bool ?? false
         self.dockLayout = IslandDockLayout(storedIdentifiers: userDefaults.stringArray(forKey: Keys.dockTools))
-        self.showLevelHUD = userDefaults.object(forKey: Keys.showLevelHUD) as? Bool ?? true
         self.hideInFullscreen = userDefaults.object(forKey: Keys.hideInFullscreen) as? Bool ?? true
         self.scrollGestures = userDefaults.object(forKey: Keys.scrollGestures) as? Bool ?? true
         let delay = userDefaults.object(forKey: Keys.hoverOpenDelay) as? Double ?? Self.defaultHoverOpenDelay
@@ -369,7 +362,6 @@ public final class IslandWidgetSettings: ObservableObject {
         showTools = true
         showMenuBarIcon = false
         dockLayout = IslandDockLayout()
-        showLevelHUD = true
         hideInFullscreen = true
         scrollGestures = true
         hoverOpenDelay = Self.defaultHoverOpenDelay
@@ -386,7 +378,6 @@ public final class IslandWidgetSettings: ObservableObject {
         island?.showsCalendarWidget = showCalendar
         island?.showsNetworkWidget = showNetwork
         if island?.showsToolsTab != showTools { island?.showsToolsTab = showTools }
-        island?.showsLevelHUD = showLevelHUD
         island?.allowsScrollGestures = scrollGestures
         island?.hoverOpenDelay = hoverOpenDelay
         if island?.hidesInFullscreen != hideInFullscreen { island?.hidesInFullscreen = hideInFullscreen }

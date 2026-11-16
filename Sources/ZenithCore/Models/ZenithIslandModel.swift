@@ -283,9 +283,6 @@ public struct IslandAlert: Identifiable, Sendable, Equatable {
     public let subtitle: String?
     public let tintColor: Color?
     public let timestamp: Date
-    /// Set for a volume or brightness reading: the island draws a bar from 0 to 1 instead of text.
-    public let level: Double?
-    public let levelKind: IslandLevelKind?
 
     public init(
         id: UUID = UUID(),
@@ -293,9 +290,7 @@ public struct IslandAlert: Identifiable, Sendable, Equatable {
         title: String,
         subtitle: String? = nil,
         tintColor: Color? = nil,
-        timestamp: Date = Date(),
-        level: Double? = nil,
-        levelKind: IslandLevelKind? = nil
+        timestamp: Date = Date()
     ) {
         self.id = id
         self.icon = icon
@@ -303,8 +298,6 @@ public struct IslandAlert: Identifiable, Sendable, Equatable {
         self.subtitle = subtitle
         self.tintColor = tintColor
         self.timestamp = timestamp
-        self.level = level
-        self.levelKind = levelKind
     }
 
     /// Dynamic theme color for this alert HUD (e.g. green for MagSafe charging, amber for low battery).
@@ -362,8 +355,6 @@ public final class ZenithIslandState: ObservableObject {
     @Published public private(set) var backPage: IslandPage? = nil
 
     // Behaviour (written by `IslandWidgetSettings`).
-    /// Volume and brightness changes show as a bar on the island.
-    public var showsLevelHUD: Bool = true
     /// Swipes on the island open, close and change track.
     public var allowsScrollGestures: Bool = true
     /// The island steps aside while a full-screen app has the display.
@@ -489,44 +480,6 @@ public final class ZenithIslandState: ObservableObject {
                     if !self.isExpanded {
                         self.isRimLightVisible = false
                     }
-                }
-            }
-        }
-    }
-
-    /// Shows a volume or brightness level as a bar for a moment. A level of the same kind already showing is
-    /// updated in place, so holding the key moves the bar instead of replaying the alert.
-    public func showLevel(_ kind: IslandLevelKind, level: Double, isMuted: Bool = false) {
-        guard isEnabled, showsLevelHUD, !isHiddenForFullscreen, page == nil, level.isFinite else { return }
-        let clamped = min(max(level, 0), 1)
-        alertDismissWorkItem?.cancel()
-        alertDismissTask?.cancel()
-
-        let isUpdate = activeAlert?.levelKind == kind
-        let alert = IslandAlert(
-            id: isUpdate ? activeAlert?.id ?? UUID() : UUID(),
-            icon: kind.icon(level: clamped, isMuted: isMuted),
-            title: kind.title,
-            tintColor: .white,
-            level: isMuted ? 0 : clamped,
-            levelKind: kind
-        )
-        if isUpdate {
-            activeAlert = alert
-        } else {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                activeAlert = alert
-                isRimLightVisible = true
-            }
-        }
-
-        alertDismissTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 1_600_000_000)
-            guard let self = self, !Task.isCancelled else { return }
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                self.activeAlert = nil
-                if !self.isExpanded {
-                    self.isRimLightVisible = false
                 }
             }
         }

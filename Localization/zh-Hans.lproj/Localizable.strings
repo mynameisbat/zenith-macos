@@ -573,10 +573,7 @@
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "如果在隐私护盾打开时推出该宗卷，Zenith 会退出，网络可能中断，直到你再次打开 Zenith。请将 Zenith 拖到“应用程序”文件夹，并从那里打开。";
 "Turn On Anyway" = "仍然打开";
 "Playback position" = "播放位置";
-"Brightness" = "亮度";
 "Behavior" = "行为";
-"Volume and Brightness" = "音量和亮度";
-"Show the level on the island when you change it." = "调节时在灵动岛上显示当前级别。";
 "Swipe Gestures" = "轻扫手势";
 "Swipe down on the island to open it, up to close it, and sideways to change track." = "在灵动岛上向下轻扫以打开，向上轻扫以关闭，左右轻扫以切换曲目。";
 "Hide in Full-Screen Apps" = "在全屏 App 中隐藏";

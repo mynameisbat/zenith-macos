@@ -185,7 +185,6 @@ struct IslandToolsTests {
 
         // A notice does not take the page's place.
         island.triggerAlert(icon: "sparkles", title: "Freed 1 GB")
-        island.showLevel(.volume, level: 0.5)
         #expect(island.activeAlert == nil)
 
         // Back: the island as it opens; with the pointer away it then closes as after any hover.

@@ -137,14 +137,8 @@ public struct ZenithDynamicIslandView: View {
     private var islandContainer: some View {
         ZStack(alignment: .top) {
             if let alert = islandState.activeAlert {
-                Group {
-                    if let level = alert.level {
-                        levelCapsuleView(alert, level: level)
-                    } else {
-                        alertCapsuleView(alert)
-                    }
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+                alertCapsuleView(alert)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
             } else if islandState.isExpanded {
                 expandedIslandContent
                     .transition(contentArrival)
@@ -235,39 +229,6 @@ public struct ZenithDynamicIslandView: View {
                 .animation(.easeOut(duration: 0.3).delay(0.1)),
             removal: AnyTransition.opacity.animation(.easeIn(duration: 0.12))
         )
-    }
-
-    /// A volume or brightness reading: its symbol, a bar and the percentage.
-    private func levelCapsuleView(_ alert: IslandAlert, level: Double) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: alert.icon)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(width: 22, height: 18)
-
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.18))
-                    Capsule()
-                        .fill(Color.white)
-                        .frame(width: max(0, geo.size.width * CGFloat(level)))
-                }
-            }
-            .frame(height: 5)
-            .animation(.easeOut(duration: 0.12), value: level)
-
-            Text(verbatim: "\(Int((level * 100).rounded()))%")
-                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
-                .foregroundColor(.white.opacity(0.8))
-                .frame(width: 36, alignment: .trailing)
-        }
-        .padding(.horizontal, 16)
-        .frame(width: geometry.alertWidth, height: geometry.alertHeight)
-        .padding(.top, geometry.hasNotch ? geometry.notchRect.height : 0)
-        .frame(width: geometry.alertWidth, height: geometry.effectiveAlertHeight, alignment: .top)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: alert.title))
-        .accessibilityValue(Text(verbatim: "\(Int((level * 100).rounded()))%"))
     }
 
     private func alertCapsuleView(_ alert: IslandAlert) -> some View {

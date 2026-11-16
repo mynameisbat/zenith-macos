@@ -70,10 +70,7 @@ enum ScreenshotRenderer {
         island.isHoverEmphasized = true
         save("island-timer-hover", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: 40))
         island.isHoverEmphasized = false
-        // A volume change, as the island shows it.
         island.focusTimer = nil
-        island.showLevel(.volume, level: 0.62)
-        save("island-volume", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedSize(page: nil, showsDock: island.showsToolsTab).height))
         save("recording-picker", RecordingPickerBar(model: RecordingPickerModel()).padding(20).background(Color.gray))
         island.dismissAlert()
         island.focusTimer = nil

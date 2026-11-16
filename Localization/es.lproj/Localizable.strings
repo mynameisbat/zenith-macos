@@ -573,10 +573,7 @@
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "Si ese volumen se expulsa con Privacy Shield activado, Zenith se cierra y puedes quedarte sin internet hasta que vuelvas a abrir Zenith. Arrastra Zenith a la carpeta Aplicaciones y ábrelo desde allí.";
 "Turn On Anyway" = "Activar de todos modos";
 "Playback position" = "Posición de reproducción";
-"Brightness" = "Brillo";
 "Behavior" = "Comportamiento";
-"Volume and Brightness" = "Volumen y brillo";
-"Show the level on the island when you change it." = "Muestra el nivel en la isla cuando lo cambias.";
 "Swipe Gestures" = "Gestos de deslizamiento";
 "Swipe down on the island to open it, up to close it, and sideways to change track." = "Desliza hacia abajo sobre la isla para abrirla, hacia arriba para cerrarla y hacia los lados para cambiar de pista.";
 "Hide in Full-Screen Apps" = "Ocultar en apps a pantalla completa";
