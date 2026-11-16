@@ -20,6 +20,7 @@ private struct Harness {
 
     init() {
         settings = KeepAwakeSettings(userDefaults: TestDefaults.make("KeepAwakeTests_\(UUID().uuidString)")!)
+        settings.keepsDisplayOn = false  // the tests below start from the system-sleep-only assertion
         let clock = self.clock
         service = KeepAwakeService(
             settings: settings,
@@ -289,19 +290,19 @@ struct KeepAwakeTests {
     func testSettingsPersist() {
         let defaults = TestDefaults.make("KeepAwakeSettings_\(UUID().uuidString)")!
         let settings = KeepAwakeSettings(userDefaults: defaults)
-        #expect(settings.keepsDisplayOn == false)
+        #expect(settings.keepsDisplayOn == true)  // a dark screen reads as sleep, so the display is kept on by default
         #expect(settings.showsOnIsland == true)
         #expect(settings.customMinutes == KeepAwakeSettings.defaultCustomMinutes)
         #expect(settings.hotKeyEnabled == false)
 
-        settings.keepsDisplayOn = true
+        settings.keepsDisplayOn = false
         settings.customMinutes = 100_000
         settings.addWatchedApp(xcode)
         settings.hotKeyEnabled = true
         #expect(settings.customMinutes == 1_440)
 
         let reloaded = KeepAwakeSettings(userDefaults: defaults)
-        #expect(reloaded.keepsDisplayOn)
+        #expect(!reloaded.keepsDisplayOn)
         #expect(reloaded.customMinutes == 1_440)
         #expect(reloaded.watchedApps == [xcode])
         #expect(reloaded.hotKeyEnabled)
@@ -309,7 +310,7 @@ struct KeepAwakeTests {
         reloaded.customMinutes = 1
         #expect(reloaded.customMinutes == 5)
         reloaded.resetToDefaults()
-        #expect(!reloaded.keepsDisplayOn && reloaded.watchedApps.isEmpty && !reloaded.hotKeyEnabled)
+        #expect(reloaded.keepsDisplayOn && reloaded.watchedApps.isEmpty && !reloaded.hotKeyEnabled)
         #expect(reloaded.customMinutes == KeepAwakeSettings.defaultCustomMinutes)
     }
 
