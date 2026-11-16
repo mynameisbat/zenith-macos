@@ -26,6 +26,7 @@ public enum DestructiveConfirmation {
         alert.informativeText = message
         alert.addButton(withTitle: String(localized: "Cancel"))
         alert.addButton(withTitle: destructiveTitle)
+        IslandDialogs.raiseAboveIsland(alert.window)
         return alert.runModal() == .alertSecondButtonReturn
     }
 }

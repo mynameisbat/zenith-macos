@@ -35,7 +35,7 @@ public final class ToastHUDController: NSObject {
         dismissWorkItem?.cancel()
 
         // A full-screen app has taken the island off the display; the floating panel still shows there.
-        if ZenithIslandState.shared.isEnabled, !ZenithIslandState.shared.isHiddenForFullscreen {
+        if ZenithIslandState.shared.showsNotices {
             // The island alert is read aloud by `triggerAlert`.
             ZenithIslandState.shared.triggerAlert(icon: icon, title: message, subtitle: subtitle)
             if let panel = panel, panel.isVisible {
@@ -76,7 +76,15 @@ public final class ToastHUDController: NSObject {
         let vf = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
         let toastWidth: CGFloat = max(220, min(420, CGFloat(message.count * 8 + 60)))
         let x = vf.midX - toastWidth / 2
-        let y = vf.maxY - 70
+        var y = vf.maxY - 70
+        if let page = ZenithIslandState.shared.page {
+            // The island has grown into a page and covers the usual spot: show the toast just under the page, above it.
+            let pageFrame = ZenithIslandWindowController.shared.currentGeometry.expandedFrame(page: page, showsDock: true)
+            y = max(vf.minY + 20, pageFrame.minY - 56)
+            panel.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)
+        } else {
+            panel.level = .floating
+        }
         panel.setFrame(NSRect(x: x, y: y, width: toastWidth, height: 44), display: true)
 
         panel.alphaValue = 0.0

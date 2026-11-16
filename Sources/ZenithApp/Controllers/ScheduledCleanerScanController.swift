@@ -12,7 +12,7 @@ enum ScheduledCleanerScanController {
         let scheduler = CleanerScanScheduler.shared
         scheduler.notifier = { title, subtitle in
             let island = ZenithIslandState.shared
-            if island.isEnabled, !island.isHiddenForFullscreen {
+            if island.showsNotices {
                 island.triggerAlert(icon: "sparkles", title: title, subtitle: subtitle, duration: noticeDuration)
             } else {
                 ToastHUDController.shared.show(verbatim: title, icon: "sparkles", subtitle: subtitle)

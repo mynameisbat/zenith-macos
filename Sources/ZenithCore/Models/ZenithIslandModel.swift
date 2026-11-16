@@ -29,19 +29,25 @@ public struct ZenithIslandGeometry: Sendable, Equatable {
         }()
         let resolvedScreen = screen ?? defaultScreen
         let frame = resolvedScreen?.frame ?? CGRect(x: 0, y: 0, width: 1920, height: 1080)
-        self.screenFrame = frame
+        var notch: CGRect?
         if let s = resolvedScreen,
            let left = s.auxiliaryTopLeftArea,
            let right = s.auxiliaryTopRightArea,
            right.origin.x > left.maxX {
+            notch = CGRect(x: left.maxX, y: frame.maxY - left.height, width: right.origin.x - left.maxX, height: left.height)
+        }
+        self.init(screenFrame: frame, notch: notch)
+    }
+
+    /// The geometry of a display with this frame and, if it has one, this notch (in screen coordinates). What
+    /// `init(screen:)` reads from an `NSScreen`; tests give the numbers directly.
+    public init(screenFrame frame: CGRect, notch: CGRect?) {
+        self.screenFrame = frame
+        if let notch {
             self.hasNotch = true
-            let notchW = right.origin.x - left.maxX
-            let notchH = left.height
-            let notchX = left.maxX
-            let notchY = frame.maxY - notchH
-            self.notchRect = CGRect(x: notchX, y: notchY, width: notchW, height: notchH)
-            self.idleWidth = notchW
-            self.idleHeight = notchH
+            self.notchRect = notch
+            self.idleWidth = notch.width
+            self.idleHeight = notch.height
         } else {
             self.hasNotch = false
             let idleW: CGFloat = 110
@@ -92,6 +98,46 @@ public struct ZenithIslandGeometry: Sendable, Equatable {
     /// Computes the window frame for the expanded drop shelf.
     public var expandedFrame: CGRect {
         windowFrame(isExpanded: true)
+    }
+
+    // MARK: Sizes that depend on what the open island shows
+
+    /// The row of tool buttons under the open island, with the line above it that names the button under the pointer.
+    public static let dockHeight: CGFloat = 66
+
+    /// The strip at the top of a page with its title and its back and close buttons. Beside a notch it is the notch's
+    /// own row; without one it is a row of its own.
+    public var pageHeaderHeight: CGFloat {
+        hasNotch ? notchRect.height + 4 : 34
+    }
+
+    /// The room a page's content gets: what it asks for, less on a display too small for it.
+    public func pageContentSize(for page: IslandPage) -> CGSize {
+        let wanted = page.contentSize
+        let width = min(wanted.width, max(expandedWidth, screenFrame.width - 40))
+        let height = min(wanted.height, max(160, screenFrame.height - pageHeaderHeight - 90))
+        return CGSize(width: width, height: height)
+    }
+
+    /// The size of the open island: 380 × 96 for what is going on (taller by the dock when it has one), or a page's.
+    public func expandedSize(page: IslandPage?, showsDock: Bool) -> CGSize {
+        if let page {
+            let content = pageContentSize(for: page)
+            return CGSize(width: content.width, height: pageHeaderHeight + content.height)
+        }
+        return CGSize(width: expandedWidth, height: expandedHeight + (showsDock ? Self.dockHeight : 0))
+    }
+
+    /// The open island in screen coordinates: hanging from the top edge, centred on the notch.
+    public func expandedFrame(page: IslandPage?, showsDock: Bool) -> CGRect {
+        let size = expandedSize(page: page, showsDock: showsDock)
+        return CGRect(x: notchRect.midX - size.width / 2, y: screenFrame.maxY - size.height, width: size.width, height: size.height)
+    }
+
+    /// The window the island is drawn in. It is as large as the open island with its dock while no page is open,
+    /// and exactly a page's size while one is, so a page costs nothing until it is opened.
+    public func canvasFrame(page: IslandPage?) -> CGRect {
+        expandedFrame(page: page, showsDock: true)
     }
 
     /// Effective width for Idle capsule when media (Now Playing) is active.
@@ -237,9 +283,6 @@ public struct IslandAlert: Identifiable, Sendable, Equatable {
     public let subtitle: String?
     public let tintColor: Color?
     public let timestamp: Date
-    /// Set for a volume or brightness reading: the island draws a bar from 0 to 1 instead of text.
-    public let level: Double?
-    public let levelKind: IslandLevelKind?
 
     public init(
         id: UUID = UUID(),
@@ -247,9 +290,7 @@ public struct IslandAlert: Identifiable, Sendable, Equatable {
         title: String,
         subtitle: String? = nil,
         tintColor: Color? = nil,
-        timestamp: Date = Date(),
-        level: Double? = nil,
-        levelKind: IslandLevelKind? = nil
+        timestamp: Date = Date()
     ) {
         self.id = id
         self.icon = icon
@@ -257,8 +298,6 @@ public struct IslandAlert: Identifiable, Sendable, Equatable {
         self.subtitle = subtitle
         self.tintColor = tintColor
         self.timestamp = timestamp
-        self.level = level
-        self.levelKind = levelKind
     }
 
     /// Dynamic theme color for this alert HUD (e.g. green for MagSafe charging, amber for low battery).
@@ -292,6 +331,8 @@ public final class ZenithIslandState: ObservableObject {
     @Published public var previewItem: IslandDropItem? = nil
     @Published public var nowPlayingTrack: NowPlayingTrack? = nil
     @Published public var activeTab: IslandExpandedTab = .shelf
+    /// The page the island has grown into, or `nil` while it shows its tabs. See `openPage`.
+    @Published public private(set) var page: IslandPage? = nil
 
     // Widgets (written by `FocusTimerService`, `CalendarWidgetModel` and `IslandWidgetSettings`).
     @Published public var focusTimer: FocusTimerSnapshot? = nil
@@ -307,9 +348,13 @@ public final class ZenithIslandState: ObservableObject {
     @Published public var aiAgents: [AIAgentSnapshot] = []
     @Published public var showsAIAgentsTab: Bool = false
 
+    /// The open island has its dock of tools under what is going on (written by `IslandWidgetSettings`). (The name
+    /// is from when the tools were a tab.)
+    @Published public var showsToolsTab: Bool = false
+    /// Where a page's back button leads: the page this one was opened from, or `nil` for the island itself.
+    @Published public private(set) var backPage: IslandPage? = nil
+
     // Behaviour (written by `IslandWidgetSettings`).
-    /// Volume and brightness changes show as a bar on the island.
-    public var showsLevelHUD: Bool = true
     /// Swipes on the island open, close and change track.
     public var allowsScrollGestures: Bool = true
     /// The island steps aside while a full-screen app has the display.
@@ -347,6 +392,12 @@ public final class ZenithIslandState: ObservableObject {
     public init() {}
 
     // MARK: - Encapsulated State Predicates (Clean Code G28, G29)
+
+    /// Whether a notice can be drawn on the island now: it is on, not hidden by a full-screen app, and not showing
+    /// a page. Otherwise the app's toasts use the floating panel.
+    public var showsNotices: Bool {
+        isEnabled && !isHiddenForFullscreen && page == nil
+    }
 
     /// True when the user is actively interacting with the island via hover, drag, drop, or active preview.
     public var isActivelyEngaged: Bool {
@@ -391,6 +442,12 @@ public final class ZenithIslandState: ObservableObject {
     /// Displays a transient alert HUD directly in the notch capsule for 1.8 seconds, then smoothly collapses back.
     public func triggerAlert(icon: String, title: String, subtitle: String? = nil, duration: TimeInterval = 1.8, tintColor: Color? = nil) {
         guard isEnabled else { return }
+        // A page is being worked in: a notice would take its place and throw away what it shows (a scrolled list, a
+        // half-typed search). It is still read aloud; the app's own toasts use the floating panel meanwhile.
+        guard page == nil else {
+            AccessibilityAnnouncer.announce(subtitle.map { "\(title). \($0)" } ?? title)
+            return
+        }
         alertDismissWorkItem?.cancel()
         alertDismissTask?.cancel()
         let alert = IslandAlert(icon: icon, title: title, subtitle: subtitle, tintColor: tintColor)
@@ -428,44 +485,6 @@ public final class ZenithIslandState: ObservableObject {
         }
     }
 
-    /// Shows a volume or brightness level as a bar for a moment. A level of the same kind already showing is
-    /// updated in place, so holding the key moves the bar instead of replaying the alert.
-    public func showLevel(_ kind: IslandLevelKind, level: Double, isMuted: Bool = false) {
-        guard isEnabled, showsLevelHUD, !isHiddenForFullscreen, level.isFinite else { return }
-        let clamped = min(max(level, 0), 1)
-        alertDismissWorkItem?.cancel()
-        alertDismissTask?.cancel()
-
-        let isUpdate = activeAlert?.levelKind == kind
-        let alert = IslandAlert(
-            id: isUpdate ? activeAlert?.id ?? UUID() : UUID(),
-            icon: kind.icon(level: clamped, isMuted: isMuted),
-            title: kind.title,
-            tintColor: .white,
-            level: isMuted ? 0 : clamped,
-            levelKind: kind
-        )
-        if isUpdate {
-            activeAlert = alert
-        } else {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                activeAlert = alert
-                isRimLightVisible = true
-            }
-        }
-
-        alertDismissTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 1_600_000_000)
-            guard let self = self, !Task.isCancelled else { return }
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                self.activeAlert = nil
-                if !self.isExpanded {
-                    self.isRimLightVisible = false
-                }
-            }
-        }
-    }
-
     /// Takes the island off the display while a full-screen app has it, and brings it back afterwards.
     public func setHiddenForFullscreen(_ hidden: Bool) {
         guard hidden != isHiddenForFullscreen else { return }
@@ -478,6 +497,8 @@ public final class ZenithIslandState: ObservableObject {
             isHoverEmphasized = false
             isHoverSuppressed = false
             if !isDropTargeted, !isDraggingOut, previewItem == nil {
+                page = nil
+                backPage = nil
                 isExpanded = false
                 isRimLightVisible = false
             }
@@ -551,6 +572,42 @@ public final class ZenithIslandState: ObservableObject {
         scheduleRimLight()
     }
 
+    /// Grows the island into `newPage` and keeps it open: a page does not close when the pointer leaves it.
+    public func openPage(_ newPage: IslandPage) {
+        guard isEnabled, !isHiddenForFullscreen else { return }
+        hoverOpenTask?.cancel()
+        hoverOpenTask = nil
+        collapseTimer?.cancel()
+        collapseTimer = nil
+        isHoverEmphasized = false
+        isHoverSuppressed = false
+        // One step of history: a page opened from another page goes back to it.
+        let previous = page == newPage ? backPage : page
+        withAnimation(Self.openingAnimation) {
+            backPage = previous
+            page = newPage
+            isExpanded = true
+        }
+        scheduleRimLight()
+    }
+
+    /// Goes back one step: to the page this one was opened from, else to the island as it opens (what is going
+    /// on, and the dock). If the pointer is then no longer on the smaller island, it closes as after any hover.
+    public func closePage() {
+        guard page != nil else { return }
+        if let previous = backPage {
+            withAnimation(Self.closingAnimation) {
+                backPage = nil
+                page = previous
+            }
+            return
+        }
+        withAnimation(Self.closingAnimation) {
+            page = nil
+        }
+        if !isHovered { onMouseLeave() }
+    }
+
     /// Closes the island now, as a swipe up on it does. The pointer is usually still on it, so hover stays quiet
     /// until `pointerLeft()`. An island that is holding a dragged file or a preview stays open.
     public func close() {
@@ -567,6 +624,8 @@ public final class ZenithIslandState: ObservableObject {
         withAnimation(Self.closingAnimation) {
             isRimLightVisible = false
             isExpanded = false
+            page = nil
+            backPage = nil
         }
     }
 
@@ -621,6 +680,8 @@ public final class ZenithIslandState: ObservableObject {
         }
         // Never collapse or hide rim light if user is currently interacting with an item preview
         guard previewItem == nil else { return }
+        // A page stays until it is closed: the pointer leaves it for a confirmation, or just to read something else.
+        guard page == nil else { return }
 
         // Instantly hide rim light when leaving so border never leaks or flashes on rapid re-hover
         rimLightFadeTask?.cancel()
@@ -634,7 +695,7 @@ public final class ZenithIslandState: ObservableObject {
         collapseTimer = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 300_000_000) // 300ms grace period
             guard let self = self, !Task.isCancelled else { return }
-            if self.isCompletelyIdle && self.isExpanded {
+            if self.isCompletelyIdle && self.isExpanded && self.page == nil {
                 withAnimation(Self.closingAnimation) {
                     self.isExpanded = false
                 }

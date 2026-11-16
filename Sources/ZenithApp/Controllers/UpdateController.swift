@@ -11,7 +11,7 @@ enum UpdateController {
         let updater = ZenithUpdater.shared
         updater.notifier = { title, subtitle in
             let island = ZenithIslandState.shared
-            if island.isEnabled, !island.isHiddenForFullscreen {
+            if island.showsNotices {
                 island.triggerAlert(icon: "arrow.down.circle.fill", title: title, subtitle: subtitle, duration: noticeDuration)
             } else {
                 ToastHUDController.shared.show(verbatim: title, icon: "arrow.down.circle.fill", subtitle: subtitle)

@@ -37,6 +37,7 @@ public struct InstalledAppInfo: Identifiable, Sendable, Equatable {
     public let bundleIdentifier: String
     public let displayName: String
     public let version: String
+    /// 0 when the app was only listed (`listInstalledApps`): measuring every app would read all of /Applications.
     public let appSizeBytes: Int64
     public let isSystemApp: Bool
 
@@ -66,19 +67,24 @@ public struct AppLeftoverItem: Identifiable, Sendable, Equatable {
     public let path: String
     public let kind: AppLeftoverKind
     public let sizeBytes: Int64
+    /// The entry carries the app's display name, not its bundle identifier. A name is weaker proof of ownership
+    /// (two products can share one), so the uninstaller's list leaves these unticked.
+    public let matchedByName: Bool
 
     public init(
         id: String = UUID().uuidString,
         name: String,
         path: String,
         kind: AppLeftoverKind,
-        sizeBytes: Int64
+        sizeBytes: Int64,
+        matchedByName: Bool = false
     ) {
         self.id = id
         self.name = name
         self.path = path
         self.kind = kind
         self.sizeBytes = sizeBytes
+        self.matchedByName = matchedByName
     }
 }
 
@@ -99,40 +105,179 @@ public struct AppUninstallPlan: Identifiable, Sendable, Equatable {
     }
 }
 
+/// Why an app is not offered for uninstalling.
+public enum UninstallRefusal: Error, Equatable, Sendable {
+    /// Not a folder ending in `.app`.
+    case notAnApp
+    /// Lives in a system location or is one of Apple's own apps.
+    case partOfMacOS
+    /// Zenith does not remove itself.
+    case isZenith
+    /// The bundle sits inside another app (a helper, a login item).
+    case insideAnotherApp
+    /// No Info.plist with a usable bundle identifier, so nothing can be tied to it safely.
+    case unreadable
+}
+
+/// How the uninstaller finds out that an app is open, and asks it to quit. Tests pass a fake.
+public struct RunningAppControl: Sendable {
+    public let isRunning: @Sendable (_ bundleIdentifier: String, _ bundlePath: String) -> Bool
+    public let requestQuit: @Sendable (_ bundleIdentifier: String, _ bundlePath: String) -> Void
+
+    public init(
+        isRunning: @escaping @Sendable (_ bundleIdentifier: String, _ bundlePath: String) -> Bool,
+        requestQuit: @escaping @Sendable (_ bundleIdentifier: String, _ bundlePath: String) -> Void
+    ) {
+        self.isRunning = isRunning
+        self.requestQuit = requestQuit
+    }
+
+    /// The copies of this app that are running from this very bundle (a second copy elsewhere is left alone).
+    private static func instances(_ bundleIdentifier: String, _ bundlePath: String) -> [NSRunningApplication] {
+        guard !bundleIdentifier.isEmpty else { return [] }
+        let wanted = URL(fileURLWithPath: bundlePath).resolvingSymlinksInPath().path
+        return NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).filter {
+            guard let url = $0.bundleURL else { return true }
+            return url.resolvingSymlinksInPath().path == wanted
+        }
+    }
+
+    public static let system = RunningAppControl(
+        isRunning: { identifier, path in !instances(identifier, path).isEmpty },
+        // `terminate()` is the polite quit: the app may still ask about unsaved documents.
+        requestQuit: { identifier, path in instances(identifier, path).forEach { $0.terminate() } }
+    )
+}
+
 /// Service providing deep application analysis, leftover artifact discovery,
 /// and safe uninstallation for Zenith.
+///
+/// What it will remove is deliberately narrow:
+///   - never an app in a system location, one of Apple's (`com.apple.*`), or Zenith itself;
+///   - leftovers only as direct children of the usual `~/Library` folders, named after the app's bundle identifier
+///     (or, flagged `matchedByName`, its display name), and never anything macOS owns (`isSafeLeftoverPath`);
+///   - `uninstall` looks the leftovers up again, so a stale or hand-made list cannot reach anything else;
+///   - the app goes first: if macOS refuses to move it, nothing else is touched.
 public final class AppUninstallerService: @unchecked Sendable {
     public static let shared = AppUninstallerService()
 
     private let fileManager: FileManager
+    private let homeDirectory: String
+    private let applicationDirectories: [String]
+    private let ownBundleIdentifier: String?
+    private let ownBundlePath: String?
+    private let trashMover: TrashMover
+    private let runCommand: SystemCommandRunner
+    private let runningApps: RunningAppControl
+    private let quitTimeout: TimeInterval
+    private let recordHistory: @Sendable (_ operation: String, _ bytes: Int64, _ items: Int) -> Void
 
-    public init(fileManager: FileManager = .default) {
+    /// - Parameters:
+    ///   - homeDirectory: Whose `Library` holds the leftovers; tests pass a throwaway one.
+    ///   - applicationDirectories: Where installed apps are listed from (default `/Applications` and `~/Applications`).
+    ///   - ownBundleIdentifier, ownBundlePath: The running app, which is never offered.
+    ///   - trashMover: How an item reaches the Trash (retried through Finder where macOS refuses the app).
+    ///   - runCommand: Runs `launchctl` for the app's launch agents.
+    ///   - runningApps: Whether the app is open, and asking it to quit.
+    ///   - quitTimeout: How long an open app gets to quit before the uninstall gives up without removing anything.
+    ///   - recordHistory: Where a finished uninstall is noted (the Command Hub's "freed so far").
+    public init(
+        fileManager: FileManager = .default,
+        homeDirectory: String = NSHomeDirectory(),
+        applicationDirectories: [String]? = nil,
+        ownBundleIdentifier: String? = Bundle.main.bundleIdentifier,
+        ownBundlePath: String? = Bundle.main.bundlePath,
+        trashMover: TrashMover = .system,
+        runCommand: @escaping SystemCommandRunner = SystemCommand.processRunner,
+        runningApps: RunningAppControl = .system,
+        quitTimeout: TimeInterval = 5,
+        recordHistory: @escaping @Sendable (_ operation: String, _ bytes: Int64, _ items: Int) -> Void = { operation, bytes, items in
+            SystemCleaningHistoryTracker.shared.record(operationName: operation, bytesFreed: bytes, itemCount: items)
+        }
+    ) {
         self.fileManager = fileManager
+        self.homeDirectory = (homeDirectory as NSString).standardizingPath
+        self.applicationDirectories = applicationDirectories ?? ["/Applications", "\(homeDirectory)/Applications"]
+        self.ownBundleIdentifier = ownBundleIdentifier
+        self.ownBundlePath = ownBundlePath
+        self.trashMover = trashMover
+        self.runCommand = runCommand
+        self.runningApps = runningApps
+        self.quitTimeout = quitTimeout
+        self.recordHistory = recordHistory
     }
 
     // MARK: - App Scanning
 
-    /// Scans standard application directories (/Applications and ~/Applications)
-    /// and returns metadata for user-uninstallable apps.
-    public func scanInstalledApps(customDirectory: String? = nil) -> [InstalledAppInfo] {
-        let home = NSHomeDirectory()
-        let dirsToScan: [String]
-        if let custom = customDirectory {
-            dirsToScan = [custom]
-        } else {
-            dirsToScan = ["/Applications", "\(home)/Applications"]
+    /// The apps that can be uninstalled, by name, without their sizes (see `InstalledAppInfo.appSizeBytes`).
+    /// Looks in `applicationDirectories` and in plain folders one level down (`/Applications/Setapp/…`).
+    public func listInstalledApps() -> [InstalledAppInfo] {
+        var apps: [InstalledAppInfo] = []
+        var seen = Set<String>()
+        for directory in applicationDirectories {
+            collectApps(in: directory, depth: 0, seen: &seen, into: &apps)
         }
+        return apps.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+    }
+
+    private func collectApps(in directory: String, depth: Int, seen: inout Set<String>, into apps: inout [InstalledAppInfo]) {
+        guard let contents = try? fileManager.contentsOfDirectory(atPath: directory) else { return }
+        for name in contents where !name.hasPrefix(".") {
+            let path = "\(directory)/\(name)"
+            guard !isSymbolicLink(path) else { continue }
+            if name.lowercased().hasSuffix(".app") {
+                guard seen.insert((path as NSString).standardizingPath).inserted,
+                      case .success(let info) = eligibility(ofAppAt: path, measuringSize: false) else { continue }
+                apps.append(info)
+            } else if depth < 1 {
+                var isDirectory: ObjCBool = false
+                guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue else { continue }
+                collectApps(in: path, depth: depth + 1, seen: &seen, into: &apps)
+            }
+        }
+    }
+
+    /// Whether the app at `path` may be uninstalled, and if so what it is.
+    public func eligibility(ofAppAt path: String, measuringSize: Bool = true) -> Result<InstalledAppInfo, UninstallRefusal> {
+        let canonical = (path as NSString).standardizingPath
+        var isDirectory: ObjCBool = false
+        guard canonical.lowercased().hasSuffix(".app"),
+              fileManager.fileExists(atPath: canonical, isDirectory: &isDirectory), isDirectory.boolValue,
+              !isSymbolicLink(canonical) else { return .failure(.notAnApp) }
+
+        // A bundle inside another bundle is that app's helper: removing it breaks the outer app.
+        let parents = (canonical as NSString).deletingLastPathComponent.lowercased()
+        guard !parents.split(separator: "/").contains(where: { $0.hasSuffix(".app") }) else { return .failure(.insideAnotherApp) }
+
+        guard !isSystemPath(canonical) else { return .failure(.partOfMacOS) }
+        guard let info = readAppInfo(atPath: canonical, measuringSize: false),
+              Self.isUsableBundleIdentifier(info.bundleIdentifier) else { return .failure(.unreadable) }
+        guard !isProtectedAppleBundle(info.bundleIdentifier) else { return .failure(.partOfMacOS) }
+        guard !isZenith(bundleIdentifier: info.bundleIdentifier, path: canonical) else { return .failure(.isZenith) }
+
+        guard measuringSize else { return .success(info) }
+        return .success(InstalledAppInfo(
+            bundlePath: info.bundlePath,
+            bundleIdentifier: info.bundleIdentifier,
+            displayName: info.displayName,
+            version: info.version,
+            appSizeBytes: calculateSize(of: canonical),
+            isSystemApp: false
+        ))
+    }
+
+    /// Scans standard application directories (/Applications and ~/Applications)
+    /// and returns metadata, with sizes, for user-uninstallable apps.
+    public func scanInstalledApps(customDirectory: String? = nil) -> [InstalledAppInfo] {
+        let dirsToScan = customDirectory.map { [$0] } ?? applicationDirectories
 
         var apps: [InstalledAppInfo] = []
         for dir in dirsToScan {
             guard let contents = try? fileManager.contentsOfDirectory(atPath: dir) else { continue }
             for item in contents where item.hasSuffix(".app") {
                 let fullPath = "\(dir)/\(item)"
-                if let info = parseAppInfo(atPath: fullPath) {
-                    // Filter out protected system apps unless explicitly in test environment
-                    if !info.isSystemApp {
-                        apps.append(info)
-                    }
+                if let info = parseAppInfo(atPath: fullPath), !info.isSystemApp {
+                    apps.append(info)
                 }
             }
         }
@@ -145,40 +290,44 @@ public final class AppUninstallerService: @unchecked Sendable {
         guard fileManager.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else {
             return nil
         }
+        if let info = readAppInfo(atPath: path, measuringSize: true) { return info }
 
+        // Fallback for simple/un-bundled test folders
+        let fallbackName = (path as NSString).lastPathComponent.replacingOccurrences(of: ".app", with: "")
+        return InstalledAppInfo(
+            bundlePath: path,
+            bundleIdentifier: "com.unknown.\(fallbackName.lowercased())",
+            displayName: fallbackName,
+            version: "1.0",
+            appSizeBytes: calculateSize(of: path),
+            isSystemApp: isSystemPath(path)
+        )
+    }
+
+    /// What the bundle's Info.plist says, or `nil` when there is none to read.
+    private func readAppInfo(atPath path: String, measuringSize: Bool) -> InstalledAppInfo? {
         let plistPath = "\(path)/Contents/Info.plist"
         guard let plistData = try? Data(contentsOf: URL(fileURLWithPath: plistPath)),
               let plist = try? PropertyListSerialization.propertyList(from: plistData, format: nil) as? [String: Any] else {
-            // Fallback for simple/un-bundled test folders
-            let fallbackName = (path as NSString).lastPathComponent.replacingOccurrences(of: ".app", with: "")
-            let size = calculateSize(of: path)
-            return InstalledAppInfo(
-                bundlePath: path,
-                bundleIdentifier: "com.unknown.\(fallbackName.lowercased())",
-                displayName: fallbackName,
-                version: "1.0",
-                appSizeBytes: size,
-                isSystemApp: isSystemPath(path)
-            )
+            return nil
         }
 
+        let fileName = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
         let bundleId = (plist["CFBundleIdentifier"] as? String) ?? ""
-        let name = (plist["CFBundleDisplayName"] as? String)
-            ?? (plist["CFBundleName"] as? String)
-            ?? ((path as NSString).lastPathComponent.replacingOccurrences(of: ".app", with: ""))
+        let name = [plist["CFBundleDisplayName"] as? String, plist["CFBundleName"] as? String]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? fileName
         let version = (plist["CFBundleShortVersionString"] as? String)
             ?? (plist["CFBundleVersion"] as? String)
             ?? "1.0"
-        let size = calculateSize(of: path)
-        let isSystem = isSystemPath(path) || isProtectedAppleBundle(bundleId)
 
         return InstalledAppInfo(
             bundlePath: path,
             bundleIdentifier: bundleId,
             displayName: name,
             version: version,
-            appSizeBytes: size,
-            isSystemApp: isSystem
+            appSizeBytes: measuringSize ? calculateSize(of: path) : 0,
+            isSystemApp: isSystemPath(path) || isProtectedAppleBundle(bundleId)
         )
     }
 
@@ -188,223 +337,201 @@ public final class AppUninstallerService: @unchecked Sendable {
     /// for associated state, caches, preferences, containers, and daemons.
     public func analyzeApp(atPath path: String, homeDirectory: String? = nil) -> AppUninstallPlan? {
         guard let appInfo = parseAppInfo(atPath: path) else { return nil }
-        let home = homeDirectory ?? NSHomeDirectory()
-        let leftovers = scanLeftovers(for: appInfo, home: home)
+        let leftovers = scanLeftovers(for: appInfo, home: homeDirectory ?? self.homeDirectory)
         return AppUninstallPlan(app: appInfo, leftovers: leftovers)
     }
 
-    /// Discovers all leftover files and folders matching the app name or bundle identifier.
-    public func scanLeftovers(for app: InstalledAppInfo, home: String) -> [AppLeftoverItem] {
-        let bundleId = app.bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
-        let appName = app.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        var items: [AppLeftoverItem] = []
-
-        // 1. Application Support (~/Library/Application Support/<Name> or <BundleID>)
-        let appSupport = "\(home)/Library/Application Support"
-        checkDirectoryCandidates(base: appSupport, kind: .appSupport, names: [appName, bundleId], items: &items)
-
-        // 2. Caches (~/Library/Caches/<BundleID> or <Name>)
-        let caches = "\(home)/Library/Caches"
-        checkDirectoryCandidates(base: caches, kind: .caches, names: [bundleId, appName], items: &items)
-
-        // 3. Sandboxed Containers (~/Library/Containers/<BundleID>)
-        if !bundleId.isEmpty {
-            let containerPath = "\(home)/Library/Containers/\(bundleId)"
-            if fileManager.fileExists(atPath: containerPath) {
-                let size = calculateSize(of: containerPath)
-                items.append(AppLeftoverItem(name: bundleId, path: containerPath, kind: .sandboxContainers, sizeBytes: size))
-            }
-        }
-
-        // 4. Group Containers (~/Library/Group Containers/*.<BundleID>*)
-        let groupContainers = "\(home)/Library/Group Containers"
-        if fileManager.fileExists(atPath: groupContainers),
-           let contents = try? fileManager.contentsOfDirectory(atPath: groupContainers) {
-            for dirName in contents {
-                // Matched by bundle identifier only: an app's display name ("Notes", "Mail") is too common a word
-                // to decide that a shared container belongs to it.
-                if !bundleId.isEmpty && dirName.localizedCaseInsensitiveContains(bundleId) {
-                    let fullPath = "\(groupContainers)/\(dirName)"
-                    let size = calculateSize(of: fullPath)
-                    items.append(AppLeftoverItem(name: dirName, path: fullPath, kind: .groupContainers, sizeBytes: size))
-                }
-            }
-        }
-
-        // 5. Preferences (~/Library/Preferences/<BundleID>.plist)
-        if !bundleId.isEmpty {
-            let prefPath = "\(home)/Library/Preferences/\(bundleId).plist"
-            if fileManager.fileExists(atPath: prefPath) {
-                let size = calculateSize(of: prefPath)
-                items.append(AppLeftoverItem(name: "\(bundleId).plist", path: prefPath, kind: .preferences, sizeBytes: size))
-            }
-            // ByHost Preferences
-            let byHostDir = "\(home)/Library/Preferences/ByHost"
-            if fileManager.fileExists(atPath: byHostDir),
-               let byHostContents = try? fileManager.contentsOfDirectory(atPath: byHostDir) {
-                for file in byHostContents where file.hasPrefix(bundleId) {
-                    let p = "\(byHostDir)/\(file)"
-                    items.append(AppLeftoverItem(name: file, path: p, kind: .preferences, sizeBytes: calculateSize(of: p)))
-                }
-            }
-        }
-
-        // 6. Saved Application State (~/Library/Saved Application State/<BundleID>.savedState)
-        if !bundleId.isEmpty {
-            let statePath = "\(home)/Library/Saved Application State/\(bundleId).savedState"
-            if fileManager.fileExists(atPath: statePath) {
-                items.append(AppLeftoverItem(name: "\(bundleId).savedState", path: statePath, kind: .savedState, sizeBytes: calculateSize(of: statePath)))
-            }
-        }
-
-        // 7. WebKit (~/Library/WebKit/<BundleID>)
-        if !bundleId.isEmpty {
-            let webKitPath = "\(home)/Library/WebKit/\(bundleId)"
-            if fileManager.fileExists(atPath: webKitPath) {
-                items.append(AppLeftoverItem(name: bundleId, path: webKitPath, kind: .webKit, sizeBytes: calculateSize(of: webKitPath)))
-            }
-        }
-
-        // 8. HTTPStorages (~/Library/HTTPStorages/<BundleID>)
-        if !bundleId.isEmpty {
-            let httpPath = "\(home)/Library/HTTPStorages/\(bundleId)"
-            if fileManager.fileExists(atPath: httpPath) {
-                items.append(AppLeftoverItem(name: bundleId, path: httpPath, kind: .httpStorages, sizeBytes: calculateSize(of: httpPath)))
-            }
-        }
-
-        // 9. Logs (~/Library/Logs/<AppName> or <BundleID>)
-        let logsDir = "\(home)/Library/Logs"
-        checkDirectoryCandidates(base: logsDir, kind: .logs, names: [appName, bundleId], items: &items)
-
-        // 10. Launch Agents (~/Library/LaunchAgents/<BundleID>*.plist)
-        let userAgents = "\(home)/Library/LaunchAgents"
-        checkLaunchAgentCandidates(base: userAgents, bundleId: bundleId, items: &items)
-
-        return items
-    }
-
-    private func checkDirectoryCandidates(base: String, kind: AppLeftoverKind, names: [String], items: inout [AppLeftoverItem]) {
-        for n in names where !n.isEmpty {
-            let candidate = "\(base)/\(n)"
-            if fileManager.fileExists(atPath: candidate) {
-                // Avoid duplicates if appName == bundleId
-                if !items.contains(where: { $0.path == candidate }) {
-                    let s = calculateSize(of: candidate)
-                    items.append(AppLeftoverItem(name: n, path: candidate, kind: kind, sizeBytes: s))
-                }
-            }
+    /// Discovers all leftover files and folders matching the app name or bundle identifier, with their sizes.
+    public func scanLeftovers(for app: InstalledAppInfo, home: String? = nil) -> [AppLeftoverItem] {
+        leftoverCandidates(for: app, home: home ?? homeDirectory).map {
+            AppLeftoverItem(
+                name: $0.name,
+                path: $0.path,
+                kind: $0.kind,
+                sizeBytes: calculateSize(of: $0.path),
+                matchedByName: $0.matchedByName
+            )
         }
     }
 
-    private func checkLaunchAgentCandidates(base: String, bundleId: String, items: inout [AppLeftoverItem]) {
-        guard fileManager.fileExists(atPath: base),
-              let files = try? fileManager.contentsOfDirectory(atPath: base) else { return }
-        for f in files where f.hasSuffix(".plist") {
-            // Agents are unloaded and deleted, so only those named after the app's bundle identifier qualify.
-            if !bundleId.isEmpty && f.hasPrefix(bundleId) {
-                let p = "\(base)/\(f)"
-                if !items.contains(where: { $0.path == p }) {
-                    items.append(AppLeftoverItem(name: f, path: p, kind: .launchAgents, sizeBytes: calculateSize(of: p)))
-                }
-            }
+    private struct LeftoverCandidate {
+        let name: String
+        let path: String
+        let kind: AppLeftoverKind
+        let matchedByName: Bool
+    }
+
+    /// Where this app's leftovers are, without measuring them. Every candidate is a direct child of one of the
+    /// folders below and passes `isSafeLeftoverPath`, so the list is exactly what an uninstall may remove.
+    private func leftoverCandidates(for app: InstalledAppInfo, home rawHome: String) -> [LeftoverCandidate] {
+        let home = (rawHome as NSString).standardizingPath
+        let library = "\(home)/Library"
+        // A name taken from an Info.plist is untrusted: "../Fonts" must not walk out of the folder it is looked up in.
+        let trimmedId = app.bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        let bundleId = Self.isUsableBundleIdentifier(trimmedId) ? trimmedId : ""
+        let trimmedName = app.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let appName = Self.isUsableEntryName(trimmedName) ? trimmedName : ""
+
+        var found: [LeftoverCandidate] = []
+        var seen = Set<String>()
+
+        func add(_ name: String, in base: String, kind: AppLeftoverKind, byName: Bool = false) {
+            let path = "\(base)/\(name)"
+            let canonical = (path as NSString).standardizingPath
+            guard (canonical as NSString).deletingLastPathComponent == (base as NSString).standardizingPath,
+                  fileManager.fileExists(atPath: path),
+                  isSafeLeftoverPath(canonical, home: home),
+                  seen.insert(canonical.lowercased()).inserted else { return }
+            found.append(LeftoverCandidate(name: name, path: path, kind: kind, matchedByName: byName))
         }
+
+        /// Entries of `base` whose name is the identifier, alone or as whole dot-separated components.
+        func addEntries(in base: String, kind: AppLeftoverKind, where matches: (String) -> Bool) {
+            guard !bundleId.isEmpty, let entries = try? fileManager.contentsOfDirectory(atPath: base) else { return }
+            for entry in entries.sorted() where matches(entry) { add(entry, in: base, kind: kind) }
+        }
+
+        func addByIdentifierThenName(in base: String, kind: AppLeftoverKind) {
+            if !bundleId.isEmpty { add(bundleId, in: base, kind: kind) }
+            if !appName.isEmpty, appName.lowercased() != bundleId.lowercased() { add(appName, in: base, kind: kind, byName: true) }
+        }
+
+        addByIdentifierThenName(in: "\(library)/Application Support", kind: .appSupport)
+        addByIdentifierThenName(in: "\(library)/Caches", kind: .caches)
+        if !bundleId.isEmpty {
+            add(bundleId, in: "\(library)/Containers", kind: .sandboxContainers)
+        }
+        // Shared containers: by bundle identifier only. A display name ("Notes", "Mail") is too common a word to
+        // decide that a shared container belongs to this app.
+        addEntries(in: "\(library)/Group Containers", kind: .groupContainers) {
+            Self.entryName($0, containsIdentifier: bundleId)
+        }
+        if !bundleId.isEmpty {
+            add("\(bundleId).plist", in: "\(library)/Preferences", kind: .preferences)
+        }
+        addEntries(in: "\(library)/Preferences/ByHost", kind: .preferences) {
+            Self.entryName($0, startsWithIdentifier: bundleId)
+        }
+        if !bundleId.isEmpty {
+            add("\(bundleId).savedState", in: "\(library)/Saved Application State", kind: .savedState)
+            add(bundleId, in: "\(library)/WebKit", kind: .webKit)
+            add(bundleId, in: "\(library)/HTTPStorages", kind: .httpStorages)
+        }
+        addByIdentifierThenName(in: "\(library)/Logs", kind: .logs)
+        // Agents are unloaded and removed, so only those named after the app's bundle identifier qualify.
+        addEntries(in: "\(library)/LaunchAgents", kind: .launchAgents) {
+            $0.hasSuffix(".plist") && Self.entryName($0, startsWithIdentifier: bundleId)
+        }
+        return found
     }
 
     // MARK: - Uninstallation Execution
 
-    /// Executes the uninstallation plan: terminates running process, unloads launchd jobs,
-    /// and either moves all artifacts to the macOS Trash or removes them permanently.
+    /// True while a copy of this app is running from this bundle.
+    public func isAppRunning(_ app: InstalledAppInfo) -> Bool {
+        runningApps.isRunning(app.bundleIdentifier, app.bundlePath)
+    }
+
+    /// Executes the uninstallation plan: asks the app to quit, moves the app to the Trash, unloads its launch agents
+    /// and moves the chosen leftovers to the Trash (or removes everything permanently when `moveToTrash` is false).
+    ///
+    /// - Parameters:
+    ///   - selectedLeftovers: The leftovers to remove; `nil` means all of the plan's. Each one is looked up again and
+    ///     skipped unless it is still a leftover of this app.
+    ///   - includeApp: `false` keeps the app and removes only the leftovers.
+    /// - Returns: The bytes removed.
+    /// - Throws: Before anything is removed if the app is protected, does not quit, or cannot be moved;
+    ///   `UninstallError.someFailed` afterwards if some leftovers stayed behind.
     @discardableResult
     public func uninstall(
         plan: AppUninstallPlan,
         selectedLeftovers: [AppLeftoverItem]? = nil,
+        includeApp: Bool = true,
         moveToTrash: Bool = true
     ) throws -> Int64 {
+        let app = plan.app
         // Safety guard: Reject protected system or Apple apps
-        if isSystemPath(plan.app.bundlePath) || isProtectedAppleBundle(plan.app.bundleIdentifier) {
+        if isSystemPath(app.bundlePath) || isProtectedAppleBundle(app.bundleIdentifier) {
             throw UninstallError.protectedSystemApplication
         }
+        if isZenith(bundleIdentifier: app.bundleIdentifier, path: app.bundlePath) {
+            throw UninstallError.cannotUninstallZenith
+        }
 
-        // 1. Terminate running process if active
-        terminateRunningApp(bundleIdentifier: plan.app.bundleIdentifier)
+        // 1. An open app keeps writing to the very files that are about to go: it has to quit first.
+        try quitIfRunning(app)
 
-        let itemsToDelete = selectedLeftovers ?? plan.leftovers
         var totalFreed: Int64 = 0
+        var removedCount = 0
 
-        // 2. Unload & remove Launch Agents first
-        for item in itemsToDelete where item.kind == .launchAgents {
+        // 2. The app itself. If macOS refuses, stop here with everything else still in place.
+        if includeApp, fileManager.fileExists(atPath: app.bundlePath) {
+            try removeFile(atPath: app.bundlePath, moveToTrash: moveToTrash)
+            totalFreed += app.appSizeBytes
+            removedCount += 1
+        }
+
+        // 3. Leftovers: only what a fresh look still ties to this app.
+        let stillLeftovers = Set(leftoverCandidates(for: app, home: homeDirectory).map { ($0.path as NSString).standardizingPath })
+        let chosen = (selectedLeftovers ?? plan.leftovers).filter {
+            stillLeftovers.contains(($0.path as NSString).standardizingPath)
+        }
+        for item in chosen where item.kind == .launchAgents {
             unloadLaunchAgent(atPath: item.path)
         }
 
-        // 3. Remove/Trash leftover items
-        for item in itemsToDelete {
-            if isSafeLeftoverPath(item.path) {
-                totalFreed += item.sizeBytes
+        var failures: [(name: String, reason: String)] = []
+        for item in chosen {
+            do {
                 try removeFile(atPath: item.path, moveToTrash: moveToTrash)
+                totalFreed += item.sizeBytes
+                removedCount += 1
+            } catch {
+                failures.append((name: item.name, reason: error.localizedDescription))
             }
         }
 
-        // 4. Remove/Trash the main .app bundle
-        if fileManager.fileExists(atPath: plan.app.bundlePath) {
-            totalFreed += plan.app.appSizeBytes
-            try removeFile(atPath: plan.app.bundlePath, moveToTrash: moveToTrash)
+        if removedCount > 0 {
+            recordHistory("App Uninstallation (\(app.displayName))", totalFreed, removedCount)
         }
-
-        if totalFreed > 0 {
-            SystemCleaningHistoryTracker.shared.record(
-                operationName: "App Uninstallation (\(plan.app.displayName))",
-                bytesFreed: totalFreed,
-                itemCount: itemsToDelete.count + 1
-            )
+        if let first = failures.first {
+            throw UninstallError.someFailed(names: failures.map(\.name), firstReason: first.reason)
         }
-
         return totalFreed
+    }
+
+    /// Asks an open app to quit and waits for it. Throws, with nothing removed, if it is still open afterwards
+    /// (it may be asking about unsaved documents).
+    private func quitIfRunning(_ app: InstalledAppInfo) throws {
+        guard runningApps.isRunning(app.bundleIdentifier, app.bundlePath) else { return }
+        runningApps.requestQuit(app.bundleIdentifier, app.bundlePath)
+        let deadline = Date().addingTimeInterval(quitTimeout)
+        while runningApps.isRunning(app.bundleIdentifier, app.bundlePath) {
+            guard Date() < deadline else { throw UninstallError.appStillRunning(app.displayName) }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
     }
 
     // MARK: - File Removal (Clean Code F3, G30)
 
     private func removeFile(atPath path: String, moveToTrash: Bool) throws {
+        let url = URL(fileURLWithPath: path)
         if moveToTrash {
-            try sendToTrash(atPath: path)
+            try trashMover.move(url)
         } else {
-            try deletePermanently(atPath: path)
-        }
-    }
-
-    private func sendToTrash(atPath path: String) throws {
-        let url = URL(fileURLWithPath: path)
-        try fileManager.trashItem(at: url, resultingItemURL: nil)
-    }
-
-    private func deletePermanently(atPath path: String) throws {
-        let url = URL(fileURLWithPath: path)
-        try fileManager.removeItem(at: url)
-    }
-
-    private func terminateRunningApp(bundleIdentifier: String) {
-        guard !bundleIdentifier.isEmpty else { return }
-        let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
-        for app in runningApps {
-            app.terminate()
+            try fileManager.removeItem(at: url)
         }
     }
 
     private func unloadLaunchAgent(atPath path: String) {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        proc.arguments = ["bootout", "gui/\(getuid())", path]
-        try? proc.run()
-        proc.waitUntilExit()
+        _ = runCommand("/bin/launchctl", ["bootout", "gui/\(getuid())", path])
     }
 
     // MARK: - Safety Validations
 
     public func isProtectedAppleBundle(_ bundleId: String) -> Bool {
-        let lower = bundleId.lowercased()
-        guard lower.hasPrefix("com.apple.") else { return false }
         // System Apple apps cannot be uninstalled
-        return true
+        bundleId.lowercased().hasPrefix("com.apple.")
     }
 
     public func isSystemPath(_ path: String) -> Bool {
@@ -420,9 +547,21 @@ public final class AppUninstallerService: @unchecked Sendable {
         return false
     }
 
+    private func isZenith(bundleIdentifier: String, path: String) -> Bool {
+        if let own = ownBundleIdentifier, !own.isEmpty, own.lowercased() == bundleIdentifier.lowercased() { return true }
+        if let own = ownBundlePath, !own.isEmpty {
+            return URL(fileURLWithPath: own).resolvingSymlinksInPath().path == URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        }
+        return false
+    }
+
     public func isSafeLeftoverPath(_ path: String) -> Bool {
+        isSafeLeftoverPath(path, home: homeDirectory)
+    }
+
+    private func isSafeLeftoverPath(_ path: String, home rawHome: String) -> Bool {
         let canonical = (path as NSString).standardizingPath
-        let home = (NSHomeDirectory() as NSString).standardizingPath
+        let home = (rawHome as NSString).standardizingPath
         // Leftovers must reside inside user's ~/Library
         guard canonical.hasPrefix("\(home)/Library/") else {
             return false
@@ -474,43 +613,79 @@ public final class AppUninstallerService: @unchecked Sendable {
         return name.hasPrefix("com.apple.") || name.hasPrefix("group.com.apple.") || Self.appleOwnedLeftoverNames.contains(name)
     }
 
+    // MARK: - Matching names
+
+    /// A name that can be looked up as one entry of a folder: no path separators, not hidden, not `.`/`..`.
+    static func isUsableEntryName(_ name: String) -> Bool {
+        !name.isEmpty && !name.hasPrefix(".") && !name.contains("/") && !name.contains(":") && !name.contains("\0")
+    }
+
+    /// A bundle identifier worth matching files against: letters, digits, `-`, `_`, and at least two dot-separated
+    /// parts. A one-word identifier would claim any folder of that name.
+    static func isUsableBundleIdentifier(_ identifier: String) -> Bool {
+        let parts = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count >= 2 else { return false }
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        return parts.allSatisfy { part in !part.isEmpty && part.unicodeScalars.allSatisfy { allowed.contains($0) } }
+    }
+
+    /// `com.acme.app.plist` and `com.acme.app.helper.plist` start with `com.acme.app`; `com.acme.apple.plist` does not.
+    static func entryName(_ entry: String, startsWithIdentifier identifier: String) -> Bool {
+        guard !identifier.isEmpty else { return false }
+        let entry = entry.lowercased(), identifier = identifier.lowercased()
+        return entry == identifier || entry.hasPrefix(identifier + ".")
+    }
+
+    /// `group.com.acme.app` and `TEAMID.com.acme.app.shared` contain `com.acme.app` as whole components.
+    static func entryName(_ entry: String, containsIdentifier identifier: String) -> Bool {
+        guard !identifier.isEmpty else { return false }
+        let entry = entry.lowercased(), identifier = identifier.lowercased()
+        return entry == identifier
+            || entry.hasPrefix(identifier + ".")
+            || entry.hasSuffix("." + identifier)
+            || entry.contains("." + identifier + ".")
+    }
+
     // MARK: - Helpers
 
-    public func calculateSize(of path: String) -> Int64 {
-        var isDir: ObjCBool = false
-        guard fileManager.fileExists(atPath: path, isDirectory: &isDir) else { return 0 }
-        if !isDir.boolValue {
-            let attrs = try? fileManager.attributesOfItem(atPath: path)
-            return (attrs?[.size] as? NSNumber)?.int64Value ?? 0
-        }
-        guard let enumerator = fileManager.enumerator(
-            at: URL(fileURLWithPath: path),
-            includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileSizeKey],
-            options: [.skipsHiddenFiles]
-        ) else { return 0 }
+    private func isSymbolicLink(_ path: String) -> Bool {
+        var info = stat()
+        return lstat(path, &info) == 0 && (info.st_mode & S_IFMT) == S_IFLNK
+    }
 
-        var total: Int64 = 0
-        for case let fileURL as URL in enumerator {
-            guard let vals = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileSizeKey]) else { continue }
-            total += Int64(vals.totalFileAllocatedSize ?? vals.fileSize ?? 0)
-        }
-        return total
+    /// Everything a removal takes with it: hidden files and the inside of bundles count, symbolic links do not.
+    public func calculateSize(of path: String) -> Int64 {
+        SystemCleanerService.calculateSize(of: path, fileManager: fileManager)
     }
 }
 
 public enum UninstallError: Error, LocalizedError, Equatable {
     case protectedSystemApplication
+    case cannotUninstallZenith
     case appNotFound
     case failedToDelete(String)
+    /// The app was asked to quit and is still open. Nothing was removed.
+    case appStillRunning(String)
+    /// The rest is in the Trash; these stayed where they were.
+    case someFailed(names: [String], firstReason: String)
 
     public var errorDescription: String? {
         switch self {
         case .protectedSystemApplication:
-            return "Cannot uninstall protected macOS system applications or Apple internal components."
+            return String(localized: "Apps that are part of macOS or made by Apple can't be uninstalled here.")
+        case .cannotUninstallZenith:
+            return String(localized: "Zenith can't uninstall itself. Quit it and move it to the Trash in Finder.")
         case .appNotFound:
             return "Application bundle could not be found at the specified path."
         case .failedToDelete(let path):
             return "Failed to remove artifact at \(path)."
+        case .appStillRunning(let name):
+            return String(localized: "\(name) is still open, so nothing was removed. Quit it, then try again.")
+        case .someFailed(let names, let reason):
+            let listed = names.prefix(3).joined(separator: ", ")
+            return names.count == 1
+                ? String(localized: "1 item could not be moved: \(listed). \(reason)")
+                : String(localized: "\(names.count) items could not be moved: \(listed). \(reason)")
         }
     }
 }

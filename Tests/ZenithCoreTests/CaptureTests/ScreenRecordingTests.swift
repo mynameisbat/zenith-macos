@@ -356,9 +356,7 @@ struct ScreenRecordingTests {
     @MainActor
     @Test("REC-16: settings default to Movies, 30 fps, H.264 .mov with a countdown, microphone off")
     func settings() throws {
-        let suite = "zenith-recording-tests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = TestDefaults.make("recording-tests-\(UUID().uuidString)")!
         let home = URL(fileURLWithPath: "/Users/someone", isDirectory: true)
         let settings = ScreenRecordingSettings(userDefaults: defaults, homeDirectory: home)
         #expect(settings.microphone == false)
@@ -388,9 +386,7 @@ struct ScreenRecordingTests {
     @MainActor
     @Test("REC-17: the Permissions page lists the microphone, on only while the switch is on")
     func permissions() {
-        let suite = "zenith-recording-perm-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = TestDefaults.make("recording-perm-\(UUID().uuidString)")!
         let settings = ScreenRecordingSettings(userDefaults: defaults)
         let activity = LiveFeatureActivity(widgets: IslandWidgetSettings(userDefaults: defaults, island: nil), recording: settings)
         #expect(activity.activity(for: .recordingMicrophone) == .off)

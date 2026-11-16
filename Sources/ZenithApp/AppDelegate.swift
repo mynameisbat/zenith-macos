@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import ZenithCore
 
 /// Main application lifecycle, status item setup, and global hotkey wiring delegate.
@@ -21,10 +22,24 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 3. Configure Settings window content provider
         SettingsWindowController.shared.configureDefaultContent()
+        // Settings are a page of the island. The window is what is left when the island cannot show one (a
+        // full-screen app has hidden it).
+        SettingsWindowController.shared.presentationOverride = {
+            let island = ZenithIslandState.shared
+            guard island.isEnabled, !island.isHiddenForFullscreen else { return false }
+            island.openPage(.settings)
+            return true
+        }
 
         // 4. Setup persistent Menu Bar status item & dropdown menu (F42, F43)
+        // The icon is there only if Settings asks for it or the island has no Tools tab (`needsMenuBarIcon`):
+        // otherwise everything is reached from the island.
         wireMenuBarActions()
-        MenuBarController.shared.setup()
+        applyMenuBarIcon()
+        menuBarIconObserver = IslandWidgetSettings.shared.objectWillChange.sink { [weak self] _ in
+            // The new value is published before it is stored.
+            Task { @MainActor [weak self] in self?.applyMenuBarIcon() }
+        }
 
         // 5. Start background clipboard monitoring (F01)
         ClipboardStore.shared.soundService = AudioFeedbackManager.shared
@@ -47,6 +62,23 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         CleaningModeCoordinator.shared.configure()  // full-screen windows, and the shortcut if Settings turned it on
         SnippetExpansionService.shared.refresh()  // typed snippet expansion: off by default, needs Accessibility
         AIAgentsCoordinator.shared.start()  // AI agents on the island: off by default, reads local logs only
+    }
+
+    private var menuBarIconObserver: AnyCancellable?
+
+    private func applyMenuBarIcon() {
+        if IslandWidgetSettings.shared.needsMenuBarIcon {
+            MenuBarController.shared.setup()
+        } else {
+            MenuBarController.shared.teardown()
+        }
+    }
+
+    /// Zenith was opened again while it runs (Finder, Spotlight, the Dock). With no menu bar icon this is the way
+    /// in that always exists: show the settings, on the island when it can, else in their window.
+    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        ZenithToolActions.openSettings()
+        return false
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

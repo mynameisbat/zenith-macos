@@ -10,6 +10,10 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
     private var popover: NSPopover?
     private var eventMonitor: Any?
     private var telemetryTimer: Timer?
+    private var releaseWork: DispatchWorkItem?
+    /// How long a closed hub keeps its views, so reopening it straight away is instant. After that they are let go:
+    /// the view tree, its symbols and the process icons are memory nobody is looking at.
+    private static let releaseDelay: TimeInterval = 30
 
     public var isVisible: Bool {
         popover?.isShown ?? false
@@ -17,6 +21,18 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
 
     public override init() {
         super.init()
+        // A transient popover closes on a click elsewhere, but not when another app comes forward by ⌘Tab, a shortcut
+        // or Mission Control. Left open it keeps sampling processes every 2.5 s for nobody, so close it then.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationDidResignActive),
+            name: NSApplication.didResignActiveNotification,
+            object: nil
+        )
+    }
+
+    @objc private func applicationDidResignActive() {
+        if isVisible { close() }
     }
 
     /// Toggles the Command Hub popover anchored to the status bar button.
@@ -31,6 +47,8 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
     /// Shows the popover anchored to the given button.
     public func show(relativeTo button: NSStatusBarButton) {
         ZenithCommandHubState.shared.reset()
+        releaseWork?.cancel()
+        releaseWork = nil
         if popover == nil {
             let newPopover = NSPopover()
             newPopover.behavior = .transient
@@ -40,17 +58,11 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
             let hubView = ZenithCommandHubView(
                 onAreaCapture: { [weak self] in
                     self?.close(immediately: true)
-                    CaptureOverlayController.shared.startAreaCapture { image in
-                        guard let image = image else { return }
-                        AnnotationWindowController.shared.present(image: image)
-                    }
+                    ZenithToolActions.captureArea()
                 },
                 onFullscreenCapture: { [weak self] in
                     self?.close(immediately: true)
-                    CaptureOverlayController.shared.captureFullscreen { image in
-                        guard let image = image else { return }
-                        AnnotationWindowController.shared.present(image: image)
-                    }
+                    ZenithToolActions.captureScreen()
                 },
                 onScreenOCR: { [weak self] in
                     self?.close(immediately: true)
@@ -62,8 +74,7 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
                 },
                 onOpenPreferences: { [weak self] in
                     self?.close()
-                    SettingsWindowController.shared.configureDefaultContent()
-                    SettingsWindowController.shared.show()
+                    ZenithToolActions.openSettings()
                 },
                 onQuit: {
                     AppDelegate.isExplicitQuit = true
@@ -240,5 +251,18 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
     public func popoverDidClose(_ notification: Notification) {
         stopTelemetryPolling()
         removeEventMonitor()
+        scheduleRelease()
+    }
+
+    private func scheduleRelease() {
+        releaseWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, !self.isVisible else { return }
+            self.popover?.contentViewController = nil
+            self.popover = nil
+            self.releaseWork = nil
+        }
+        releaseWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.releaseDelay, execute: work)
     }
 }

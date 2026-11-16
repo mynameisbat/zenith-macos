@@ -187,6 +187,18 @@ public extension ZenithIslandState {
         return tabs.first ?? .shelf
     }
 
+    /// The tab the open island shows right now, from its own state.
+    var currentTab: IslandExpandedTab {
+        Self.resolvedTab(
+            active: activeTab,
+            hasTrack: nowPlayingTrack != nil,
+            hasShelfItems: !droppedItems.isEmpty,
+            showsWidgets: showsWidgets,
+            showsAIAgents: showsAIAgentsTab,
+            isDropTargeted: isDropTargeted
+        )
+    }
+
     /// Something to show next to the notch while the island is closed: a running timer, playing media, a coding
     /// agent at work or keep awake.
     var hasCompactActivity: Bool {
@@ -213,10 +225,12 @@ public final class IslandWidgetSettings: ObservableObject {
         public static let showNetwork = "zenith_island_show_network"
         public static let focusMinutes = "zenith_island_focus_minutes"
         public static let breakMinutes = "zenith_island_break_minutes"
-        public static let showLevelHUD = "zenith_island_show_level_hud"
         public static let hideInFullscreen = "zenith_island_hide_in_fullscreen"
         public static let scrollGestures = "zenith_island_scroll_gestures"
         public static let hoverOpenDelay = "zenith_island_hover_open_delay"
+        public static let showTools = "zenith_island_show_tools"
+        public static let showMenuBarIcon = "zenith_show_menu_bar_icon"
+        public static let dockTools = "zenith_island_dock_tools"
     }
 
     public static let focusRange = 5...120
@@ -249,9 +263,32 @@ public final class IslandWidgetSettings: ObservableObject {
         didSet { save(showNetwork, Keys.showNetwork); syncIsland() }
     }
 
-    /// Volume and brightness changes appear on the island.
-    @Published public var showLevelHUD: Bool {
-        didSet { save(showLevelHUD, Keys.showLevelHUD); syncIsland() }
+    /// The open island has a dock of tools, and the Command Hub leaves its launch buttons to it.
+    @Published public var showTools: Bool {
+        didSet { save(showTools, Keys.showTools); syncIsland() }
+    }
+
+    /// The tools on the dock under the open island, as the user arranged them. Saved on every change.
+    @Published public var dockLayout: IslandDockLayout {
+        didSet {
+            guard dockLayout != oldValue else { return }
+            save(dockLayout.storedIdentifiers, Keys.dockTools)
+        }
+    }
+
+    /// Also keep Zenith's icon (and the Command Hub behind it) in the menu bar. Off: everything is on the island.
+    @Published public var showMenuBarIcon: Bool {
+        didSet { save(showMenuBarIcon, Keys.showMenuBarIcon) }
+    }
+
+    /// Whether the menu bar icon has to be there: asked for, or the island has no Tools tab, in which case the icon
+    /// is the only way left to reach Zenith's tools and settings.
+    public static func needsMenuBarIcon(wantsIcon: Bool, showsTools: Bool) -> Bool {
+        wantsIcon || !showsTools
+    }
+
+    public var needsMenuBarIcon: Bool {
+        Self.needsMenuBarIcon(wantsIcon: showMenuBarIcon, showsTools: showTools)
     }
 
     /// The island is taken away while a full-screen app has the display.
@@ -299,7 +336,9 @@ public final class IslandWidgetSettings: ObservableObject {
         self.showTimer = userDefaults.object(forKey: Keys.showTimer) as? Bool ?? true
         self.showCalendar = userDefaults.object(forKey: Keys.showCalendar) as? Bool ?? false
         self.showNetwork = userDefaults.object(forKey: Keys.showNetwork) as? Bool ?? false
-        self.showLevelHUD = userDefaults.object(forKey: Keys.showLevelHUD) as? Bool ?? true
+        self.showTools = userDefaults.object(forKey: Keys.showTools) as? Bool ?? true
+        self.showMenuBarIcon = userDefaults.object(forKey: Keys.showMenuBarIcon) as? Bool ?? false
+        self.dockLayout = IslandDockLayout(storedIdentifiers: userDefaults.stringArray(forKey: Keys.dockTools))
         self.hideInFullscreen = userDefaults.object(forKey: Keys.hideInFullscreen) as? Bool ?? true
         self.scrollGestures = userDefaults.object(forKey: Keys.scrollGestures) as? Bool ?? true
         let delay = userDefaults.object(forKey: Keys.hoverOpenDelay) as? Double ?? Self.defaultHoverOpenDelay
@@ -320,7 +359,9 @@ public final class IslandWidgetSettings: ObservableObject {
         showTimer = true
         showCalendar = false
         showNetwork = false
-        showLevelHUD = true
+        showTools = true
+        showMenuBarIcon = false
+        dockLayout = IslandDockLayout()
         hideInFullscreen = true
         scrollGestures = true
         hoverOpenDelay = Self.defaultHoverOpenDelay
@@ -336,7 +377,7 @@ public final class IslandWidgetSettings: ObservableObject {
         island?.showsTimerWidget = showTimer
         island?.showsCalendarWidget = showCalendar
         island?.showsNetworkWidget = showNetwork
-        island?.showsLevelHUD = showLevelHUD
+        if island?.showsToolsTab != showTools { island?.showsToolsTab = showTools }
         island?.allowsScrollGestures = scrollGestures
         island?.hoverOpenDelay = hoverOpenDelay
         if island?.hidesInFullscreen != hideInFullscreen { island?.hidesInFullscreen = hideInFullscreen }

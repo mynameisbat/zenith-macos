@@ -6,6 +6,8 @@ import ZenithCore
 struct CleanupToolView: View {
     @ObservedObject var model: CleanupToolModel
     @ObservedObject var projectRoots: ProjectSearchRootsModel
+    /// Runs once a removal has finished and the list has been scanned again (the uninstaller leaves the app's page).
+    var afterClean: (@MainActor () async -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -142,6 +144,21 @@ struct CleanupToolView: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 5)
+        .contextMenu {
+            // The uninstaller's rows are files and folders, and "matched by name only" asks for a look first.
+            if let path = uninstallerPath(of: candidate) {
+                Button("Show in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+                }
+            }
+        }
+    }
+
+    /// The file behind a row of the uninstaller's list (its id is the path; the app's own row has a prefix).
+    private func uninstallerPath(of candidate: CleanupCandidate) -> String? {
+        guard model.kind == .uninstaller else { return nil }
+        let prefix = "app:"
+        return candidate.id.hasPrefix(prefix) ? String(candidate.id.dropFirst(prefix.count)) : candidate.id
     }
 
     // MARK: Where projects are searched
@@ -192,6 +209,7 @@ struct CleanupToolView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Search This Folder"
+        IslandDialogs.raiseAboveIsland(panel)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         projectRoots.add(url.path)
     }
@@ -210,6 +228,7 @@ struct CleanupToolView: View {
             ToastHUDController.shared.show(message: "Freed \(format(freed))!", icon: "sparkles")
             AudioFeedbackManager.shared.playNewCopySound()
         }
+        await afterClean?()
     }
 
     private func format(_ bytes: Int64) -> String {

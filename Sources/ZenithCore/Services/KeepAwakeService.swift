@@ -23,7 +23,8 @@ public final class KeepAwakeSettings: ObservableObject {
     /// Sent after any setting changed.
     public let didChange = PassthroughSubject<Void, Never>()
 
-    /// Also keep the display from dimming and turning off.
+    /// Also keep the display from dimming and turning off (on by default: a dark or locked screen reads as the Mac
+    /// having gone to sleep, which is what keep awake is meant to prevent).
     @Published public var keepsDisplayOn: Bool {
         didSet { save(keepsDisplayOn, Keys.keepsDisplayOn) }
     }
@@ -59,7 +60,7 @@ public final class KeepAwakeSettings: ObservableObject {
 
     public init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
-        keepsDisplayOn = userDefaults.object(forKey: Keys.keepsDisplayOn) as? Bool ?? false
+        keepsDisplayOn = userDefaults.object(forKey: Keys.keepsDisplayOn) as? Bool ?? true
         showsOnIsland = userDefaults.object(forKey: Keys.showsOnIsland) as? Bool ?? true
         customMinutes = Self.clampedMinutes(userDefaults.object(forKey: Keys.customMinutes) as? Int ?? Self.defaultCustomMinutes)
         hotKeyEnabled = userDefaults.object(forKey: Keys.hotKeyEnabled) as? Bool ?? false
@@ -89,7 +90,7 @@ public final class KeepAwakeSettings: ObservableObject {
     }
 
     public func resetToDefaults() {
-        keepsDisplayOn = false
+        keepsDisplayOn = true
         showsOnIsland = true
         customMinutes = Self.defaultCustomMinutes
         watchedApps = []

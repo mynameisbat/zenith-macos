@@ -31,7 +31,7 @@ public struct CleanupConfirmation: Sendable, Equatable {
 @MainActor
 public final class CleanupToolModel: ObservableObject, Identifiable {
     public enum Kind: String, CaseIterable, Sendable {
-        case projects, installers, leftovers, drives
+        case projects, installers, leftovers, drives, uninstaller
     }
 
     public nonisolated let kind: Kind
@@ -50,6 +50,7 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
 
     private let scanWork: @Sendable () async -> [CleanupCandidate]
     private let cleanWork: @Sendable ([CleanupCandidate]) async throws -> Int64
+    private let customConfirmation: (@MainActor (_ selected: [CleanupCandidate], _ summary: String) -> CleanupConfirmation?)?
 
     public init(
         kind: Kind,
@@ -58,7 +59,8 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
         actionTitle: String,
         movesToTrash: Bool,
         scan: @escaping @Sendable () async -> [CleanupCandidate],
-        clean: @escaping @Sendable ([CleanupCandidate]) async throws -> Int64
+        clean: @escaping @Sendable ([CleanupCandidate]) async throws -> Int64,
+        confirmation: (@MainActor (_ selected: [CleanupCandidate], _ summary: String) -> CleanupConfirmation?)? = nil
     ) {
         self.kind = kind
         self.title = title
@@ -67,6 +69,7 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
         self.movesToTrash = movesToTrash
         self.scanWork = scan
         self.cleanWork = clean
+        self.customConfirmation = confirmation
     }
 
     // MARK: Selection
@@ -93,6 +96,8 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
     }
 
     public func confirmation() -> CleanupConfirmation {
+        // A tool can word its own question (the uninstaller names the app); `nil` falls back to the general one.
+        if let custom = customConfirmation?(selectedCandidates, selectionSummary()) { return custom }
         let count = selectedCandidates.count
         if movesToTrash {
             return CleanupConfirmation(
@@ -154,12 +159,12 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
         return freed
     }
 
-    private static func format(_ bytes: Int64) -> String {
+    fileprivate static func format(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 }
 
-// MARK: - The four tools
+// MARK: - The tools
 
 /// Keeps the service's own items, by candidate id, between the scan and the removal.
 private final class ItemStore<Item: Sendable>: @unchecked Sendable {
@@ -287,6 +292,83 @@ extension CleanupToolModel {
             }
         )
     }
+
+    /// One installed app and the files it keeps in ~/Library. The app is the first row; a file tied to it only by
+    /// its display name starts unticked. Once the app is gone, a new scan lists whatever of its files is still there.
+    @MainActor
+    public static func uninstaller(app: InstalledAppInfo, service: AppUninstallerService = .shared) -> CleanupToolModel {
+        let store = ItemStore<AppLeftoverItem>()
+        let measured = ItemStore<InstalledAppInfo>()
+        let appID = uninstallerAppCandidateID(for: app)
+        return CleanupToolModel(
+            kind: .uninstaller,
+            title: app.displayName,
+            explanation: String(localized: "The app and the files it keeps in your Library. Files that only carry the app's name are not ticked for you: check that they are this app's before you tick them. Everything goes to the Trash."),
+            actionTitle: String(localized: "Move to Trash"),
+            movesToTrash: true,
+            scan: {
+                await Task.detached { () -> [CleanupCandidate] in
+                    var rows: [CleanupCandidate] = []
+                    if case .success(let info) = service.eligibility(ofAppAt: app.bundlePath) {
+                        measured.replace([appID: info])
+                        rows.append(CleanupCandidate(
+                            id: appID,
+                            title: info.displayName,
+                            detail: String(localized: "The app itself · \(tilde(info.bundlePath))"),
+                            bytes: info.appSizeBytes,
+                            isSelected: true
+                        ))
+                    } else {
+                        measured.replace([:])
+                    }
+                    let leftovers = service.scanLeftovers(for: app).sorted { $0.sizeBytes > $1.sizeBytes }
+                    store.replace(Dictionary(leftovers.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first }))
+                    rows += leftovers.map {
+                        CleanupCandidate(
+                            id: $0.path,
+                            title: $0.name,
+                            detail: $0.matchedByName
+                                ? String(localized: "\(tilde($0.path)) · matched by name only")
+                                : tilde($0.path),
+                            bytes: $0.sizeBytes,
+                            isSelected: !$0.matchedByName
+                        )
+                    }
+                    return rows
+                }.value
+            },
+            clean: { chosen in
+                let ids = chosen.map(\.id)
+                let leftovers = store.items(for: ids)
+                let target = measured.items(for: [appID]).first
+                return try await Task.detached {
+                    try service.uninstall(
+                        plan: AppUninstallPlan(app: target ?? app, leftovers: leftovers),
+                        selectedLeftovers: leftovers,
+                        includeApp: target != nil && ids.contains(appID),
+                        moveToTrash: true
+                    )
+                }.value
+            },
+            confirmation: { selected, summary in
+                // Without the app ticked this is an ordinary "move these to the Trash".
+                guard selected.contains(where: { $0.id == appID }) else { return nil }
+                let size = format(selected.reduce(0) { $0 + $1.bytes })
+                return CleanupConfirmation(
+                    title: String(localized: "Uninstall \(app.displayName)?"),
+                    message: service.isAppRunning(app)
+                        ? String(localized: "\(app.displayName) is open and will be asked to quit first. \(size) will go to the Trash, where you can still restore it:\n\(summary)")
+                        : String(localized: "\(size) will go to the Trash, where you can still restore it:\n\(summary)"),
+                    actionTitle: String(localized: "Move to Trash")
+                )
+            }
+        )
+    }
+
+    /// The id of the row that stands for the app itself in the uninstaller's list.
+    public nonisolated static func uninstallerAppCandidateID(for app: InstalledAppInfo) -> String {
+        "app:" + app.bundlePath
+    }
 }
 
 // MARK: - Where projects are searched
@@ -340,7 +422,7 @@ public final class ProjectSearchRootsModel: ObservableObject {
     }
 }
 
-/// The four tools, created once so a scan survives switching tabs in Settings.
+/// The tools, created once so a scan survives switching tabs in Settings.
 @MainActor
 public final class CleanupTools {
     public static let shared = CleanupTools()
@@ -350,6 +432,7 @@ public final class CleanupTools {
     public let installers = CleanupToolModel.installers()
     public let leftovers = CleanupToolModel.leftovers()
     public let drives = CleanupToolModel.drives()
+    public let uninstaller = AppUninstallerModel()
 
     public var all: [CleanupToolModel] { [projects, installers, leftovers, drives] }
 

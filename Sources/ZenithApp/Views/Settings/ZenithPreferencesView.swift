@@ -43,8 +43,22 @@ extension SettingsTab {
 public struct ZenithPreferencesView: View {
     @ObservedObject public var viewModel: SettingsViewModel
 
-    public init(viewModel: SettingsViewModel = SettingsViewModel()) {
+    /// Drawn as a page of the island: on the island's black instead of a window's background, with no room left
+    /// for a window's buttons and no minimum size of its own.
+    private let inIsland: Bool
+
+    public init(viewModel: SettingsViewModel = SettingsViewModel(), inIsland: Bool = false) {
         self.viewModel = viewModel
+        self.inIsland = inIsland
+    }
+
+    @ViewBuilder
+    private var sidebarBackground: some View {
+        if inIsland {
+            Color.white.opacity(0.06)
+        } else {
+            ZenithVisualEffect(material: .sidebar)
+        }
     }
 
     private static let sidebarWidth: CGFloat = 210
@@ -53,15 +67,18 @@ public struct ZenithPreferencesView: View {
         HStack(spacing: 0) {
             sidebarView
                 .frame(width: Self.sidebarWidth)
-                .background(ZenithVisualEffect(material: .sidebar))
+                .background(sidebarBackground)
 
             Divider()
 
             detailPaneView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(nsColor: .windowBackgroundColor))
+                .background(inIsland ? Color.clear : Color(nsColor: .windowBackgroundColor))
         }
-        .frame(minWidth: SettingsWindowController.defaultWidth, maxWidth: .infinity, minHeight: SettingsWindowController.defaultHeight, maxHeight: .infinity)
+        .frame(
+            minWidth: inIsland ? 0 : SettingsWindowController.defaultWidth, maxWidth: .infinity,
+            minHeight: inIsland ? 0 : SettingsWindowController.defaultHeight, maxHeight: .infinity
+        )
         .ignoresSafeArea()
         .onAppear {
             takePendingTab()
@@ -87,7 +104,7 @@ public struct ZenithPreferencesView: View {
     private var sidebarView: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Room for the window's traffic lights.
-            Color.clear.frame(height: 44)
+            Color.clear.frame(height: inIsland ? 10 : 44)
 
             searchField
                 .padding(.horizontal, 10)

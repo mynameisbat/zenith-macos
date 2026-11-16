@@ -573,10 +573,7 @@
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "如果在隐私护盾打开时推出该宗卷，Zenith 会退出，网络可能中断，直到你再次打开 Zenith。请将 Zenith 拖到“应用程序”文件夹，并从那里打开。";
 "Turn On Anyway" = "仍然打开";
 "Playback position" = "播放位置";
-"Brightness" = "亮度";
 "Behavior" = "行为";
-"Volume and Brightness" = "音量和亮度";
-"Show the level on the island when you change it." = "调节时在灵动岛上显示当前级别。";
 "Swipe Gestures" = "轻扫手势";
 "Swipe down on the island to open it, up to close it, and sideways to change track." = "在灵动岛上向下轻扫以打开，向上轻扫以关闭，左右轻扫以切换曲目。";
 "Hide in Full-Screen Apps" = "在全屏 App 中隐藏";
@@ -1065,3 +1062,81 @@
 "If your custom resolver filters ads, its blocks are counted here too, and Never Block applies to it." = "如果你的自定义解析器会过滤广告，它的拦截也会计入此处，“永不拦截”也对它生效。";
 "Nothing is blocked: your lists are empty and this resolver does not filter ads. Use AdGuard DNS below, or import a list." = "没有拦截任何内容：你的列表为空，且此解析器不过滤广告。请使用下方的 AdGuard DNS，或导入列表。";
 "Ad blocking has no list: choose AdGuard DNS in Settings › Privacy Shield, or import a list." = "广告拦截没有列表：请在“设置 › 隐私护盾”中选择 AdGuard DNS，或导入列表。";
+
+/* App uninstaller (Settings › Cleaner › Uninstall) and the Cleaner tab's section names */
+"Uninstall an app" = "卸载 App";
+"Pick an app to see the files it keeps in your Library. Nothing is removed until you confirm, and everything goes to the Trash. Apps that are part of macOS are not listed." = "选取一个 App，查看它在资源库中保存的文件。在你确认之前不会移除任何内容，所有项目都会移到废纸篓。属于 macOS 的 App 不会列出。";
+"Choose App" = "选取 App";
+"Pick an app that is not in the Applications folder" = "选取不在“应用程序”文件夹中的 App";
+"Search apps" = "搜索 App";
+"Looking for apps…" = "正在查找 App…";
+"No apps found in the Applications folders." = "在“应用程序”文件夹中未找到 App。";
+"No app matches your search." = "没有与搜索匹配的 App。";
+"All Apps" = "所有 App";
+"The app and the files it keeps in your Library. Files that only carry the app's name are not ticked for you: check that they are this app's before you tick them. Everything goes to the Trash." = "该 App 及其在资源库中保存的文件。仅名称与该 App 相同的文件不会预先勾选：勾选前请确认它们确实属于此 App。所有项目都会移到废纸篓。";
+"The app itself · %@" = "App 本身 · %@";
+"%@ · matched by name only" = "%@ · 仅按名称匹配";
+"%@ is open and will be asked to quit first. %@ will go to the Trash, where you can still restore it:\n%@" = "%@ 正在运行，将先被要求退出。%@ 将被移到废纸篓，你仍可从中恢复：\n%@";
+"%@ and its files are in the Trash." = "%@ 及其文件已移到废纸篓。";
+"%@ is not an app." = "%@ 不是 App。";
+"%@ is part of macOS or made by Apple, so Zenith leaves it alone." = "%@ 属于 macOS 或由 Apple 开发，因此 Zenith 不会处理它。";
+"%@ is a part of another app. Uninstall that app instead." = "%@ 是另一个 App 的组成部分。请改为卸载那个 App。";
+"Zenith can't tell which files belong to %@, so it won't uninstall it." = "Zenith 无法判断哪些文件属于 %@，因此不会卸载它。";
+"Zenith can't uninstall itself. Quit it and move it to the Trash in Finder." = "Zenith 无法卸载自身。请退出 Zenith，然后在访达中将其移到废纸篓。";
+"Apps that are part of macOS or made by Apple can't be uninstalled here." = "属于 macOS 或由 Apple 开发的 App 无法在此卸载。";
+"%@ is still open, so nothing was removed. Quit it, then try again." = "%@ 仍在运行，因此未移除任何内容。请先退出它，然后重试。";
+"1 item could not be moved: %@. %@" = "有 1 个项目无法移动：%@。%@";
+"%lld items could not be moved: %@. %@" = "有 %lld 个项目无法移动：%@。%@";
+"System" = "系统";
+"Projects" = "项目";
+"Installers" = "安装器";
+"Leftovers" = "残留文件";
+"Drives" = "磁盘";
+
+/* Island Tools tab (the Command Hub's launch buttons, on the island) */
+"Tools" = "工具";
+"Settings" = "设置";
+"Pick an app and move it and its files to the Trash" = "选取一个 App，将它及其文件移到废纸篓";
+"Open Zenith's settings" = "打开 Zenith 的设置";
+"Scanning for system junk…" = "正在扫描系统垃圾…";
+
+/* Island pages (the island grown into a tool: System, Cleaner, Ports, Homebrew, Settings) */
+"System junk, project build folders, old installers and leftovers" = "系统垃圾、项目构建文件夹、旧安装器和残留文件";
+"Processes listening on network ports" = "正在监听网络端口的进程";
+"Installed and outdated Homebrew packages" = "已安装和已过期的 Homebrew 软件包";
+
+/* Menu bar icon (Settings › Dynamic Island › Behavior) */
+"Menu Bar Icon" = "菜单栏图标";
+
+/* Island dock and Tools page */
+"All Tools" = "所有工具";
+"Quick Clean" = "快速清理";
+"Uninstall App" = "卸载 App";
+"Capture" = "截屏";
+"Everyday" = "日常";
+"Back" = "返回";
+"%@: On" = "%@：开";
+"%@: Off" = "%@：关";
+"Every tool, in groups" = "所有工具，按组排列";
+"Look sites up over encrypted DNS through a local proxy" = "通过本地代理使用加密 DNS 查询网站";
+"Keep the Mac from going to sleep on its own" = "防止 Mac 自动进入睡眠";
+"Tool Dock" = "工具 Dock";
+"A row of tools under the open island, and a page with all of them. The Command Hub then leaves its own buttons out; searching there still finds them." = "灵动岛展开时下方的一排工具，以及包含全部工具的页面。Command Hub 随即不再显示自己的按钮；在其中搜索仍可找到它们。";
+"Also keep Zenith in the menu bar, with the Command Hub. It is always there while the tool dock is off, and opening Zenith again from Finder or Spotlight shows these settings either way." = "同时在菜单栏保留 Zenith 及其 Command Hub。工具 Dock 关闭时图标始终显示；无论如何，从访达或聚焦再次打开 Zenith 都会显示这些设置。";
+
+/* Arranging the island dock */
+"Dock" = "Dock";
+"Reset" = "还原";
+"Edit Dock…" = "编辑 Dock…";
+"Move Left" = "左移";
+"Move Right" = "右移";
+"Remove from Dock" = "从 Dock 移除";
+"On the dock" = "已在 Dock 上";
+"Not on the dock" = "不在 Dock 上";
+"All Tools is always the last icon on the dock" = "“所有工具”始终是 Dock 上的最后一个图标";
+"Click a tool to put it on the dock or take it off. Drag the icons here to reorder." = "点按工具可将其加入或移出 Dock。拖移此处的图标可重新排序。";
+"The dock is full. Click a tool on it to take it off, or drag to reorder." = "Dock 已满。点按其中的工具将其移出，或拖移以重新排序。";
+"Running apps, CPU, memory, storage and network speed" = "正在运行的 App、CPU、内存、存储空间和网速";
+"Privacy Shield Settings…" = "Privacy Shield 设置…";
+"Search running apps" = "搜索正在运行的 App";
+"Keep the Mac awake for" = "让 Mac 保持唤醒";

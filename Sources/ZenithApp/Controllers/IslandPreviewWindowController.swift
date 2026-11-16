@@ -48,7 +48,9 @@ public final class IslandPreviewWindowController: NSObject {
         let cardHeight: CGFloat = item.isImageFile ? 320 : (item.isTextOrCodeFile ? 280 : 250)
 
         let x = geometry.notchRect.midX - (cardWidth / 2)
-        let y = geometry.expandedFrame.minY - cardHeight - 8
+        // Under the island as it is drawn, dock included.
+        let islandFrame = geometry.expandedFrame(page: nil, showsDock: ZenithIslandState.shared.showsToolsTab)
+        let y = islandFrame.minY - cardHeight - 8
         let targetFrame = NSRect(x: x, y: y, width: cardWidth, height: cardHeight)
         self.currentFrame = targetFrame
 
@@ -104,7 +106,7 @@ public final class IslandPreviewWindowController: NSObject {
             guard let self = self else { return }
             let mouseLoc = NSEvent.mouseLocation
             let previewBounds = self.panel?.frame ?? .zero
-            let islandBounds = geometry.expandedFrame
+            let islandBounds = geometry.expandedFrame(page: nil, showsDock: true)
 
             // Dismiss if click is outside both the preview card and the Dynamic Island
             if !previewBounds.contains(mouseLoc) && !islandBounds.contains(mouseLoc) {
