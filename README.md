@@ -27,7 +27,7 @@ Zenith lives in your Menu Bar as a lightweight accessory app (no Dock icon), bri
 ### Option 1: Download Pre-built DMG Installer (Recommended)
 Download the latest disk image from [GitHub Releases](https://github.com/mynameisbat/zenith-macos/releases):
 
-1. Download **`Zenith-2.5.0.dmg`** (or latest release).
+1. Download **`Zenith-2.6.0.dmg`** (or latest release).
 2. Double-click the DMG file to mount it.
 3. Drag **Zenith.app** into your **Applications** folder.
 4. Launch Zenith from Spotlight or Applications.
@@ -35,7 +35,7 @@ Download the latest disk image from [GitHub Releases](https://github.com/mynamei
 #### Terminal / CLI Installation
 ```bash
 # Mount DMG and copy to /Applications
-hdiutil attach Zenith-2.5.0.dmg
+hdiutil attach Zenith-2.6.0.dmg
 cp -R "/Volumes/Zenith/Zenith.app" /Applications/
 hdiutil detach "/Volumes/Zenith"
 
@@ -153,11 +153,10 @@ The certificate that signs a release is what installed copies trust for automati
 - **Keep Awake asks for how long**: clicking the mug while Keep Awake is off shows 15 min, 1 h, 2 h, 5 h and Until Turned Off right on the dock (or at the bottom of the Tools page); clicking it while on turns it off. While it is on, the line above the dock says how long is left when the pointer is on the mug. The other modes (while chosen apps run, while on the power adapter) are in the mug's right-click menu.
 - **Your own dock**: the dock holds up to six tools of your choice, in your order, followed by All Tools (which stays, as the way to everything else). On the Tools page press **Edit**: click a tool to put it on the dock or take it off, drag the icons on the strip at the bottom to reorder them, **Reset** for the original six, **Done** when finished. Right-clicking an icon on the dock itself offers Move Left, Move Right, Remove from Dock and Edit Dock…. Every change is saved as you make it.
 - **Tools page** (the dock's last icon): every tool with its full name, in four groups (Capture, Everyday, Clean Up, System). Settings and Quit are two small buttons in the page's top corner, apart from the tools.
-- **Pages**: Uninstall App, Cleaner, System, Ports, Homebrew and Settings open *inside* the island, which grows to fit them (System is what the machine is doing: running apps, CPU, memory, storage and network speed; Privacy Shield and Keep Awake are switches on the dock and the Tools page, and a right-click on them gives Keep Awake's durations and Privacy Shield's settings). A page stays open when the pointer leaves it; close it with its ✕, with Escape, with the back arrow (one step back) or by clicking anywhere else. While a page is open the island takes the keyboard for its search and text fields without bringing Zenith in front, notices use the floating panel under the page, and volume and brightness bars are not drawn. While the island has its dock the Command Hub leaves out its quick-action grid and its Clean and Boost buttons; typing in the hub's search field still finds and runs an action.
+- **Pages**: Uninstall App, Cleaner, System, Ports, Homebrew and Settings open *inside* the island, which grows to fit them (System is what the machine is doing: running apps, CPU, memory, storage and network speed; Privacy Shield and Keep Awake are switches on the dock and the Tools page, and a right-click on them gives Keep Awake's durations and Privacy Shield's settings). A page stays open when the pointer leaves it; close it with its ✕, with Escape, with the back arrow (one step back) or by clicking anywhere else. While a page is open the island takes the keyboard for its search and text fields without bringing Zenith in front, and notices use the floating panel under the page. While the island has its dock the Command Hub leaves out its quick-action grid and its Clean and Boost buttons; typing in the hub's search field still finds and runs an action.
 - **No menu bar icon by default**: everything is reached from the island, and anything that used to open the Settings window opens the island's Settings page instead (the window is only used while a full-screen app has hidden the island). Opening Zenith again from Finder or Spotlight while it runs shows the settings, so there is always a way in. The icon and the Command Hub popover come back with Settings → Dynamic Island → Behavior → Menu Bar Icon, and by themselves whenever the tool dock is switched off.
-- **Volume and brightness bar**: changing the volume (keys or Control Center) shows a level bar on the island. Brightness-key presses do too, read from the built-in display only; that part relies on macOS delivering the brightness keys to Zenith and has not been confirmed on a real keyboard yet. The system's own indicator still appears.
 - **Full-screen apps**: the island hides while an app is full screen on its display, both a real macOS full-screen Space and an app that covers the whole display with its own window (a game, a video player). Notices then use the floating panel. An app that goes full screen without a change of app is noticed only when the pointer comes near the island, a notice is about to show, or the app is activated again.
-- **Behavior settings** (Settings → Dynamic Island → Behavior): Volume and Brightness, Hover Delay, Swipe Gestures and Hide in Full-Screen Apps. Each switch can be turned off.
+- **Behavior settings** (Settings → Dynamic Island → Behavior): Tool Dock, Menu Bar Icon, Hover Delay, Swipe Gestures and Hide in Full-Screen Apps. Each switch can be turned off.
 - **Widgets** (Settings → Dynamic Island):
   - **Focus timer**: a Pomodoro-style timer (25-minute focus, 5-minute break by default, both adjustable). While it runs, a progress ring and the time left sit either side of the notch; pause, resume or stop it from the island or from Settings. When it ends the island says so (with a sound if sound effects are on) and offers the break, or the next focus session.
   - **Next calendar event**: your next timed event in the next 12 hours (or the one going on now) with how long until it starts, in its calendar's color. Off until you turn it on; macOS then asks for Calendar access. Events are read on your Mac only, through EventKit.
