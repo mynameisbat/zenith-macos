@@ -6,7 +6,9 @@ import ZenithCore
 
 /// Specialized non-activating floating panel positioned at the top of the screen for Zenith Island.
 public final class ZenithIslandPanel: NSPanel {
-    public override var canBecomeKey: Bool { false }
+    /// Only while a page is open: its search fields and text fields need the keyboard. The panel is non-activating,
+    /// so taking the keyboard does not bring Zenith in front of the app being used.
+    public override var canBecomeKey: Bool { ZenithIslandState.shared.page != nil }
     public override var canBecomeMain: Bool { false }
 
     public override init(
@@ -26,6 +28,9 @@ public final class ZenithIslandPanel: NSPanel {
         self.acceptsMouseMovedEvents = true
         self.ignoresMouseEvents = true
         self.animationBehavior = .none
+        // The island is black whatever the system appearance is, and its pages show views written for windows:
+        // dark, so their text and controls are drawn for a dark background.
+        self.appearance = NSAppearance(named: .darkAqua)
     }
 }
 
@@ -92,10 +97,20 @@ public final class ZenithIslandHostingView: NSHostingView<ZenithDynamicIslandVie
         guard ZenithIslandState.shared.isExpanded,
               ZenithIslandState.shared.activeAlert == nil,
               ZenithIslandState.shared.isHovered || ZenithIslandState.shared.isDropTargeted,
-              bounds.contains(localPoint) else {
+              expandedHitRect.contains(localPoint) else {
             return nil
         }
         return super.hitTest(point)
+    }
+
+    /// The open island inside this view. The view is the whole canvas, which is larger than a tab and, for a moment
+    /// after a page closes, larger than the island.
+    private var expandedHitRect: NSRect {
+        let state = ZenithIslandState.shared
+        let size = ZenithIslandWindowController.shared.currentGeometry.expandedSize(page: state.page, showsDock: state.showsToolsTab)
+        let x = (bounds.width - size.width) / 2
+        let y = isFlipped ? 0 : (bounds.height - size.height)
+        return NSRect(x: x, y: y, width: size.width, height: size.height)
     }
 
     private var idleHitRect: NSRect {
@@ -128,7 +143,7 @@ public final class ZenithIslandHostingView: NSHostingView<ZenithDynamicIslandVie
     /// Hit target for cursor hover detection. Transient alerts must never expand the drop shelf on hover.
     private var currentHoverHitRect: NSRect {
         if ZenithIslandState.shared.isExpanded || ZenithIslandState.shared.isDropTargeted {
-            return bounds
+            return expandedHitRect
         } else if ZenithIslandState.shared.hasCompactActivity {
             return nowPlayingHitRect
         } else {
@@ -139,7 +154,7 @@ public final class ZenithIslandHostingView: NSHostingView<ZenithDynamicIslandVie
     /// Hit target for drag-and-drop operations, allowing files dragged onto the notch or alert capsule to stage.
     private var currentDragHitRect: NSRect {
         if ZenithIslandState.shared.isExpanded || ZenithIslandState.shared.isDropTargeted {
-            return bounds
+            return expandedHitRect
         } else if ZenithIslandState.shared.activeAlert != nil {
             return alertHitRect
         } else {
@@ -274,6 +289,12 @@ public final class ZenithIslandWindowController: NSObject {
     private var fullscreenObservers: [NSObjectProtocol] = []
     private var localScrollMonitor: Any?
     private var localClickMonitor: Any?
+    /// Installed only while a page is open: a click anywhere else, or Escape, closes it.
+    private var pageOutsideClickMonitor: Any?
+    private var pageKeyMonitor: Any?
+    private var canvasShrinkTask: Task<Void, Never>?
+    /// The open page's frame with a margin, kept under `mouseStateLock` for the mouse monitors.
+    private var pageInteractionRect: CGRect?
     private var lastPointerCoverCheck: TimeInterval = 0
     private var scrollGesture = IslandScrollGesture()
     private let mouseStateLock = NSLock()
@@ -289,7 +310,7 @@ public final class ZenithIslandWindowController: NSObject {
         guard panel == nil else { return }
 
         self.geometry = ZenithIslandGeometry()
-        let initialFrame = geometry.expandedFrame
+        let initialFrame = geometry.canvasFrame(page: nil)
 
         let islandPanel = ZenithIslandPanel(
             contentRect: initialFrame,
@@ -378,6 +399,18 @@ public final class ZenithIslandWindowController: NSObject {
             }
             .store(in: &cancellables)
 
+        // A page opening or closing: the canvas grows before the island does and shrinks after it has, the panel
+        // takes the keyboard for the page's fields, and a click elsewhere closes the page.
+        ZenithIslandState.shared.$page
+            .removeDuplicates()
+            .sink { [weak self] page in
+                // Before the view draws the page: a page drawn in the small canvas would be cut off.
+                self?.growCanvas(for: page)
+                // The new value is published before it is stored; the rest reads the state.
+                Task { @MainActor [weak self] in self?.handlePageChange(page) }
+            }
+            .store(in: &cancellables)
+
         // Observe drop shelf preview item state changes
         ZenithIslandState.shared.$previewItem
             .removeDuplicates()
@@ -409,7 +442,7 @@ public final class ZenithIslandWindowController: NSObject {
             // Fast-path guard: if cursor is outside the dynamic island interactive region
             // and the panel is already ignoring mouse events while idle, skip scheduling
             // an asynchronous Task on @MainActor.
-            let idleInteractionRect = self.geometry.idleFrame.insetBy(dx: -30, dy: -30)
+            let idleInteractionRect = self.pointerInteractionRect
             if !idleInteractionRect.contains(mouseLoc) {
                 self.mouseStateLock.lock()
                 let ignoring = self.isIgnoringMouseEvents
@@ -426,7 +459,7 @@ public final class ZenithIslandWindowController: NSObject {
         self.localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] event in
             guard let self = self else { return event }
             let mouseLoc = NSEvent.mouseLocation
-            let idleInteractionRect = self.geometry.idleFrame.insetBy(dx: -30, dy: -30)
+            let idleInteractionRect = self.pointerInteractionRect
             if !idleInteractionRect.contains(mouseLoc) {
                 self.mouseStateLock.lock()
                 let ignoring = self.isIgnoringMouseEvents
@@ -515,12 +548,90 @@ public final class ZenithIslandWindowController: NSObject {
         handleMouseMoved(screenPoint: NSEvent.mouseLocation)
     }
 
+    private func growCanvas(for page: IslandPage?) {
+        guard let panel = panel, let page else { return }
+        canvasShrinkTask?.cancel()
+        canvasShrinkTask = nil
+        let frame = geometry.canvasFrame(page: page)
+        if !panel.frame.equalTo(frame) { panel.setFrame(frame, display: true) }
+        mouseStateLock.lock()
+        pageInteractionRect = frame.insetBy(dx: -30, dy: -30)
+        mouseStateLock.unlock()
+    }
+
+    private func handlePageChange(_ page: IslandPage?) {
+        guard let panel = panel else { return }
+
+        if page != nil {
+            panel.orderFrontRegardless()
+            panel.makeKey()
+            installPageMonitors()
+        } else {
+            removePageMonitors()
+            mouseStateLock.lock()
+            pageInteractionRect = nil
+            mouseStateLock.unlock()
+            // Let the closing morph finish inside the large canvas, then give the screen back.
+            canvasShrinkTask?.cancel()
+            canvasShrinkTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 450_000_000)
+                guard let self = self, !Task.isCancelled else { return }
+                self.canvasShrinkTask = nil
+                guard ZenithIslandState.shared.page == nil, let panel = self.panel else { return }
+                let frame = self.geometry.canvasFrame(page: nil)
+                if !panel.frame.equalTo(frame) { panel.setFrame(frame, display: true) }
+            }
+        }
+        handleMouseMoved(screenPoint: NSEvent.mouseLocation)
+    }
+
+    /// Where the pointer has to be for a mouse move to matter: around the closed island, or around the page while
+    /// one is open (a page stays open with the pointer away, and must wake up when it comes back).
+    private var pointerInteractionRect: CGRect {
+        mouseStateLock.lock()
+        defer { mouseStateLock.unlock() }
+        return pageInteractionRect ?? geometry.idleFrame.insetBy(dx: -30, dy: -30)
+    }
+
+    private func installPageMonitors() {
+        if pageOutsideClickMonitor == nil {
+            // Only clicks that go to other apps arrive here, so a confirmation Zenith itself shows does not close
+            // the page it was asked from.
+            pageOutsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+                let location = NSEvent.mouseLocation
+                Task { @MainActor [weak self] in
+                    guard let self = self, ZenithIslandState.shared.page != nil,
+                          !self.activeScreenRect.contains(location) else { return }
+                    ZenithIslandState.shared.close()
+                }
+            }
+        }
+        if pageKeyMonitor == nil {
+            pageKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self = self, event.window === self.panel, event.keyCode == 53,
+                      ZenithIslandState.shared.page != nil else { return event }
+                // Escape belongs to a text being composed (Chinese, Japanese, Korean input) before it closes the page.
+                if let editor = event.window?.firstResponder as? NSTextView, editor.hasMarkedText() { return event }
+                ZenithIslandState.shared.close()
+                return nil
+            }
+        }
+    }
+
+    private func removePageMonitors() {
+        for monitor in [pageOutsideClickMonitor, pageKeyMonitor].compactMap({ $0 }) {
+            NSEvent.removeMonitor(monitor)
+        }
+        pageOutsideClickMonitor = nil
+        pageKeyMonitor = nil
+    }
+
     /// Evaluates cursor position to toggle mouse click passthrough.
     /// The island as it is drawn now, in screen coordinates: what the pointer can hover, click and swipe.
     private var activeScreenRect: CGRect {
         let state = ZenithIslandState.shared
         if state.isExpanded || state.isDropTargeted {
-            return geometry.expandedFrame
+            return geometry.expandedFrame(page: state.page, showsDock: state.showsToolsTab)
         } else if state.activeAlert != nil {
             return geometry.alertFrame
         } else if state.hasCompactActivity {
@@ -557,8 +668,9 @@ public final class ZenithIslandWindowController: NSObject {
 
     private func handleScroll(_ sample: IslandScrollGesture.Sample, screenPoint: NSPoint) {
         let state = ZenithIslandState.shared
+        // A page scrolls its own lists: a swipe there is not a gesture on the island.
         guard state.isEnabled, state.allowsScrollGestures, !state.isHiddenForFullscreen, panel != nil,
-              state.activeAlert == nil, activeScreenRect.contains(screenPoint) else { return }
+              state.activeAlert == nil, state.page == nil, activeScreenRect.contains(screenPoint) else { return }
 
         // Sideways belongs to the shelf when it is showing: its items scroll that way.
         let showsPlayer = !state.isExpanded || state.activeTab == .nowPlaying
@@ -674,8 +786,9 @@ public final class ZenithIslandWindowController: NSObject {
 
         // Ensure canvas frame is permanently centered symmetrically around geom.notchRect.midX.
         // Maintaining a stable canvas frame prevents window origin jumps that cause left-skewed distortion on hover.
-        let targetFrame = geometry.expandedFrame
-        if !panel.frame.equalTo(targetFrame) {
+        // (While a page is open, or closing, the canvas is the page's: `handlePageChange` owns the frame then.)
+        let targetFrame = geometry.canvasFrame(page: nil)
+        if ZenithIslandState.shared.page == nil, canvasShrinkTask == nil, !panel.frame.equalTo(targetFrame) {
             panel.setFrame(targetFrame, display: false)
         }
         if newMode == .idle {
@@ -694,7 +807,7 @@ public final class ZenithIslandWindowController: NSObject {
     @objc private func screenParametersChanged() {
         self.geometry = ZenithIslandGeometry()
         if let panel = panel {
-            let targetFrame = geometry.expandedFrame
+            let targetFrame = geometry.canvasFrame(page: ZenithIslandState.shared.page)
             panel.setFrame(targetFrame, display: false)
             if let hosted = panel.contentView as? ZenithIslandHostingView {
                 hosted.rootView = ZenithDynamicIslandView(geometry: self.geometry)
@@ -721,6 +834,9 @@ public final class ZenithIslandWindowController: NSObject {
         }
         collapseTask?.cancel()
         collapseTask = nil
+        canvasShrinkTask?.cancel()
+        canvasShrinkTask = nil
+        removePageMonitors()
         cancellables.removeAll()
         fullscreenObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         fullscreenObservers.removeAll()

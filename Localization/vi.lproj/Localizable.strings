@@ -1065,3 +1065,81 @@
 "If your custom resolver filters ads, its blocks are counted here too, and Never Block applies to it." = "Nếu resolver tùy chỉnh của bạn có lọc quảng cáo, các lần chặn của nó cũng được đếm ở đây, và Không bao giờ chặn cũng áp dụng cho nó.";
 "Nothing is blocked: your lists are empty and this resolver does not filter ads. Use AdGuard DNS below, or import a list." = "Không có gì bị chặn: danh sách của bạn trống và resolver này không lọc quảng cáo. Hãy dùng AdGuard DNS bên dưới, hoặc nhập một danh sách.";
 "Ad blocking has no list: choose AdGuard DNS in Settings › Privacy Shield, or import a list." = "Chặn quảng cáo chưa có danh sách: chọn AdGuard DNS trong Cài đặt › Privacy Shield, hoặc nhập một danh sách.";
+
+/* App uninstaller (Settings › Cleaner › Uninstall) and the Cleaner tab's section names */
+"Uninstall an app" = "Gỡ cài đặt ứng dụng";
+"Pick an app to see the files it keeps in your Library. Nothing is removed until you confirm, and everything goes to the Trash. Apps that are part of macOS are not listed." = "Chọn một ứng dụng để xem các tệp nó lưu trong Thư viện của bạn. Không có gì bị xoá cho tới khi bạn xác nhận, và mọi thứ đều được chuyển vào Thùng rác. Các ứng dụng thuộc macOS không được liệt kê.";
+"Choose App" = "Chọn ứng dụng";
+"Pick an app that is not in the Applications folder" = "Chọn một ứng dụng không nằm trong thư mục Ứng dụng";
+"Search apps" = "Tìm ứng dụng";
+"Looking for apps…" = "Đang tìm ứng dụng…";
+"No apps found in the Applications folders." = "Không tìm thấy ứng dụng nào trong các thư mục Ứng dụng.";
+"No app matches your search." = "Không có ứng dụng nào khớp với từ khoá.";
+"All Apps" = "Tất cả ứng dụng";
+"The app and the files it keeps in your Library. Files that only carry the app's name are not ticked for you: check that they are this app's before you tick them. Everything goes to the Trash." = "Ứng dụng và các tệp nó lưu trong Thư viện của bạn. Những tệp chỉ trùng tên ứng dụng không được đánh dấu sẵn: hãy kiểm tra xem chúng có đúng là của ứng dụng này trước khi đánh dấu. Mọi thứ đều được chuyển vào Thùng rác.";
+"The app itself · %@" = "Chính ứng dụng · %@";
+"%@ · matched by name only" = "%@ · chỉ khớp theo tên";
+"%@ is open and will be asked to quit first. %@ will go to the Trash, where you can still restore it:\n%@" = "%@ đang mở và sẽ được yêu cầu thoát trước. %@ sẽ được chuyển vào Thùng rác, nơi bạn vẫn có thể khôi phục:\n%@";
+"%@ and its files are in the Trash." = "%@ và các tệp của nó đã nằm trong Thùng rác.";
+"%@ is not an app." = "%@ không phải là ứng dụng.";
+"%@ is part of macOS or made by Apple, so Zenith leaves it alone." = "%@ thuộc macOS hoặc do Apple làm ra, nên Zenith không đụng tới.";
+"%@ is a part of another app. Uninstall that app instead." = "%@ là một phần của ứng dụng khác. Hãy gỡ cài đặt ứng dụng đó.";
+"Zenith can't tell which files belong to %@, so it won't uninstall it." = "Zenith không xác định được tệp nào thuộc về %@, nên sẽ không gỡ cài đặt nó.";
+"Zenith can't uninstall itself. Quit it and move it to the Trash in Finder." = "Zenith không thể tự gỡ cài đặt chính nó. Hãy thoát Zenith rồi chuyển nó vào Thùng rác trong Finder.";
+"Apps that are part of macOS or made by Apple can't be uninstalled here." = "Không thể gỡ cài đặt tại đây các ứng dụng thuộc macOS hoặc do Apple làm ra.";
+"%@ is still open, so nothing was removed. Quit it, then try again." = "%@ vẫn đang mở nên chưa có gì bị xoá. Hãy thoát ứng dụng rồi thử lại.";
+"1 item could not be moved: %@. %@" = "Không chuyển được 1 mục: %@. %@";
+"%lld items could not be moved: %@. %@" = "Không chuyển được %lld mục: %@. %@";
+"System" = "Hệ thống";
+"Projects" = "Dự án";
+"Installers" = "Bộ cài đặt";
+"Leftovers" = "Phần sót lại";
+"Drives" = "Ổ đĩa";
+
+/* Island Tools tab (the Command Hub's launch buttons, on the island) */
+"Tools" = "Công cụ";
+"Settings" = "Cài đặt";
+"Pick an app and move it and its files to the Trash" = "Chọn một ứng dụng rồi chuyển nó cùng các tệp của nó vào Thùng rác";
+"Open Zenith's settings" = "Mở cài đặt của Zenith";
+"Scanning for system junk…" = "Đang quét rác hệ thống…";
+
+/* Island pages (the island grown into a tool: System, Cleaner, Ports, Homebrew, Settings) */
+"System junk, project build folders, old installers and leftovers" = "Rác hệ thống, thư mục build của dự án, bộ cài đặt cũ và phần sót lại";
+"Processes listening on network ports" = "Các tiến trình đang lắng nghe trên cổng mạng";
+"Installed and outdated Homebrew packages" = "Các gói Homebrew đã cài và đã lỗi thời";
+
+/* Menu bar icon (Settings › Dynamic Island › Behavior) */
+"Menu Bar Icon" = "Biểu tượng trên thanh menu";
+
+/* Island dock and Tools page */
+"All Tools" = "Tất cả công cụ";
+"Quick Clean" = "Dọn nhanh";
+"Uninstall App" = "Gỡ ứng dụng";
+"Capture" = "Chụp màn hình";
+"Everyday" = "Hằng ngày";
+"Back" = "Quay lại";
+"%@: On" = "%@: Bật";
+"%@: Off" = "%@: Tắt";
+"Every tool, in groups" = "Mọi công cụ, chia theo nhóm";
+"Look sites up over encrypted DNS through a local proxy" = "Tra cứu tên miền qua DNS mã hoá bằng một proxy cục bộ";
+"Keep the Mac from going to sleep on its own" = "Giữ cho máy Mac không tự ngủ";
+"Tool Dock" = "Dock công cụ";
+"A row of tools under the open island, and a page with all of them. The Command Hub then leaves its own buttons out; searching there still finds them." = "Một hàng công cụ dưới island khi mở, và một trang có đủ mọi công cụ. Khi đó Command Hub bỏ các nút của nó; tìm kiếm ở đó vẫn ra chúng.";
+"Also keep Zenith in the menu bar, with the Command Hub. It is always there while the tool dock is off, and opening Zenith again from Finder or Spotlight shows these settings either way." = "Giữ thêm Zenith trên thanh menu, kèm Command Hub. Biểu tượng luôn hiện khi dock công cụ đang tắt, và dù thế nào thì mở lại Zenith từ Finder hoặc Spotlight cũng hiện phần cài đặt này.";
+
+/* Arranging the island dock */
+"Dock" = "Dock";
+"Reset" = "Đặt lại";
+"Edit Dock…" = "Sửa dock…";
+"Move Left" = "Chuyển sang trái";
+"Move Right" = "Chuyển sang phải";
+"Remove from Dock" = "Gỡ khỏi dock";
+"On the dock" = "Đang ở trên dock";
+"Not on the dock" = "Không ở trên dock";
+"All Tools is always the last icon on the dock" = "Tất cả công cụ luôn là biểu tượng cuối cùng trên dock";
+"Click a tool to put it on the dock or take it off. Drag the icons here to reorder." = "Bấm một công cụ để đưa lên dock hoặc gỡ xuống. Kéo các biểu tượng ở đây để đổi thứ tự.";
+"The dock is full. Click a tool on it to take it off, or drag to reorder." = "Dock đã đầy. Bấm một công cụ trên dock để gỡ xuống, hoặc kéo để đổi thứ tự.";
+"Running apps, CPU, memory, storage and network speed" = "Ứng dụng đang chạy, CPU, bộ nhớ, ổ đĩa và tốc độ mạng";
+"Privacy Shield Settings…" = "Cài đặt Privacy Shield…";
+"Search running apps" = "Tìm ứng dụng đang chạy";
+"Keep the Mac awake for" = "Giữ máy Mac thức trong";

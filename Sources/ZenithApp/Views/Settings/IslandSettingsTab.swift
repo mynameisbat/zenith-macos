@@ -75,6 +75,33 @@ public struct IslandSettingsTab: View {
 
             ZenithSettingsSection("Behavior") {
                 ZenithSettingsRow(
+                    "Menu Bar Icon",
+                    subtitle: "Also keep Zenith in the menu bar, with the Command Hub. It is always there while the tool dock is off, and opening Zenith again from Finder or Spotlight shows these settings either way.",
+                    symbol: "menubar.rectangle",
+                    tint: ZenithTint.general
+                ) {
+                    Toggle("Menu Bar Icon", isOn: $settings.showMenuBarIcon)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .disabled(!settings.showTools)
+                }
+
+                ZenithSettingsDivider(inset: 44)
+
+                ZenithSettingsRow(
+                    "Tool Dock",
+                    subtitle: "A row of tools under the open island, and a page with all of them. The Command Hub then leaves its own buttons out; searching there still finds them.",
+                    symbol: "square.grid.2x2.fill",
+                    tint: ZenithTint.island
+                ) {
+                    Toggle("Tool Dock", isOn: $settings.showTools)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                }
+
+                ZenithSettingsDivider(inset: 44)
+
+                ZenithSettingsRow(
                     "Volume and Brightness",
                     subtitle: "Show the level on the island when you change it.",
                     symbol: "speaker.wave.2.fill",

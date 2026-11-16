@@ -15,6 +15,12 @@ public enum KeepAwakeMode: Sendable, Equatable, Hashable {
     /// The durations offered in menus.
     public static let presetDurations: [TimeInterval] = [15 * 60, 3_600, 2 * 3_600, 5 * 3_600]
 
+    /// What the island offers when Keep Awake is turned on from its button: the preset times, then "until turned
+    /// off". A click that silently meant "forever" left the user asking how long it would hold.
+    public static var quickChoices: [KeepAwakeMode] {
+        presetDurations.map { KeepAwakeMode.duration($0) } + [.indefinite]
+    }
+
     public var title: String {
         switch self {
         case .duration(let seconds): return Self.durationTitle(seconds)

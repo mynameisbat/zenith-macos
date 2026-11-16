@@ -1065,3 +1065,81 @@
 "If your custom resolver filters ads, its blocks are counted here too, and Never Block applies to it." = "Wenn dein eigener Resolver Werbung filtert, werden seine Blockierungen hier ebenfalls gezählt, und „Nie blockieren“ gilt auch für ihn.";
 "Nothing is blocked: your lists are empty and this resolver does not filter ads. Use AdGuard DNS below, or import a list." = "Nichts wird blockiert: Deine Listen sind leer und dieser Resolver filtert keine Werbung. Verwende unten AdGuard DNS oder importiere eine Liste.";
 "Ad blocking has no list: choose AdGuard DNS in Settings › Privacy Shield, or import a list." = "Der Werbeblocker hat keine Liste: Wähle AdGuard DNS unter Einstellungen › Privacy Shield oder importiere eine Liste.";
+
+/* App uninstaller (Settings › Cleaner › Uninstall) and the Cleaner tab's section names */
+"Uninstall an app" = "App deinstallieren";
+"Pick an app to see the files it keeps in your Library. Nothing is removed until you confirm, and everything goes to the Trash. Apps that are part of macOS are not listed." = "Wähle eine App, um die Dateien zu sehen, die sie in deiner Library ablegt. Nichts wird entfernt, bevor du bestätigst, und alles wird in den Papierkorb gelegt. Apps, die zu macOS gehören, werden nicht aufgeführt.";
+"Choose App" = "App auswählen";
+"Pick an app that is not in the Applications folder" = "Eine App auswählen, die nicht im Ordner „Programme“ liegt";
+"Search apps" = "Apps suchen";
+"Looking for apps…" = "Apps werden gesucht …";
+"No apps found in the Applications folders." = "In den Programme-Ordnern wurden keine Apps gefunden.";
+"No app matches your search." = "Keine App entspricht deiner Suche.";
+"All Apps" = "Alle Apps";
+"The app and the files it keeps in your Library. Files that only carry the app's name are not ticked for you: check that they are this app's before you tick them. Everything goes to the Trash." = "Die App und die Dateien, die sie in deiner Library ablegt. Dateien, die nur den Namen der App tragen, sind nicht vorausgewählt: Prüfe, ob sie wirklich zu dieser App gehören, bevor du sie auswählst. Alles wird in den Papierkorb gelegt.";
+"The app itself · %@" = "Die App selbst · %@";
+"%@ · matched by name only" = "%@ · nur über den Namen zugeordnet";
+"%@ is open and will be asked to quit first. %@ will go to the Trash, where you can still restore it:\n%@" = "%@ ist geöffnet und wird zuerst zum Beenden aufgefordert. %@ wird in den Papierkorb gelegt, wo du es noch wiederherstellen kannst:\n%@";
+"%@ and its files are in the Trash." = "%@ und die zugehörigen Dateien liegen im Papierkorb.";
+"%@ is not an app." = "%@ ist keine App.";
+"%@ is part of macOS or made by Apple, so Zenith leaves it alone." = "%@ gehört zu macOS oder stammt von Apple, daher lässt Zenith es unangetastet.";
+"%@ is a part of another app. Uninstall that app instead." = "%@ ist Teil einer anderen App. Deinstalliere stattdessen diese App.";
+"Zenith can't tell which files belong to %@, so it won't uninstall it." = "Zenith kann nicht feststellen, welche Dateien zu %@ gehören, und deinstalliert es daher nicht.";
+"Zenith can't uninstall itself. Quit it and move it to the Trash in Finder." = "Zenith kann sich nicht selbst deinstallieren. Beende Zenith und lege es im Finder in den Papierkorb.";
+"Apps that are part of macOS or made by Apple can't be uninstalled here." = "Apps, die zu macOS gehören oder von Apple stammen, können hier nicht deinstalliert werden.";
+"%@ is still open, so nothing was removed. Quit it, then try again." = "%@ ist noch geöffnet, daher wurde nichts entfernt. Beende die App und versuche es erneut.";
+"1 item could not be moved: %@. %@" = "1 Objekt konnte nicht bewegt werden: %@. %@";
+"%lld items could not be moved: %@. %@" = "%lld Objekte konnten nicht bewegt werden: %@. %@";
+"System" = "System";
+"Projects" = "Projekte";
+"Installers" = "Installer";
+"Leftovers" = "Reste";
+"Drives" = "Laufwerke";
+
+/* Island Tools tab (the Command Hub's launch buttons, on the island) */
+"Tools" = "Werkzeuge";
+"Settings" = "Einstellungen";
+"Pick an app and move it and its files to the Trash" = "Eine App auswählen und sie mit ihren Dateien in den Papierkorb legen";
+"Open Zenith's settings" = "Einstellungen von Zenith öffnen";
+"Scanning for system junk…" = "Systemmüll wird gesucht …";
+
+/* Island pages (the island grown into a tool: System, Cleaner, Ports, Homebrew, Settings) */
+"System junk, project build folders, old installers and leftovers" = "Systemmüll, Build-Ordner von Projekten, alte Installationsprogramme und Reste";
+"Processes listening on network ports" = "Prozesse, die an Netzwerkports lauschen";
+"Installed and outdated Homebrew packages" = "Installierte und veraltete Homebrew-Pakete";
+
+/* Menu bar icon (Settings › Dynamic Island › Behavior) */
+"Menu Bar Icon" = "Menüleistensymbol";
+
+/* Island dock and Tools page */
+"All Tools" = "Alle Werkzeuge";
+"Quick Clean" = "Schnell reinigen";
+"Uninstall App" = "App deinstallieren";
+"Capture" = "Aufnahme";
+"Everyday" = "Alltag";
+"Back" = "Zurück";
+"%@: On" = "%@: Ein";
+"%@: Off" = "%@: Aus";
+"Every tool, in groups" = "Alle Werkzeuge, nach Gruppen";
+"Look sites up over encrypted DNS through a local proxy" = "Websites über verschlüsseltes DNS durch einen lokalen Proxy auflösen";
+"Keep the Mac from going to sleep on its own" = "Verhindern, dass der Mac von selbst in den Ruhezustand geht";
+"Tool Dock" = "Werkzeug-Dock";
+"A row of tools under the open island, and a page with all of them. The Command Hub then leaves its own buttons out; searching there still finds them." = "Eine Reihe von Werkzeugen unter der geöffneten Island und eine Seite mit allen Werkzeugen. Der Command Hub lässt seine eigenen Tasten dann weg; über die Suche dort findest du sie weiterhin.";
+"Also keep Zenith in the menu bar, with the Command Hub. It is always there while the tool dock is off, and opening Zenith again from Finder or Spotlight shows these settings either way." = "Zenith zusätzlich in der Menüleiste behalten, mit dem Command Hub. Das Symbol ist immer da, solange das Werkzeug-Dock aus ist, und in jedem Fall zeigt ein erneutes Öffnen von Zenith aus dem Finder oder Spotlight diese Einstellungen.";
+
+/* Arranging the island dock */
+"Dock" = "Dock";
+"Reset" = "Zurücksetzen";
+"Edit Dock…" = "Dock bearbeiten …";
+"Move Left" = "Nach links";
+"Move Right" = "Nach rechts";
+"Remove from Dock" = "Aus dem Dock entfernen";
+"On the dock" = "Im Dock";
+"Not on the dock" = "Nicht im Dock";
+"All Tools is always the last icon on the dock" = "„Alle Werkzeuge“ ist immer das letzte Symbol im Dock";
+"Click a tool to put it on the dock or take it off. Drag the icons here to reorder." = "Klicke auf ein Werkzeug, um es ins Dock zu legen oder daraus zu entfernen. Ziehe die Symbole hier, um sie neu anzuordnen.";
+"The dock is full. Click a tool on it to take it off, or drag to reorder." = "Das Dock ist voll. Klicke auf ein Werkzeug im Dock, um es zu entfernen, oder ziehe zum Neuanordnen.";
+"Running apps, CPU, memory, storage and network speed" = "Laufende Apps, CPU, Speicher, Festplatte und Netzwerkgeschwindigkeit";
+"Privacy Shield Settings…" = "Privacy Shield-Einstellungen …";
+"Search running apps" = "Laufende Apps suchen";
+"Keep the Mac awake for" = "Mac wach halten für";

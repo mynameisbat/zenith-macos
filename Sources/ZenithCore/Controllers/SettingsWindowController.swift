@@ -109,6 +109,11 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
 
     public var viewControllerProvider: (@MainActor () -> NSViewController)?
 
+    /// Asked first by `show()`. Returning true means the settings were shown somewhere else (the island's Settings
+    /// page), and the window stays closed. Every "open Settings" in the app goes through `show()`, so this one hook
+    /// moves them all.
+    public var presentationOverride: (@MainActor () -> Bool)?
+
     public override init(window: NSWindow? = nil) {
         super.init(window: window)
     }
@@ -123,6 +128,7 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
 
     /// Idempotently presents the Settings window, centering it and activating Zenith.
     public func show() {
+        if let presentationOverride, presentationOverride() { return }
         let win = window ?? createWindow()
         if win.isMiniaturized {
             win.deminiaturize(nil)

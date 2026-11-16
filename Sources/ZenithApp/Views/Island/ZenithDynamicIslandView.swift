@@ -37,11 +37,16 @@ public struct ZenithDynamicIslandView: View {
         restingHeight + (isEmphasized && geometry.hasNotch ? ZenithTheme.Island.hoverEmphasisDrop : 0)
     }
 
+    /// The open island's size: what is going on plus the dock, or the page it has grown into.
+    private var expandedSize: CGSize {
+        geometry.expandedSize(page: islandState.page, showsDock: islandState.showsToolsTab)
+    }
+
     private var restingWidth: CGFloat {
         if isDisplayingAlert {
             return geometry.alertWidth
         } else if islandState.isExpanded {
-            return geometry.expandedWidth
+            return expandedSize.width
         } else if islandState.compactActivityUsesWideWings {
             return geometry.timerIdleWidth
         } else if isNowPlayingActive {
@@ -55,7 +60,7 @@ public struct ZenithDynamicIslandView: View {
         if isDisplayingAlert {
             return geometry.effectiveAlertHeight
         } else if islandState.isExpanded {
-            return geometry.expandedHeight
+            return expandedSize.height
         } else if isNowPlayingActive {
             return geometry.nowPlayingIdleHeight
         } else {
@@ -178,6 +183,9 @@ public struct ZenithDynamicIslandView: View {
         .scaleEffect(islandState.isDropTargeted ? 1.015 : 1.0, anchor: .top)
         .animation(islandState.isExpanded ? ZenithIslandState.openingAnimation : ZenithIslandState.closingAnimation,
                    value: islandState.isExpanded)
+        .animation(islandState.page != nil ? ZenithIslandState.openingAnimation : ZenithIslandState.closingAnimation,
+                   value: islandState.page)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: islandState.currentTab)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.activeAlert)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isNowPlayingActive)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.focusTimer == nil)
@@ -318,7 +326,30 @@ public struct ZenithDynamicIslandView: View {
         )
     }
 
+    @ViewBuilder
     private var expandedIslandContent: some View {
+        if let page = islandState.page {
+            IslandPageView(page: page, geometry: geometry, islandState: islandState)
+                .frame(width: expandedSize.width, height: expandedSize.height, alignment: .top)
+        } else {
+            tabbedIslandContent
+        }
+    }
+
+    /// What is going on (music, a timer, an agent, staged files) in the island's usual 96 pt, and under it the dock
+    /// of tools. A file being dragged in gets the whole island: the dock steps aside for the drop.
+    private var tabbedIslandContent: some View {
+        VStack(spacing: 0) {
+            contextCard
+            if islandState.showsToolsTab {
+                IslandDock(islandState: islandState)
+                    .opacity(islandState.isDropTargeted ? 0.35 : 1)
+            }
+        }
+        .frame(width: geometry.expandedWidth, height: expandedSize.height, alignment: .top)
+    }
+
+    private var contextCard: some View {
         let tabs = availableTabs
         let current = currentTab
         let hasTabs = tabs.count > 1 && !islandState.isDropTargeted

@@ -9,7 +9,20 @@ public struct CleanerSettingsTab: View {
 
     private enum Section: String, CaseIterable, Identifiable {
         case system = "System", projects = "Projects", installers = "Installers", leftovers = "Leftovers", drives = "Drives"
+        case uninstall = "Uninstall"
         var id: String { rawValue }
+
+        /// (A literal, so the segment is translated; `Text(rawValue)` would show the English word.)
+        var title: LocalizedStringKey {
+            switch self {
+            case .system: return "System"
+            case .projects: return "Projects"
+            case .installers: return "Installers"
+            case .leftovers: return "Leftovers"
+            case .drives: return "Drives"
+            case .uninstall: return "Uninstall"
+            }
+        }
     }
 
     /// (Not `@State`: the SwiftUI macro plugin is not available to a Command Line Tools build.)
@@ -24,7 +37,7 @@ public struct CleanerSettingsTab: View {
 
     private func tool(for section: Section) -> CleanupToolModel? {
         switch section {
-        case .system: return nil
+        case .system, .uninstall: return nil
         case .projects: return tools.projects
         case .installers: return tools.installers
         case .leftovers: return tools.leftovers
@@ -32,10 +45,25 @@ public struct CleanerSettingsTab: View {
         }
     }
 
+    /// A section asked for from elsewhere (the island's Uninstall button), once.
+    private func takePendingSection() {
+        if let raw = CleanerSettingsLink.takePending(), let section = Section(rawValue: raw) {
+            sectionModel.section = section
+        }
+    }
+
     public var body: some View {
+        content
+            .onAppear { takePendingSection() }
+            .onReceive(NotificationCenter.default.publisher(for: CleanerSettingsLink.notification)) { _ in
+                takePendingSection()
+            }
+    }
+
+    private var content: some View {
         VStack(spacing: 0) {
             Picker("Cleaner", selection: $sectionModel.section) {
-                ForEach(Section.allCases) { Text($0.rawValue).tag($0) }
+                ForEach(Section.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -50,6 +78,12 @@ public struct CleanerSettingsTab: View {
                         .padding(.vertical, 16)
                 }
                 .id(sectionModel.section)
+            } else if sectionModel.section == .uninstall {
+                ScrollView(.vertical, showsIndicators: true) {
+                    AppUninstallerView(model: tools.uninstaller, projectRoots: tools.projectRoots)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                }
             } else {
                 systemCleaner
             }

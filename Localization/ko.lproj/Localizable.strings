@@ -1065,3 +1065,81 @@
 "If your custom resolver filters ads, its blocks are counted here too, and Never Block applies to it." = "사용자 지정 리졸버가 광고를 필터링한다면 그 차단도 여기에서 집계되며, '차단 안 함'도 적용됩니다.";
 "Nothing is blocked: your lists are empty and this resolver does not filter ads. Use AdGuard DNS below, or import a list." = "차단되는 항목이 없습니다: 목록이 비어 있고 이 리졸버는 광고를 필터링하지 않습니다. 아래의 AdGuard DNS를 사용하거나 목록을 가져오세요.";
 "Ad blocking has no list: choose AdGuard DNS in Settings › Privacy Shield, or import a list." = "광고 차단에 목록이 없습니다: 설정 › Privacy Shield에서 AdGuard DNS를 선택하거나 목록을 가져오세요.";
+
+/* App uninstaller (Settings › Cleaner › Uninstall) and the Cleaner tab's section names */
+"Uninstall an app" = "앱 제거";
+"Pick an app to see the files it keeps in your Library. Nothing is removed until you confirm, and everything goes to the Trash. Apps that are part of macOS are not listed." = "앱을 선택하면 라이브러리에 보관된 해당 앱의 파일을 볼 수 있습니다. 확인하기 전에는 아무것도 제거되지 않으며, 모든 항목은 휴지통으로 이동됩니다. macOS에 포함된 앱은 표시되지 않습니다.";
+"Choose App" = "앱 선택";
+"Pick an app that is not in the Applications folder" = "응용 프로그램 폴더에 없는 앱 선택";
+"Search apps" = "앱 검색";
+"Looking for apps…" = "앱을 찾는 중…";
+"No apps found in the Applications folders." = "응용 프로그램 폴더에서 앱을 찾을 수 없습니다.";
+"No app matches your search." = "검색과 일치하는 앱이 없습니다.";
+"All Apps" = "모든 앱";
+"The app and the files it keeps in your Library. Files that only carry the app's name are not ticked for you: check that they are this app's before you tick them. Everything goes to the Trash." = "앱과 라이브러리에 보관된 해당 앱의 파일입니다. 앱 이름만 같은 파일은 미리 선택되지 않습니다. 이 앱의 파일이 맞는지 확인한 후 선택하십시오. 모든 항목은 휴지통으로 이동됩니다.";
+"The app itself · %@" = "앱 자체 · %@";
+"%@ · matched by name only" = "%@ · 이름만 일치";
+"%@ is open and will be asked to quit first. %@ will go to the Trash, where you can still restore it:\n%@" = "%@이(가) 열려 있어 먼저 종료를 요청합니다. 총 %@ 분량의 항목이 휴지통으로 이동되며, 휴지통에서 복원할 수 있습니다:\n%@";
+"%@ and its files are in the Trash." = "%@ 및 해당 파일이 휴지통으로 이동되었습니다.";
+"%@ is not an app." = "%@은(는) 앱이 아닙니다.";
+"%@ is part of macOS or made by Apple, so Zenith leaves it alone." = "%@은(는) macOS의 일부이거나 Apple에서 만든 앱이므로 Zenith가 건드리지 않습니다.";
+"%@ is a part of another app. Uninstall that app instead." = "%@은(는) 다른 앱의 일부입니다. 대신 그 앱을 제거하십시오.";
+"Zenith can't tell which files belong to %@, so it won't uninstall it." = "어떤 파일이 %@에 속하는지 알 수 없어 Zenith가 제거하지 않습니다.";
+"Zenith can't uninstall itself. Quit it and move it to the Trash in Finder." = "Zenith는 자신을 제거할 수 없습니다. Zenith를 종료한 다음 Finder에서 휴지통으로 이동하십시오.";
+"Apps that are part of macOS or made by Apple can't be uninstalled here." = "macOS의 일부이거나 Apple에서 만든 앱은 여기에서 제거할 수 없습니다.";
+"%@ is still open, so nothing was removed. Quit it, then try again." = "%@이(가) 아직 열려 있어 아무것도 제거하지 않았습니다. 앱을 종료한 후 다시 시도하십시오.";
+"1 item could not be moved: %@. %@" = "1개 항목을 이동할 수 없습니다: %@. %@";
+"%lld items could not be moved: %@. %@" = "%lld개 항목을 이동할 수 없습니다: %@. %@";
+"System" = "시스템";
+"Projects" = "프로젝트";
+"Installers" = "설치 프로그램";
+"Leftovers" = "잔여 파일";
+"Drives" = "드라이브";
+
+/* Island Tools tab (the Command Hub's launch buttons, on the island) */
+"Tools" = "도구";
+"Settings" = "설정";
+"Pick an app and move it and its files to the Trash" = "앱을 선택해 해당 파일과 함께 휴지통으로 이동";
+"Open Zenith's settings" = "Zenith 설정 열기";
+"Scanning for system junk…" = "시스템 정크 검색 중…";
+
+/* Island pages (the island grown into a tool: System, Cleaner, Ports, Homebrew, Settings) */
+"System junk, project build folders, old installers and leftovers" = "시스템 정크, 프로젝트 빌드 폴더, 오래된 설치 프로그램 및 잔여 파일";
+"Processes listening on network ports" = "네트워크 포트에서 수신 대기 중인 프로세스";
+"Installed and outdated Homebrew packages" = "설치된 Homebrew 패키지와 업데이트가 있는 패키지";
+
+/* Menu bar icon (Settings › Dynamic Island › Behavior) */
+"Menu Bar Icon" = "메뉴 막대 아이콘";
+
+/* Island dock and Tools page */
+"All Tools" = "모든 도구";
+"Quick Clean" = "빠른 정리";
+"Uninstall App" = "앱 제거";
+"Capture" = "캡처";
+"Everyday" = "일상";
+"Back" = "뒤로";
+"%@: On" = "%@: 켬";
+"%@: Off" = "%@: 끔";
+"Every tool, in groups" = "모든 도구를 그룹별로 표시";
+"Look sites up over encrypted DNS through a local proxy" = "로컬 프록시를 통해 암호화된 DNS로 사이트 조회";
+"Keep the Mac from going to sleep on its own" = "Mac이 자동으로 잠자기에 들어가지 않도록 유지";
+"Tool Dock" = "도구 Dock";
+"A row of tools under the open island, and a page with all of them. The Command Hub then leaves its own buttons out; searching there still finds them." = "열린 Island 아래의 도구 한 줄과 모든 도구가 있는 페이지입니다. 그러면 Command Hub에는 자체 버튼이 표시되지 않으며, 검색하면 계속 찾을 수 있습니다.";
+"Also keep Zenith in the menu bar, with the Command Hub. It is always there while the tool dock is off, and opening Zenith again from Finder or Spotlight shows these settings either way." = "Zenith를 Command Hub와 함께 메뉴 막대에도 표시합니다. 도구 Dock이 꺼져 있는 동안에는 항상 표시되며, 어느 경우든 Finder나 Spotlight에서 Zenith를 다시 열면 이 설정이 나타납니다.";
+
+/* Arranging the island dock */
+"Dock" = "Dock";
+"Reset" = "재설정";
+"Edit Dock…" = "Dock 편집…";
+"Move Left" = "왼쪽으로 이동";
+"Move Right" = "오른쪽으로 이동";
+"Remove from Dock" = "Dock에서 제거";
+"On the dock" = "Dock에 있음";
+"Not on the dock" = "Dock에 없음";
+"All Tools is always the last icon on the dock" = "모든 도구는 항상 Dock의 마지막 아이콘입니다";
+"Click a tool to put it on the dock or take it off. Drag the icons here to reorder." = "도구를 클릭해 Dock에 추가하거나 제거하십시오. 여기의 아이콘을 드래그해 순서를 바꿉니다.";
+"The dock is full. Click a tool on it to take it off, or drag to reorder." = "Dock이 가득 찼습니다. Dock의 도구를 클릭해 제거하거나 드래그해 순서를 바꾸십시오.";
+"Running apps, CPU, memory, storage and network speed" = "실행 중인 앱, CPU, 메모리, 저장 공간 및 네트워크 속도";
+"Privacy Shield Settings…" = "Privacy Shield 설정…";
+"Search running apps" = "실행 중인 앱 검색";
+"Keep the Mac awake for" = "Mac을 깨어 있게 유지할 시간";

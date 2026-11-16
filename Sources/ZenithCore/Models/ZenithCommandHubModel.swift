@@ -125,6 +125,10 @@ public final class ZenithCommandHubState: ObservableObject {
     @Published public var presentationID: UUID = UUID()
     @Published public var hardwareSnapshot: HardwareSnapshot = HardwareSnapshot()
     @Published public var showTopHogs: Bool = true
+    /// The island's Tools tab has the hub's launch buttons (capture, clipboard, Clean, Boost…), so the hub leaves
+    /// them out. Read when the hub is shown (`refreshLaunchButtonPlacement`), not observed: the island's state
+    /// changes with every hover and every second of a playing track.
+    @Published public private(set) var launchButtonsOnIsland: Bool = false
 
     private let optimizer: SystemOptimizerService
 
@@ -164,6 +168,27 @@ public final class ZenithCommandHubState: ObservableObject {
                 self?.hardwareSnapshot = snapshot
             }
         }
+    }
+
+    /// True when the island can be opened on a Tools tab right now. Not while a full-screen app has hidden it: the
+    /// hub is then the only place the buttons can be.
+    public static func launchButtonsAreOnIsland(isEnabled: Bool, showsToolsTab: Bool, isHiddenForFullscreen: Bool) -> Bool {
+        isEnabled && showsToolsTab && !isHiddenForFullscreen
+    }
+
+    public func refreshLaunchButtonPlacement(island: ZenithIslandState = .shared) {
+        let onIsland = Self.launchButtonsAreOnIsland(
+            isEnabled: island.isEnabled,
+            showsToolsTab: island.showsToolsTab,
+            isHiddenForFullscreen: island.isHiddenForFullscreen
+        )
+        if onIsland != launchButtonsOnIsland { launchButtonsOnIsland = onIsland }
+    }
+
+    /// Whether the hub draws its grid of quick actions: always while the island does not have them, and for a
+    /// search either way, so typing a name and pressing Return still runs an action.
+    public func showsActionGrid(query: String) -> Bool {
+        !launchButtonsOnIsland || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     public func toggleTopHogs() {

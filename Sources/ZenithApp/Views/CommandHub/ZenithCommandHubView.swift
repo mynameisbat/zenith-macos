@@ -23,6 +23,10 @@ public struct ZenithCommandHubView: View {
     public var onOpenPreferences: () -> Void
     public var onQuit: () -> Void
     public var onClose: () -> Void
+    /// Drawn as the island's System page: what the machine is doing (running apps and the meters) and nothing else.
+    /// Ports, Privacy Shield, Keep Awake, Homebrew, Settings and Quit have their own places on the island, so they
+    /// are left out.
+    public var inIsland: Bool
 
     public init(
         onAreaCapture: @escaping () -> Void = {},
@@ -31,7 +35,8 @@ public struct ZenithCommandHubView: View {
         onOpenClipboard: @escaping () -> Void = {},
         onOpenPreferences: @escaping () -> Void = {},
         onQuit: @escaping () -> Void = {},
-        onClose: @escaping () -> Void = {}
+        onClose: @escaping () -> Void = {},
+        inIsland: Bool = false
     ) {
         self.onAreaCapture = onAreaCapture
         self.onFullscreenCapture = onFullscreenCapture
@@ -40,6 +45,7 @@ public struct ZenithCommandHubView: View {
         self.onOpenPreferences = onOpenPreferences
         self.onQuit = onQuit
         self.onClose = onClose
+        self.inIsland = inIsland
     }
 
     private static let width: CGFloat = 340
@@ -51,7 +57,8 @@ public struct ZenithCommandHubView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 10)
 
-            if !matchingActions.isEmpty {
+            // While the island has a Tools tab the grid is there; a search still brings the matching actions up here.
+            if !inIsland && !matchingActions.isEmpty && hubState.showsActionGrid(query: trimmedQuery) {
                 actionGrid
                     .padding(.horizontal, 12)
                     .padding(.bottom, 10)
@@ -63,38 +70,44 @@ public struct ZenithCommandHubView: View {
                 .padding(.horizontal, 6)
                 .padding(.vertical, 8)
 
-            HubPortsSection(query: trimmedQuery) {
-                SettingsTab.requestSelection(.ports)
-                onClose()
-                onOpenPreferences()
+            if !inIsland {
+                HubPortsSection(query: trimmedQuery) {
+                    SettingsTab.requestSelection(.ports)
+                    onClose()
+                    onOpenPreferences()
+                }
+                .padding(.horizontal, 6)
+                .padding(.bottom, 8)
             }
-            .padding(.horizontal, 6)
-            .padding(.bottom, 8)
 
             sectionDivider
 
             VStack(spacing: 12) {
                 metersRow
-                // One grid, so the switches of Privacy Shield and Keep Awake line up whatever the labels' width
-                // (it changes with the language).
-                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 12) {
-                    controlsRow
-                    KeepAwakeHubRow()
+                if !inIsland {
+                    // One grid, so the switches of Privacy Shield and Keep Awake line up whatever the labels' width
+                    // (it changes with the language).
+                    Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 12) {
+                        controlsRow
+                        KeepAwakeHubRow()
+                    }
                 }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
 
-            HomebrewHubRow {
-                HomebrewSettingsLink.request()
-                onOpenPreferences()
+            if !inIsland {
+                HomebrewHubRow {
+                    HomebrewSettingsLink.request()
+                    onOpenPreferences()
+                }
+
+                sectionDivider
+
+                appRow
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 5)
             }
-
-            sectionDivider
-
-            appRow
-                .padding(.horizontal, 6)
-                .padding(.vertical, 5)
         }
         .frame(width: Self.width)
         .onExitCommand {
@@ -102,11 +115,13 @@ public struct ZenithCommandHubView: View {
         }
         .onAppear {
             isSearchFocused = true
+            hubState.refreshLaunchButtonPlacement()
             hubState.refreshHardwareSnapshot()
-            PortManagerModel.shared.refresh()
+            if !inIsland { PortManagerModel.shared.refresh() }
         }
         .onValueChange(of: hubState.presentationID) { _ in
             isSearchFocused = true
+            hubState.refreshLaunchButtonPlacement()
         }
     }
 
@@ -126,7 +141,9 @@ public struct ZenithCommandHubView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
 
-            TextField("Search actions and apps", text: $hubState.searchText)
+            // On the island this page lists running apps only, so that is all the field finds.
+            TextField(inIsland ? LocalizedStringKey("Search running apps") : LocalizedStringKey("Search actions and apps"),
+                      text: $hubState.searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
                 .focused($isSearchFocused)
@@ -175,11 +192,12 @@ public struct ZenithCommandHubView: View {
     }
 
     private func runBoost() {
-        hubState.boostSystem()
-        ToastHUDController.shared.show(message: "Boost: memory purged, DNS cache flushed", icon: "bolt.fill")
+        ZenithToolActions.boost()
     }
 
     private func handleSubmit() {
+        // On the island Return has no action to run: the tools are on the dock and the Tools page.
+        guard !inIsland else { return }
         let query = trimmedQuery.lowercased()
         if query == "/boost" || query == "boost" {
             runBoost()
@@ -513,32 +531,7 @@ public struct ZenithCommandHubView: View {
     }
 
     private func runCleaner() {
-        Task {
-            // Nothing has been scanned yet: look first, so there is something to confirm.
-            if cleaner.categories.isEmpty && !cleaner.isScanning {
-                await cleaner.scan()
-            }
-            guard cleaner.selectedJunkSize > 0 else {
-                ToastHUDController.shared.show(message: "No system junk found", icon: "checkmark.circle.fill")
-                return
-            }
-            guard DestructiveConfirmation.confirm(
-                    title: "Delete \(cleaner.formatSelectedSize) permanently?",
-                    message: "These cannot be restored:\n\(cleaner.selectionSummary)",
-                    destructiveTitle: "Delete Permanently"
-                  ) else { return }
-
-            let freed = await cleaner.cleanSelected()
-            if freed > 0 {
-                ToastHUDController.shared.show(
-                    message: "Freed \(SystemCleanerService.formatBytes(freed))",
-                    icon: "sparkles"
-                )
-            }
-            if let message = Self.failureMessage(for: cleaner.lastFailedItemNames) {
-                ToastHUDController.shared.show(verbatim: message, icon: "exclamationmark.triangle.fill")
-            }
-        }
+        ZenithToolActions.clean()
     }
 
     /// What to tell the user when a clean could not remove everything, or nil when it removed all it was asked to.
@@ -582,6 +575,8 @@ public struct ZenithCommandHubView: View {
                         : "Off. Turn on to look sites up over encrypted DNS through a local proxy")
 
             HStack(spacing: 8) {
+              // Clean and Boost are on the island's Tools tab while it has one.
+              if !hubState.launchButtonsOnIsland {
                 Button {
                     runCleaner()
                 } label: {
@@ -606,6 +601,7 @@ public struct ZenithCommandHubView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .help("Free inactive memory and flush the DNS cache")
+              }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }

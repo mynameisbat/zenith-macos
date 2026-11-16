@@ -40,17 +40,11 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
             let hubView = ZenithCommandHubView(
                 onAreaCapture: { [weak self] in
                     self?.close(immediately: true)
-                    CaptureOverlayController.shared.startAreaCapture { image in
-                        guard let image = image else { return }
-                        AnnotationWindowController.shared.present(image: image)
-                    }
+                    ZenithToolActions.captureArea()
                 },
                 onFullscreenCapture: { [weak self] in
                     self?.close(immediately: true)
-                    CaptureOverlayController.shared.captureFullscreen { image in
-                        guard let image = image else { return }
-                        AnnotationWindowController.shared.present(image: image)
-                    }
+                    ZenithToolActions.captureScreen()
                 },
                 onScreenOCR: { [weak self] in
                     self?.close(immediately: true)
@@ -62,8 +56,7 @@ public final class ZenithCommandHubController: NSObject, NSPopoverDelegate {
                 },
                 onOpenPreferences: { [weak self] in
                     self?.close()
-                    SettingsWindowController.shared.configureDefaultContent()
-                    SettingsWindowController.shared.show()
+                    ZenithToolActions.openSettings()
                 },
                 onQuit: {
                     AppDelegate.isExplicitQuit = true

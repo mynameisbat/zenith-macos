@@ -1065,3 +1065,81 @@
 "If your custom resolver filters ads, its blocks are counted here too, and Never Block applies to it." = "Si tu resolutor personalizado filtra anuncios, sus bloqueos también se cuentan aquí, y «No bloquear nunca» se aplica a él.";
 "Nothing is blocked: your lists are empty and this resolver does not filter ads. Use AdGuard DNS below, or import a list." = "No se bloquea nada: tus listas están vacías y este resolutor no filtra anuncios. Usa AdGuard DNS más abajo o importa una lista.";
 "Ad blocking has no list: choose AdGuard DNS in Settings › Privacy Shield, or import a list." = "El bloqueo de anuncios no tiene lista: elige AdGuard DNS en Ajustes › Privacy Shield o importa una lista.";
+
+/* App uninstaller (Settings › Cleaner › Uninstall) and the Cleaner tab's section names */
+"Uninstall an app" = "Desinstalar una app";
+"Pick an app to see the files it keeps in your Library. Nothing is removed until you confirm, and everything goes to the Trash. Apps that are part of macOS are not listed." = "Elige una app para ver los archivos que guarda en tu Biblioteca. No se elimina nada hasta que confirmes, y todo va a la Papelera. Las apps que forman parte de macOS no aparecen en la lista.";
+"Choose App" = "Elegir app";
+"Pick an app that is not in the Applications folder" = "Elegir una app que no está en la carpeta Aplicaciones";
+"Search apps" = "Buscar apps";
+"Looking for apps…" = "Buscando apps…";
+"No apps found in the Applications folders." = "No se han encontrado apps en las carpetas Aplicaciones.";
+"No app matches your search." = "Ninguna app coincide con tu búsqueda.";
+"All Apps" = "Todas las apps";
+"The app and the files it keeps in your Library. Files that only carry the app's name are not ticked for you: check that they are this app's before you tick them. Everything goes to the Trash." = "La app y los archivos que guarda en tu Biblioteca. Los archivos que solo llevan el nombre de la app no se marcan por omisión: comprueba que son de esta app antes de marcarlos. Todo va a la Papelera.";
+"The app itself · %@" = "La propia app · %@";
+"%@ · matched by name only" = "%@ · coincide solo por el nombre";
+"%@ is open and will be asked to quit first. %@ will go to the Trash, where you can still restore it:\n%@" = "%@ está abierta y primero se le pedirá que se cierre. %@ irá a la Papelera, desde donde aún puedes restaurarlo:\n%@";
+"%@ and its files are in the Trash." = "%@ y sus archivos están en la Papelera.";
+"%@ is not an app." = "%@ no es una app.";
+"%@ is part of macOS or made by Apple, so Zenith leaves it alone." = "%@ forma parte de macOS o es de Apple, así que Zenith no la toca.";
+"%@ is a part of another app. Uninstall that app instead." = "%@ forma parte de otra app. Desinstala esa app en su lugar.";
+"Zenith can't tell which files belong to %@, so it won't uninstall it." = "Zenith no puede saber qué archivos pertenecen a %@, así que no la desinstalará.";
+"Zenith can't uninstall itself. Quit it and move it to the Trash in Finder." = "Zenith no puede desinstalarse a sí mismo. Ciérralo y trasládalo a la Papelera en el Finder.";
+"Apps that are part of macOS or made by Apple can't be uninstalled here." = "Las apps que forman parte de macOS o son de Apple no se pueden desinstalar aquí.";
+"%@ is still open, so nothing was removed. Quit it, then try again." = "%@ sigue abierta, así que no se ha eliminado nada. Ciérrala e inténtalo de nuevo.";
+"1 item could not be moved: %@. %@" = "No se ha podido trasladar 1 ítem: %@. %@";
+"%lld items could not be moved: %@. %@" = "No se han podido trasladar %lld ítems: %@. %@";
+"System" = "Sistema";
+"Projects" = "Proyectos";
+"Installers" = "Instaladores";
+"Leftovers" = "Restos";
+"Drives" = "Unidades";
+
+/* Island Tools tab (the Command Hub's launch buttons, on the island) */
+"Tools" = "Herramientas";
+"Settings" = "Ajustes";
+"Pick an app and move it and its files to the Trash" = "Elegir una app y trasladarla a la Papelera junto con sus archivos";
+"Open Zenith's settings" = "Abrir los ajustes de Zenith";
+"Scanning for system junk…" = "Buscando archivos basura del sistema…";
+
+/* Island pages (the island grown into a tool: System, Cleaner, Ports, Homebrew, Settings) */
+"System junk, project build folders, old installers and leftovers" = "Archivos basura del sistema, carpetas de compilación de proyectos, instaladores antiguos y restos";
+"Processes listening on network ports" = "Procesos que escuchan en puertos de red";
+"Installed and outdated Homebrew packages" = "Paquetes de Homebrew instalados y desactualizados";
+
+/* Menu bar icon (Settings › Dynamic Island › Behavior) */
+"Menu Bar Icon" = "Icono de la barra de menús";
+
+/* Island dock and Tools page */
+"All Tools" = "Todas las herramientas";
+"Quick Clean" = "Limpieza rápida";
+"Uninstall App" = "Desinstalar app";
+"Capture" = "Captura";
+"Everyday" = "A diario";
+"Back" = "Atrás";
+"%@: On" = "%@: activado";
+"%@: Off" = "%@: desactivado";
+"Every tool, in groups" = "Todas las herramientas, por grupos";
+"Look sites up over encrypted DNS through a local proxy" = "Resolver los sitios mediante DNS cifrado a través de un proxy local";
+"Keep the Mac from going to sleep on its own" = "Evitar que el Mac entre en reposo por sí solo";
+"Tool Dock" = "Dock de herramientas";
+"A row of tools under the open island, and a page with all of them. The Command Hub then leaves its own buttons out; searching there still finds them." = "Una fila de herramientas bajo la isla abierta y una página con todas ellas. El Command Hub deja entonces de mostrar sus propios botones; al buscar allí se siguen encontrando.";
+"Also keep Zenith in the menu bar, with the Command Hub. It is always there while the tool dock is off, and opening Zenith again from Finder or Spotlight shows these settings either way." = "Mantener también Zenith en la barra de menús, con el Command Hub. El icono está siempre presente mientras el Dock de herramientas está desactivado, y en cualquier caso volver a abrir Zenith desde el Finder o Spotlight muestra estos ajustes.";
+
+/* Arranging the island dock */
+"Dock" = "Dock";
+"Reset" = "Restablecer";
+"Edit Dock…" = "Editar Dock…";
+"Move Left" = "Mover a la izquierda";
+"Move Right" = "Mover a la derecha";
+"Remove from Dock" = "Quitar del Dock";
+"On the dock" = "En el Dock";
+"Not on the dock" = "Fuera del Dock";
+"All Tools is always the last icon on the dock" = "Todas las herramientas es siempre el último icono del Dock";
+"Click a tool to put it on the dock or take it off. Drag the icons here to reorder." = "Haz clic en una herramienta para ponerla en el Dock o quitarla. Arrastra aquí los iconos para reordenarlos.";
+"The dock is full. Click a tool on it to take it off, or drag to reorder." = "El Dock está lleno. Haz clic en una herramienta del Dock para quitarla, o arrastra para reordenar.";
+"Running apps, CPU, memory, storage and network speed" = "Apps en ejecución, CPU, memoria, almacenamiento y velocidad de red";
+"Privacy Shield Settings…" = "Ajustes de Privacy Shield…";
+"Search running apps" = "Buscar apps en ejecución";
+"Keep the Mac awake for" = "Mantener el Mac activo durante";

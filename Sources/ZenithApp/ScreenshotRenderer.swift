@@ -36,12 +36,12 @@ enum ScreenshotRenderer {
             app: .appleMusic, title: "Dawn Chorus", artist: "Example Band", album: "Field Notes",
             duration: 215, position: 84, isPlaying: true
         )
-        save("island-now-playing", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
+        save("island-now-playing", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedSize(page: nil, showsDock: island.showsToolsTab).height))
 
         island.nowPlayingTrack = NowPlayingTrack(
             app: .youtube, title: "Lo-fi beats to study to", artist: "YouTube", duration: 0, position: 0, isPlaying: true
         )
-        save("island-browser", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
+        save("island-browser", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedSize(page: nil, showsDock: island.showsToolsTab).height))
 
         // The island widgets: a focus timer part-way through and an invented meeting. Load the widget settings first,
         // or they would replace the flags set here with this Mac's when the timer card first reads them.
@@ -63,7 +63,7 @@ enum ScreenshotRenderer {
         )
         island.activeTab = .widgets
         island.isExpanded = true
-        save("island-widgets", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
+        save("island-widgets", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedSize(page: nil, showsDock: island.showsToolsTab).height))
         island.isExpanded = false
         save("island-timer", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: 40))
         // The same closed island with the pointer on it, before it opens.
@@ -73,7 +73,7 @@ enum ScreenshotRenderer {
         // A volume change, as the island shows it.
         island.focusTimer = nil
         island.showLevel(.volume, level: 0.62)
-        save("island-volume", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
+        save("island-volume", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedSize(page: nil, showsDock: island.showsToolsTab).height))
         save("recording-picker", RecordingPickerBar(model: RecordingPickerModel()).padding(20).background(Color.gray))
         island.dismissAlert()
         island.focusTimer = nil
@@ -105,13 +105,46 @@ enum ScreenshotRenderer {
         AIAgentMonitor.shared.pin([sampleClaude, sampleCodex], now: agentNow)
         island.activeTab = .aiAgents
         island.isExpanded = true
-        save("island-ai-agents", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
+        save("island-ai-agents", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedSize(page: nil, showsDock: island.showsToolsTab).height))
         AIAgentMonitor.shared.pin([sampleCodex], now: agentNow)
-        save("island-ai-agent-single", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedHeight))
+        save("island-ai-agent-single", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedSize(page: nil, showsDock: island.showsToolsTab).height))
         AIAgentMonitor.shared.pin([sampleClaude, sampleCodex], now: agentNow)
         island.isExpanded = false
         save("island-ai-working", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: 40))
+
+        // The island as it opens: what is going on with the dock of tools under it, with every tab there is (four
+        // share the strips beside the notch), then with nothing going on. Then the Tools page.
+        island.showsToolsTab = true
+        island.showsTimerWidget = true
+        island.nowPlayingTrack = NowPlayingTrack(
+            app: .appleMusic, title: "Dawn Chorus", artist: "Example Band", album: "Field Notes",
+            duration: 215, position: 84, isPlaying: true
+        )
+        island.droppedItems = [IslandDropItem(name: "Notes.txt", textContent: "Agenda for Friday")]
+        island.activeTab = .nowPlaying
+        island.isExpanded = true
+        let homeSize = geometry.expandedSize(page: nil, showsDock: true)
+        save("island-home", ZenithDynamicIslandView(geometry: geometry).frame(width: homeSize.width, height: homeSize.height))
+        island.droppedItems = []
+        island.nowPlayingTrack = nil
+        island.showsTimerWidget = false
         AIAgentMonitor.shared.stop()
+        save("island-home-idle", ZenithDynamicIslandView(geometry: geometry).frame(width: homeSize.width, height: homeSize.height))
+        // Keep Awake being turned on: the dock asks for how long.
+        IslandKeepAwakePrompt.shared.isShowing = true
+        save("island-home-keep-awake", ZenithDynamicIslandView(geometry: geometry).frame(width: homeSize.width, height: homeSize.height))
+        IslandKeepAwakePrompt.shared.isShowing = false
+        // The default dock, whatever arrangement is saved on this Mac; that one is put back when the renderer is done.
+        let savedDock = IslandWidgetSettings.shared.dockLayout
+        defer { IslandWidgetSettings.shared.dockLayout = savedDock }
+        IslandWidgetSettings.shared.dockLayout = IslandDockLayout()
+        island.openPage(.tools)
+        let toolsPageSize = geometry.expandedSize(page: .tools, showsDock: true)
+        save("island-page-tools", ZenithDynamicIslandView(geometry: geometry).frame(width: toolsPageSize.width, height: toolsPageSize.height))
+        IslandDockEditor.shared.isEditing = true
+        save("island-page-tools-editing", ZenithDynamicIslandView(geometry: geometry).frame(width: toolsPageSize.width, height: toolsPageSize.height))
+        IslandDockEditor.shared.isEditing = false
+        island.close()
 
         // The Command Hub, with an invented process list.
         let hogs = [
@@ -180,6 +213,14 @@ enum ScreenshotRenderer {
                  dark: scheme == .dark)
         }
 
+        // The island grown into a page: the hub's content (same invented numbers) and the ports list (pinned above).
+        for page in [IslandPage.system, .ports] {
+            island.openPage(page)
+            let pageSize = geometry.expandedSize(page: page, showsDock: true)
+            save("island-page-\(page.rawValue)", ZenithDynamicIslandView(geometry: geometry).frame(width: pageSize.width, height: pageSize.height))
+        }
+        island.close()
+
         // The annotation editor on the made-up picture.
         if let png = sampleImagePNG(),
            let source = CGImageSourceCreateWithData(png as CFData, nil),
@@ -242,6 +283,20 @@ enum ScreenshotRenderer {
                      dark: scheme == .dark)
             }
         }
+        // Settings as a page of the island (the stand-in services above are still in place).
+        island.openPage(.settings)
+        let settingsPageSize = geometry.expandedSize(page: .settings, showsDock: true)
+        save("island-page-settings", ZenithDynamicIslandView(geometry: geometry).frame(width: settingsPageSize.width, height: settingsPageSize.height))
+        // For checking a layout by hand only: these two pages read this Mac (its junk files, its Homebrew packages),
+        // so their pictures must never be published.
+        if ProcessInfo.processInfo.environment["ZENITH_RENDER_LOCAL_PAGES"] == "1" {
+            for page in [IslandPage.cleaner, .homebrew] {
+                island.openPage(page)
+                let pageSize = geometry.expandedSize(page: page, showsDock: true)
+                save("local-only-island-page-\(page.rawValue)", ZenithDynamicIslandView(geometry: geometry).frame(width: pageSize.width, height: pageSize.height))
+            }
+        }
+        island.close()
         return failures == 0 ? 0 : 1
     }
 

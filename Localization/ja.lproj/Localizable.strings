@@ -1065,3 +1065,81 @@
 "If your custom resolver filters ads, its blocks are counted here too, and Never Block applies to it." = "カスタムリゾルバが広告をフィルタリングする場合、そのブロックもここで数えられ、「ブロックしない」も適用されます。";
 "Nothing is blocked: your lists are empty and this resolver does not filter ads. Use AdGuard DNS below, or import a list." = "何もブロックされていません: リストが空で、このリゾルバは広告をフィルタリングしません。下のAdGuard DNSを使用するか、リストを読み込んでください。";
 "Ad blocking has no list: choose AdGuard DNS in Settings › Privacy Shield, or import a list." = "広告ブロックにリストがありません: 「設定 › Privacy Shield」でAdGuard DNSを選択するか、リストを読み込んでください。";
+
+/* App uninstaller (Settings › Cleaner › Uninstall) and the Cleaner tab's section names */
+"Uninstall an app" = "アプリをアンインストール";
+"Pick an app to see the files it keeps in your Library. Nothing is removed until you confirm, and everything goes to the Trash. Apps that are part of macOS are not listed." = "アプリを選ぶと、ライブラリに保存されているそのアプリのファイルを確認できます。確認するまで何も削除されず、すべてゴミ箱に移動します。macOSに含まれるアプリは表示されません。";
+"Choose App" = "アプリを選択";
+"Pick an app that is not in the Applications folder" = "“アプリケーション”フォルダにないアプリを選択";
+"Search apps" = "アプリを検索";
+"Looking for apps…" = "アプリを探しています…";
+"No apps found in the Applications folders." = "“アプリケーション”フォルダにアプリが見つかりません。";
+"No app matches your search." = "検索に一致するアプリはありません。";
+"All Apps" = "すべてのアプリ";
+"The app and the files it keeps in your Library. Files that only carry the app's name are not ticked for you: check that they are this app's before you tick them. Everything goes to the Trash." = "アプリ本体と、ライブラリに保存されているそのアプリのファイルです。アプリ名が同じだけのファイルにはチェックが入っていません。このアプリのものであることを確認してからチェックしてください。すべてゴミ箱に移動します。";
+"The app itself · %@" = "アプリ本体 · %@";
+"%@ · matched by name only" = "%@ · 名前のみ一致";
+"%@ is open and will be asked to quit first. %@ will go to the Trash, where you can still restore it:\n%@" = "%@は起動中のため、先に終了を求めます。%@をゴミ箱に移動します。ゴミ箱から元に戻せます:\n%@";
+"%@ and its files are in the Trash." = "%@とそのファイルをゴミ箱に入れました。";
+"%@ is not an app." = "%@はアプリではありません。";
+"%@ is part of macOS or made by Apple, so Zenith leaves it alone." = "%@はmacOSの一部またはApple製のため、Zenithは変更しません。";
+"%@ is a part of another app. Uninstall that app instead." = "%@は別のアプリの一部です。そのアプリをアンインストールしてください。";
+"Zenith can't tell which files belong to %@, so it won't uninstall it." = "どのファイルが%@のものか判断できないため、アンインストールしません。";
+"Zenith can't uninstall itself. Quit it and move it to the Trash in Finder." = "Zenithは自分自身をアンインストールできません。Zenithを終了し、Finderでゴミ箱に入れてください。";
+"Apps that are part of macOS or made by Apple can't be uninstalled here." = "macOSの一部またはApple製のアプリは、ここではアンインストールできません。";
+"%@ is still open, so nothing was removed. Quit it, then try again." = "%@がまだ起動中のため、何も削除していません。終了してからもう一度お試しください。";
+"1 item could not be moved: %@. %@" = "1項目を移動できませんでした: %@。%@";
+"%lld items could not be moved: %@. %@" = "%lld項目を移動できませんでした: %@。%@";
+"System" = "システム";
+"Projects" = "プロジェクト";
+"Installers" = "インストーラ";
+"Leftovers" = "残留ファイル";
+"Drives" = "ドライブ";
+
+/* Island Tools tab (the Command Hub's launch buttons, on the island) */
+"Tools" = "ツール";
+"Settings" = "設定";
+"Pick an app and move it and its files to the Trash" = "アプリを選び、そのファイルと一緒にゴミ箱に入れます";
+"Open Zenith's settings" = "Zenithの設定を開く";
+"Scanning for system junk…" = "システムの不要ファイルをスキャン中…";
+
+/* Island pages (the island grown into a tool: System, Cleaner, Ports, Homebrew, Settings) */
+"System junk, project build folders, old installers and leftovers" = "システムの不要ファイル、プロジェクトのビルドフォルダ、古いインストーラ、残留ファイル";
+"Processes listening on network ports" = "ネットワークポートで待ち受けているプロセス";
+"Installed and outdated Homebrew packages" = "インストール済みおよびアップデートがあるHomebrewパッケージ";
+
+/* Menu bar icon (Settings › Dynamic Island › Behavior) */
+"Menu Bar Icon" = "メニューバーアイコン";
+
+/* Island dock and Tools page */
+"All Tools" = "すべてのツール";
+"Quick Clean" = "クイッククリーン";
+"Uninstall App" = "アプリを削除";
+"Capture" = "キャプチャ";
+"Everyday" = "日常";
+"Back" = "戻る";
+"%@: On" = "%@: オン";
+"%@: Off" = "%@: オフ";
+"Every tool, in groups" = "すべてのツールをグループ別に表示";
+"Look sites up over encrypted DNS through a local proxy" = "ローカルプロキシ経由で暗号化DNSを使ってサイトを検索";
+"Keep the Mac from going to sleep on its own" = "Macが自動的にスリープしないようにする";
+"Tool Dock" = "ツールDock";
+"A row of tools under the open island, and a page with all of them. The Command Hub then leaves its own buttons out; searching there still finds them." = "開いたアイランドの下に並ぶツールと、すべてのツールを集めたページ。Command Hubには独自のボタンが表示されなくなりますが、検索すれば見つかります。";
+"Also keep Zenith in the menu bar, with the Command Hub. It is always there while the tool dock is off, and opening Zenith again from Finder or Spotlight shows these settings either way." = "ZenithをCommand Hubと一緒にメニューバーにも表示します。ツールDockがオフの間は常に表示され、いずれの場合もFinderやSpotlightからZenithをもう一度開くとこの設定が表示されます。";
+
+/* Arranging the island dock */
+"Dock" = "Dock";
+"Reset" = "リセット";
+"Edit Dock…" = "Dockを編集…";
+"Move Left" = "左へ移動";
+"Move Right" = "右へ移動";
+"Remove from Dock" = "Dockから削除";
+"On the dock" = "Dockにあります";
+"Not on the dock" = "Dockにありません";
+"All Tools is always the last icon on the dock" = "“すべてのツール”は常にDockの最後のアイコンです";
+"Click a tool to put it on the dock or take it off. Drag the icons here to reorder." = "ツールをクリックするとDockに追加または削除できます。ここのアイコンをドラッグして並べ替えます。";
+"The dock is full. Click a tool on it to take it off, or drag to reorder." = "Dockがいっぱいです。Dock上のツールをクリックして外すか、ドラッグして並べ替えてください。";
+"Running apps, CPU, memory, storage and network speed" = "実行中のアプリ、CPU、メモリ、ストレージ、ネットワーク速度";
+"Privacy Shield Settings…" = "Privacy Shieldの設定…";
+"Search running apps" = "実行中のアプリを検索";
+"Keep the Mac awake for" = "Macをスリープさせない時間";
