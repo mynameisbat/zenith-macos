@@ -2,389 +2,297 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Zenith — small Mac utilities in one menu-bar app</title>
-  <meta name="description" content="Zenith is a native, open-source macOS menu-bar app: clipboard history, screen capture and annotation, on-device OCR, a notch island with Now Playing, a focus timer and your next event, a disk cleaner and a local DNS-over-HTTPS proxy.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Zenith — small Mac utilities in the notch</title>
+  <meta name="description" content="Try Zenith in your browser: a Mac desktop where you can use the notch island and its dock of tools, clipboard history, screen capture and annotation, OCR, the cleaner and app uninstaller, and Privacy Shield. Zenith is a native, open-source macOS app.">
   <meta name="color-scheme" content="light dark">
+  <meta property="og:title" content="Zenith — try it in your browser">
+  <meta property="og:description" content="A Mac desktop in a web page where every Zenith feature can be tried with made-up data.">
+  <meta property="og:image" content="assets/shots/island-now-playing.png">
   <link rel="icon" type="image/png" href="assets/app-icon.png">
-  <link rel="stylesheet" href="style.css">
+  <!-- After changing the site, raise every v= in this block: the import map versions each module, or browsers keep old ones. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "./js/capture.js": "./js/capture.js?v=5",
+      "./js/clipboard.js": "./js/clipboard.js?v=5",
+      "./js/core.js": "./js/core.js?v=5",
+      "./js/data.js": "./js/data.js?v=5",
+      "./js/desktop.js": "./js/desktop.js?v=5",
+      "./js/hub.js": "./js/hub.js?v=5",
+      "./js/island.js": "./js/island.js?v=5",
+      "./js/main.js": "./js/main.js?v=5",
+      "./js/models.js": "./js/models.js?v=5",
+      "./js/pages.js": "./js/pages.js?v=5",
+      "./js/qr.js": "./js/qr.js?v=5",
+      "./js/settings.js": "./js/settings.js?v=5",
+      "./js/tools.js": "./js/tools.js?v=5"
+    }
+  }
+  </script>
+  <link rel="stylesheet" href="style.css?v=5">
+  <script type="module" src="js/main.js?v=5"></script>
 </head>
 <body>
-  <a class="skip" href="#main">Skip to content</a>
+  <a class="skip" href="#win-readme">Skip to the Read Me</a>
 
-  <header class="nav">
-    <div class="wrap nav-row">
-      <a class="brand" href="#top" aria-label="Zenith, back to top">
-        <img src="assets/app-icon.png" width="28" height="28" alt="">
-        <span>Zenith</span>
-      </a>
-      <nav aria-label="Primary">
-        <ul class="nav-links">
-          <li><a href="#features">Features</a></li>
-          <li><a href="#screens">Screens</a></li>
-          <li><a href="#careful">How it behaves</a></li>
-          <li><a href="#limits">Limits</a></li>
-          <li><a href="#install">Install</a></li>
-        </ul>
+  <div id="screen" class="screen">
+    <canvas id="wallpaper" class="wallpaper" aria-hidden="true"></canvas>
+
+    <!-- Menu bar -->
+    <header id="menubar" class="menubar">
+      <nav class="mb-left" aria-label="Menus">
+        <button type="button" class="mb-item mb-logo" data-menu="demo" aria-label="Demo menu">
+          <svg class="ic"><use href="#i-sparkles"/></svg>
+        </button>
+        <button type="button" class="mb-item mb-app" data-menu="app" id="mb-app-name">Finder</button>
+        <button type="button" class="mb-item" data-menu="try">Try</button>
+        <button type="button" class="mb-item mb-hide-sm" data-menu="events">Events</button>
+        <button type="button" class="mb-item mb-hide-sm" data-menu="view">View</button>
+        <button type="button" class="mb-item mb-hide-sm" data-menu="help">Help</button>
       </nav>
-      <a class="btn btn-small" href="https://github.com/mynameisbat/zenith-macos/releases/latest">Download</a>
-    </div>
-  </header>
-
-  <main id="main">
-    <!-- Hero -->
-    <section class="hero" id="top">
-      <div class="wrap hero-grid">
-        <div class="hero-copy">
-          <p class="eyebrow">macOS 13+ · Swift 6 · MIT license</p>
-          <h1>Small Mac utilities,<br>one menu-bar app.</h1>
-          <p class="lead">
-            Clipboard history, screen capture and annotation, on-device OCR, an island in your notch with Now Playing,
-            a focus timer and your next event, a disk cleaner and a local DNS-over-HTTPS proxy.
-            Native, open source, and no analytics code.
-          </p>
-          <div class="actions">
-            <a class="btn" href="https://github.com/mynameisbat/zenith-macos/releases/latest">
-              Download for macOS
-            </a>
-            <a class="btn btn-ghost" href="https://github.com/mynameisbat/zenith-macos">View source</a>
-          </div>
-          <p class="fine">
-            Zenith is signed ad hoc and not notarized yet, so macOS asks you to confirm the first launch.
-            <a href="#install">How</a>
-          </p>
-        </div>
-
-        <figure class="hero-art">
-          <div class="desk">
-            <div class="menubar" aria-hidden="true">
-              <span class="mb-left"><b>Finder</b><span>File</span><span>Edit</span><span>View</span></span>
-              <span class="mb-right"><span>Wi-Fi</span><span>Tue 9:41</span></span>
-            </div>
-            <img class="island-img" src="assets/shots/island-now-playing.png" width="760" height="192"
-                 alt="The Zenith island expanded under the notch, showing a track with its progress bar and previous, pause and next buttons">
-          </div>
-          <figcaption>
-            The island expanded under the notch while a track plays, drawn by the app's own view.
-          </figcaption>
-        </figure>
+      <div class="mb-right" aria-label="Status items">
+        <!-- Zenith's own icon: hidden unless Settings → Dynamic Island → Behavior → Menu Bar Icon is on, or the tool dock is off -->
+        <button type="button" class="mb-status" id="mb-zenith" hidden aria-label="Zenith Command Hub" aria-haspopup="dialog">
+          <svg class="ic"><use href="#i-zenith"/></svg>
+        </button>
+        <button type="button" class="mb-status mb-hide-sm" id="mb-battery" aria-label="Battery" data-menu="battery">
+          <span class="batt" aria-hidden="true"><span class="batt-fill"></span><svg class="batt-bolt"><use href="#i-bolt"/></svg></span>
+          <span class="batt-pct mb-hide-sm">85%</span>
+        </button>
+        <span class="mb-status mb-hide-sm" aria-hidden="true"><svg class="ic"><use href="#i-wifi"/></svg></span>
+        <time class="mb-clock" id="mb-clock">Tue 9:41</time>
       </div>
-    </section>
+    </header>
 
-    <!-- Features -->
-    <section class="section" id="features">
-      <div class="wrap">
-        <h2>What is in it</h2>
-        <p class="section-lead">Six tools that live in the menu bar and stay out of the way. Everything runs on your Mac.</p>
+    <!-- Notch island (built by island.js) -->
+    <div id="island" class="island" aria-label="Zenith island"></div>
 
-        <div class="cards">
-          <article class="card">
-            <div class="art art-ocr" aria-hidden="true">
-              <div class="ocr-page"><i></i><i></i><i></i><i class="short"></i></div>
-              <div class="ocr-sel"></div>
-              <div class="ocr-chip">Copied</div>
-            </div>
-            <h3>Screen OCR and QR reader <kbd>⌃⌥T</kbd></h3>
-            <p>Drag over any part of the screen. The recognised text, or the payload of a QR code or barcode, goes to the clipboard.</p>
-            <ul>
-              <li>Apple Vision, on device: nothing is uploaded</li>
-              <li>Uses the languages your system supports</li>
-            </ul>
-          </article>
+    <!-- Desktop icons -->
+    <ul id="desktop-icons" class="desktop-icons" aria-label="Desktop">
+      <li><button type="button" class="dicon" data-open="readme" data-label="Read Me"><span class="dicon-art art-doc"><svg><use href="#i-doc"/></svg></span><span class="dicon-name">Read Me</span></button></li>
+      <li><button type="button" class="dicon" data-open="scratchpad"><span class="dicon-art art-notes"><svg><use href="#i-notes"/></svg></span><span class="dicon-name">Scratchpad</span></button></li>
+      <li><button type="button" class="dicon" data-open="viewer"><span class="dicon-art art-photo"><svg><use href="#i-photo"/></svg></span><span class="dicon-name">Sample.png</span></button></li>
+      <li><button type="button" class="dicon" data-open="vault"><span class="dicon-art art-vault"><svg><use href="#i-key"/></svg></span><span class="dicon-name">Vault</span></button></li>
+      <li><button type="button" class="dicon" id="dicon-sketchbook" draggable="true" data-open="sketchbook"><span class="dicon-art art-app"><svg><use href="#i-brush"/></svg></span><span class="dicon-name">Sketchbook.app</span></button></li>
+      <li><a class="dicon" href="https://github.com/mynameisbat/zenith-macos/releases/latest"><span class="dicon-art art-dmg"><svg><use href="#i-disk"/></svg></span><span class="dicon-name">Download Zenith</span></a></li>
+    </ul>
 
-          <article class="card">
-            <div class="art art-capture" aria-hidden="true">
-              <div class="loupe"><div class="loupe-grid"></div><span class="loupe-x"></span></div>
-              <div class="arrow"></div>
-            </div>
-            <h3>Capture and annotate <kbd>⇧⌘2</kbd></h3>
-            <p>Area or full-screen capture with a 16× pixel loupe and colour readout, then an editor for the markup.</p>
-            <ul>
-              <li>Pen, arrows, rectangles, text, pixelate and crop</li>
-              <li>Exports at the display's native resolution</li>
-              <li>Needs the Screen Recording permission</li>
-            </ul>
-          </article>
+    <!-- Windows -->
+    <div id="windows" class="windows">
 
-          <article class="card">
-            <div class="art art-clip" aria-hidden="true">
-              <div class="clip-row on"><b>⌘1</b><span>https://example.com/docs</span></div>
-              <div class="clip-row"><b>⌘2</b><span>Meeting notes, draft 3</span></div>
-              <div class="clip-row"><b>⌘3</b><span>#0F62FE</span><em>pinned</em></div>
-            </div>
-            <h3>Clipboard history <kbd>⇧⌘V</kbd></h3>
-            <p>A searchable history you can drive from the keyboard, with a preview of each item, filters and pinning.</p>
-            <ul>
-              <li>Previews text, images, links and color codes</li>
-              <li>Skips items that password managers mark as concealed</li>
-              <li>Bounded: 25 MB per item, 256 MB in total</li>
-              <li>Copies made in apps you choose are not kept (common password managers are on the list by default)</li>
-              <li>Optional: empty the system clipboard after a delay, and when the Mac locks or sleeps</li>
-              <li>Paste as plain text with <kbd>⇧↵</kbd>, or paste a link without its tracking parameters</li>
-              <li>Global hotkeys need no Accessibility permission</li>
-            </ul>
-          </article>
-
-          <article class="card">
-            <div class="art art-shelf" aria-hidden="true">
-              <div class="shelf-tabs"><span>Now Playing</span><span class="on">Widgets</span><span>Shelf (2)</span></div>
-              <div class="shelf-tiles"><i>PNG</i><i>TXT</i></div>
-            </div>
-            <h3>Notch island, widgets and drop shelf</h3>
-            <p>Now Playing for Music, Spotify and browser audio, a focus timer and your next calendar event, a charging HUD, and a shelf to park files and snippets at the top of the screen.</p>
-            <ul>
-              <li>A running timer stays beside the notch</li>
-              <li>Resting the pointer on it opens it after a short delay you can set; a click opens it at once, and a swipe can open it, close it or change track</li>
-              <li>Hides while an app is full screen on its display; notices then use a floating panel</li>
-              <li>Next and previous are dimmed when the player does not take them, and the progress bar seeks when it can</li>
-              <li>Calendar access is asked only when you turn that widget on</li>
-              <li>Browser audio is read from the system's Now Playing: title, artist, artwork and position</li>
-              <li>A browser is shown under the browser's name, whatever the site</li>
-              <li>Playback controls need no permission; a media-key fallback needs Accessibility</li>
-            </ul>
-          </article>
-
-          <article class="card">
-            <div class="art art-clean" aria-hidden="true">
-              <div class="dialog">
-                <b>Move 3 items to the Trash?</b>
-                <span>Largest: Xcode caches, 2.4 GB</span>
-                <div><i>Cancel</i><i class="go">Clean</i></div>
-              </div>
-            </div>
-            <h3>Cleaner, uninstaller, process monitor</h3>
-            <p>Scan caches, build folders, old installers, deleted apps' leftovers and junk on external drives; uninstall or slim an app by dropping it on the shelf; quit heavy processes.</p>
-            <ul>
-              <li>Every deletion shows what goes and waits for you</li>
-              <li>Optional scheduled scan: it only scans, never deletes, and tells you once when at least 1 GB can be cleaned</li>
-              <li>Docker Desktop's virtual disk is never offered</li>
-              <li>Uninstall and slim send the originals to the Trash</li>
-            </ul>
-          </article>
-
-          <article class="card">
-            <div class="art art-shield" aria-hidden="true">
-              <span>App</span><i></i><span class="hl">Zenith<br><small>127.0.0.1</small></span><i></i><span>DoH</span>
-            </div>
-            <h3>Privacy Shield</h3>
-            <p>A local proxy that resolves the names of the sites you visit over DNS-over-HTTPS and splits the first TLS packet in two.</p>
-            <ul>
-              <li>Cloudflare, Google, Quad9, AdGuard, NextDNS or your own</li>
-              <li>Optional tracker blocking: a built-in list, or import a hosts file</li>
-              <li>Your previous proxy settings are saved and restored, even if Zenith is killed</li>
-              <li>Switching it off lets connections that are already open finish, for up to 30 seconds</li>
-              <li>Not a VPN: your IP address is not hidden</li>
-            </ul>
-          </article>
-        </div>
-      </div>
-    </section>
-
-
-    <!-- Screenshots -->
-    <section class="section alt" id="screens">
-      <div class="wrap">
-        <h2>The app itself</h2>
-        <p class="section-lead">
-          These are the app's real views, drawn by Zenith with made-up data (<code>Zenith --render-screenshots</code>),
-          so no one's clipboard, tracks or processes are in them.
-        </p>
-
-        <div class="shots">
-          <figure class="shot shot-wide">
-            <div class="stage stage-dark">
-              <img src="assets/shots/island-now-playing.png" width="760" height="192" loading="lazy"
-                   alt="Island showing an Apple Music track with progress and controls">
-            </div>
-            <figcaption>Island with an Apple Music track. Music and Spotify report their own state.</figcaption>
-          </figure>
-
-          <figure class="shot shot-wide">
-            <div class="stage stage-dark">
-              <img src="assets/shots/island-browser.png" width="760" height="192" loading="lazy"
-                   alt="Island showing audio playing in a browser, with the site name and playback controls">
-            </div>
-            <figcaption>Island with browser audio. Without a known length, it says "Playing now".</figcaption>
-          </figure>
-
-          <figure class="shot shot-wide">
-            <div class="stage stage-dark">
-              <img src="assets/shots/island-widgets.png" width="760" height="192" loading="lazy"
-                   alt="Island Widgets tab with a focus timer at 18:42 with pause and stop buttons, the next event, Design review, in 15 minutes, and the network speed: 2.4 MB/s down and 180 KB/s up">
-            </div>
-            <figcaption>Widgets: a focus timer, your next calendar event, and the speed of your connection. Each is a switch in Settings.</figcaption>
-          </figure>
-
-          <figure class="shot shot-wide">
-            <div class="stage stage-dark">
-              <img src="assets/shots/island-timer.png" width="760" height="80" loading="lazy"
-                   alt="Closed island with a progress ring on the left of the notch and 18:42 on the right">
-            </div>
-            <figcaption>While a timer runs, the time left sits beside the notch.</figcaption>
-          </figure>
-
-          <figure class="shot">
-            <div class="stage">
-              <picture>
-                <source srcset="assets/shots/command-hub-dark.png" media="(prefers-color-scheme: dark)">
-                <img src="assets/shots/command-hub-light.png" width="680" height="1098" loading="lazy"
-                     alt="Command Hub popover with a search field, four quick action tiles, the heaviest running apps with their CPU use, meters for CPU, memory and storage, the download and upload speed, a Privacy Shield switch, Scan and Boost buttons, and Settings and Quit">
-              </picture>
-            </div>
-            <figcaption>Command Hub: quick actions with your shortcuts, the heaviest apps (quit after a confirmation), system meters, network speed and switches.</figcaption>
-          </figure>
-
-          <figure class="shot shot-wide">
-            <div class="stage">
-              <picture>
-                <source srcset="assets/shots/settings-island-dark.png" media="(prefers-color-scheme: dark)">
-                <img src="assets/shots/settings-island-light.png" width="1440" height="1080" loading="lazy"
-                     alt="Settings window with a sidebar of colored icons and the Dynamic Island pane: Focus Timer, Next Calendar Event and Network Speed switches, focus and break lengths, and timer controls">
-              </picture>
-            </div>
-            <figcaption>Settings, laid out like System Settings. It follows your accent color and Light or Dark mode.</figcaption>
-          </figure>
-
-          <figure class="shot shot-wide shot-span">
-            <div class="stage">
-              <picture>
-                <source srcset="assets/shots/clipboard-dark.png" media="(prefers-color-scheme: dark)">
-                <img src="assets/shots/clipboard-light.png" width="1400" height="920" loading="lazy"
-                     alt="Clipboard history with a search field, All, Text, Links, Images and Pinned filters, items grouped by day, and a preview of the selected item with its details and Paste, Pin and Delete buttons">
-              </picture>
-            </div>
-            <figcaption>Clipboard history: filters, items grouped by day, a preview of the selected one, <kbd>⌘1</kbd>–<kbd>⌘9</kbd> to paste.</figcaption>
-          </figure>
-
-          <figure class="shot shot-wide shot-span">
-            <div class="stage">
-              <picture>
-                <source srcset="assets/shots/annotation-dark.png" media="(prefers-color-scheme: dark)">
-                <img src="assets/shots/annotation-light.png" width="1640" height="1008" loading="lazy"
-                     alt="Annotation editor with a captured image and a toolbar of tools, colors, line widths, undo and redo, Save and Copy">
-              </picture>
-            </div>
-            <figcaption>The annotation editor after a capture. Every tool has a one-key shortcut.</figcaption>
-          </figure>
-        </div>
-      </div>
-    </section>
-
-    <!-- How it behaves -->
-    <section class="section" id="careful">
-      <div class="wrap two-col">
-        <div>
-          <h2>Careful where it matters</h2>
-          <p class="section-lead">
-            Tools that delete files and change network settings should be boring and predictable. These are the rules the code follows. Most have automated tests; the confirmation dialogs live in the app target, which has none.
-          </p>
-        </div>
-        <ul class="rules">
-          <li><b>Nothing is deleted unasked.</b> Cleaner, uninstall and slim show what will go, then wait.</li>
-          <li><b>Data that cannot be rebuilt is left alone.</b> No Docker VM disk, no vendor folders such as Google or JetBrains, no recent files.</li>
-          <li><b>Your proxy comes back.</b> Switching Privacy Shield off, or relaunching after a crash, restores the settings you had.</li>
-          <li><b>Memory is bounded.</b> The clipboard history has hard size limits, per item and in total.</li>
-          <li><b>No analytics.</b> The source has no tracking code. The app's own network traffic is Privacy Shield's DNS lookups.</li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- Limits -->
-    <section class="section" id="limits">
-      <div class="wrap">
-        <h2>What it does not do, yet</h2>
-        <p class="section-lead">Better to read these here than to find out later.</p>
-        <div class="limits">
-          <div>
-            <h3>Not notarized</h3>
-            <p>Releases are signed ad hoc. macOS will warn on first launch until there is an Apple Developer ID behind them.</p>
+      <!-- Read Me: the site's own text, readable without the demo -->
+      <section class="win" id="win-readme" data-win="readme" data-app="Read Me" aria-labelledby="readme-title" tabindex="-1">
+        <header class="win-bar">
+          <div class="traffic">
+            <button type="button" class="tl tl-close" data-win-action="close" aria-label="Close"></button>
+            <button type="button" class="tl tl-min" data-win-action="min" aria-label="Minimize"></button>
+            <button type="button" class="tl tl-zoom" data-win-action="zoom" aria-label="Full screen"></button>
           </div>
-          <div>
-            <h3>Privacy Shield is not a VPN</h3>
-            <p>It hides the names you look up, not the addresses you connect to or your IP. It covers apps that honour the system proxy, on the primary network service. The packet splitting has not been verified against a real filtering network.</p>
+          <h2 class="win-title">Read Me</h2>
+        </header>
+        <div class="win-body readme">
+          <div class="readme-hero">
+            <img src="assets/app-icon.png" width="64" height="64" alt="">
+            <div>
+              <h1 id="readme-title">Zenith</h1>
+              <p class="readme-lead">Small Mac utilities in one app: an island in the notch with a dock of tools, clipboard history, screen capture and annotation, on-device OCR, a disk cleaner with an app uninstaller and a local DNS-over-HTTPS proxy. Native, open source, no analytics.</p>
+              <p class="readme-actions">
+                <a class="btn btn-primary" href="https://github.com/mynameisbat/zenith-macos/releases/latest">Download for macOS</a>
+                <a class="btn" href="https://github.com/mynameisbat/zenith-macos">Source on GitHub</a>
+              </p>
+              <p class="fine">macOS 13 Ventura or later · Swift 6 · MIT license</p>
+            </div>
           </div>
-          <div>
-            <h3>Leftover cleanup is conservative</h3>
-            <p>Folders of deleted apps are only offered when they look like a bundle identifier, no same-vendor app is installed and nothing has touched them for 30 days. Nothing is ticked for you, because they can hold data you would want back.</p>
-          </div>
-          <div>
-            <h3>Browser audio rests on a workaround</h3>
-            <p>macOS 15.4 and later give Now Playing data only to Apple's own programs, so Zenith reads it through the system's <code>perl</code>. It has been tried with Chrome; Safari and Firefox have not been tried. If Apple closes this, only Music and Spotify will show.</p>
-          </div>
-          <div>
-            <h3>Tested on macOS 15 and 27</h3>
-            <p>CI runs on macOS 15. The tests that need a window server run only on a Mac with a desktop session.</p>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- Permissions -->
-    <section class="section alt" id="permissions">
-      <div class="wrap">
-        <h2>Permissions, and why</h2>
-        <p class="section-lead">Settings has a Permissions page with one card for each: its state, what it is for, and what still works without it. It never asks for a permission itself.</p>
-        <div class="perms">
-          <div>
-            <h3>Screen Recording <span class="tag need">needed for capture</span></h3>
-            <p>macOS requires it to capture the display, for the loupe and for OCR. It asks the first time you take a capture.</p>
+          <div class="seg" role="tablist" aria-label="Read Me sections">
+            <button type="button" role="tab" class="seg-btn" aria-selected="true" data-readme-tab="try">Try it here</button>
+            <button type="button" role="tab" class="seg-btn" aria-selected="false" data-readme-tab="install">Install</button>
+            <button type="button" role="tab" class="seg-btn" aria-selected="false" data-readme-tab="careful">How it behaves</button>
+            <button type="button" role="tab" class="seg-btn" aria-selected="false" data-readme-tab="limits">Limits</button>
+            <button type="button" role="tab" class="seg-btn" aria-selected="false" data-readme-tab="screens">The real app</button>
           </div>
-          <div>
-            <h3>Accessibility <span class="tag opt">optional</span></h3>
-            <p>Lets Zenith press <kbd>⌘V</kbd> to paste for you and send a media key when macOS refuses a playback command from the island. Without it, items are only copied and the island says how to allow it.</p>
-          </div>
-          <div>
-            <h3>Automation <span class="tag opt">optional</span></h3>
-            <p>Lets Zenith control Music and Spotify, read Music's artwork, and ask Finder to move protected leftovers to the Trash. macOS asks once per app.</p>
-          </div>
-          <div>
-            <h3>Calendars <span class="tag opt">optional</span></h3>
-            <p>Only for the island's calendar widget. macOS asks when you turn the widget on, never before.</p>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- Install -->
-    <section class="section" id="install">
-      <div class="wrap two-col">
-        <div>
-          <h2>Install</h2>
-          <ol class="steps">
-            <li>Download the DMG from <a href="https://github.com/mynameisbat/zenith-macos/releases/latest">GitHub Releases</a>.</li>
-            <li>Open it and drag <b>Zenith</b> into <b>Applications</b>.</li>
-            <li>Control-click <b>Zenith</b>, choose <b>Open</b>, then <b>Open</b> again. This is needed once because the app is not notarized.</li>
-          </ol>
-          <p class="fine">Requires macOS 13 Ventura or later.</p>
-        </div>
-        <div>
-          <h3 class="code-title">Or build it from source</h3>
-          <div class="code">
-            <button class="copy" type="button" data-copy="#build-code" aria-label="Copy the build commands">Copy</button>
-<pre><code id="build-code">git clone https://github.com/mynameisbat/zenith-macos.git
+          <div class="readme-pane" data-readme-pane="try" role="tabpanel">
+            <p>This page is a pretend Mac. Everything Zenith does can be tried on it, with made-up tracks, processes and files. Nothing leaves your browser and nothing on your computer is changed.</p>
+            <div class="tour-progress"><span id="tour-count">0 of 0 tried</span><span class="meter"><span id="tour-bar"></span></span></div>
+            <ol class="tour" id="tour"></ol>
+          </div>
+
+          <div class="readme-pane" data-readme-pane="install" role="tabpanel" hidden>
+            <h3>Install</h3>
+            <ol class="steps">
+              <li>Download the DMG from <a href="https://github.com/mynameisbat/zenith-macos/releases/latest">GitHub Releases</a>.</li>
+              <li>Open it and drag Zenith into Applications.</li>
+              <li>Control-click Zenith, choose Open, then Open again. This is needed once, because the app is not notarized.</li>
+            </ol>
+            <p>Zenith then lives in the notch: rest the pointer on it and the island opens. There is no menu bar icon unless you turn one on in Settings → Dynamic Island. It checks GitHub for a new version once a day and installs one only after you click, and only if it is signed with the same certificate as the copy you run.</p>
+            <h3>Or build it from source</h3>
+            <div class="code-block">
+              <button type="button" class="btn btn-small code-copy" data-copy-target="build-cmd">Copy</button>
+<pre id="build-cmd"><code>git clone https://github.com/mynameisbat/zenith-macos.git
 cd zenith-macos
 ./scripts/bundle_app.sh
 open Zenith.app</code></pre>
+            </div>
+            <p class="fine">Needs Xcode 16 or later, or the Command Line Tools with a Swift 6 toolchain.</p>
+            <h3>Permissions, and why</h3>
+            <dl class="perm-list">
+              <dt>Screen Recording <em>needed for capture</em></dt>
+              <dd>macOS requires it to capture the display, for the loupe and for OCR.</dd>
+              <dt>Accessibility <em>optional</em></dt>
+              <dd>Lets Zenith press ⌘V to paste for you and send a media key when macOS refuses a playback command. Without it, items are only copied.</dd>
+              <dt>Automation <em>optional</em></dt>
+              <dd>Lets Zenith control Music and Spotify, read Music's artwork, and ask Finder to move protected leftovers to the Trash. macOS asks once per app.</dd>
+              <dt>Calendars <em>optional</em></dt>
+              <dd>Only for the island's calendar widget, asked when you turn the widget on.</dd>
+            </dl>
           </div>
-          <p class="fine">Needs Xcode 16+ or the Command Line Tools with a Swift 6 toolchain.</p>
+
+          <div class="readme-pane" data-readme-pane="careful" role="tabpanel" hidden>
+            <h3>Careful where it matters</h3>
+            <p>Tools that delete files and change network settings should be boring and predictable. These are the rules the code follows.</p>
+            <ul class="facts">
+              <li><b>Nothing is deleted unasked.</b> Cleaner, uninstall and slim show what will go, then wait. Everything the uninstaller removes goes to the Trash.</li>
+              <li><b>Data that cannot be rebuilt is left alone.</b> No Docker VM disk, no vendor folders such as Google or JetBrains, nothing touched recently.</li>
+              <li><b>Your proxy comes back.</b> Switching Privacy Shield off, or relaunching after a crash, restores the settings you had.</li>
+              <li><b>Memory is bounded.</b> The clipboard history keeps at most 25 MB per item and 256 MB in total.</li>
+              <li><b>Passwords stay out of the history.</b> Copies marked concealed, and copies made in the apps you list, are not kept.</li>
+              <li><b>No analytics.</b> The source has no tracking code. The app's own network traffic is Privacy Shield's DNS lookups and one update check a day.</li>
+            </ul>
+          </div>
+
+          <div class="readme-pane" data-readme-pane="limits" role="tabpanel" hidden>
+            <h3>What it does not do, yet</h3>
+            <dl class="perm-list">
+              <dt>Not notarized</dt>
+              <dd>Releases are not signed with an Apple Developer ID, so macOS warns on first launch.</dd>
+              <dt>Privacy Shield is not a VPN</dt>
+              <dd>It hides the names you look up, not the addresses you connect to or your IP. It covers apps that honour the system proxy, on the primary network service.</dd>
+              <dt>Browser audio rests on a workaround</dt>
+              <dd>macOS 15.4 and later give Now Playing data only to Apple's own programs, so Zenith reads it through the system's perl. If Apple closes this, only Music and Spotify will show.</dd>
+              <dt>Leftover cleanup is conservative</dt>
+              <dd>Folders of deleted apps are offered only when they look like a bundle identifier, no app from the same vendor is installed and nothing has touched them for 30 days. Nothing is ticked for you.</dd>
+              <dt>This page is not the app</dt>
+              <dd>It imitates Zenith's screens with made-up data. Text recognition here reads the page itself instead of running Apple Vision, and captures are drawn from a sketch of the screen.</dd>
+            </dl>
+          </div>
+
+          <div class="readme-pane" data-readme-pane="screens" role="tabpanel" hidden>
+            <p>These are drawn by the app itself with made-up data (<code>Zenith --render-screenshots</code>).</p>
+            <div class="shots">
+              <figure><img src="assets/shots/island-home.png" width="380" height="162" loading="lazy" alt="The open island: the player on top and the dock of tools under it"><figcaption>The island: what is going on, and the dock</figcaption></figure>
+              <figure><img src="assets/shots/island-page-tools.png" width="520" height="300" loading="lazy" alt="The Tools page: every tool in four groups, with the dock and its Edit button at the bottom"><figcaption>All Tools, inside the island</figcaption></figure>
+              <figure><img src="assets/shots/island-now-playing.png" width="380" height="96" loading="lazy" alt="The island playing a track, with progress and controls"><figcaption>Island, Now Playing</figcaption></figure>
+              <figure><img src="assets/shots/island-widgets.png" width="380" height="162" loading="lazy" alt="The island's widgets: focus timer, next event and network speed, with the dock"><figcaption>Island, Widgets</figcaption></figure>
+              <figure><img src="assets/shots/island-page-system.png" width="420" height="428" loading="lazy" alt="The System page: running apps, CPU, memory, storage and network speed"><figcaption>System page</figcaption></figure>
+              <figure><img class="shot-light" src="assets/shots/command-hub-light.png" width="340" height="517" loading="lazy" alt="The Command Hub"><img class="shot-dark" src="assets/shots/command-hub-dark.png" width="340" height="517" loading="lazy" alt="The Command Hub"><figcaption>Command Hub (menu bar icon, off by default)</figcaption></figure>
+              <figure><img class="shot-light" src="assets/shots/clipboard-light.png" width="700" height="460" loading="lazy" alt="Clipboard history with a preview pane"><img class="shot-dark" src="assets/shots/clipboard-dark.png" width="700" height="460" loading="lazy" alt="Clipboard history with a preview pane"><figcaption>Clipboard history</figcaption></figure>
+              <figure><img class="shot-light" src="assets/shots/annotation-light.png" width="820" height="504" loading="lazy" alt="The annotation editor"><img class="shot-dark" src="assets/shots/annotation-dark.png" width="820" height="504" loading="lazy" alt="The annotation editor"><figcaption>Annotation editor</figcaption></figure>
+              <figure><img class="shot-light" src="assets/shots/settings-island-light.png" width="720" height="540" loading="lazy" alt="Settings, Dynamic Island pane"><img class="shot-dark" src="assets/shots/settings-island-dark.png" width="720" height="540" loading="lazy" alt="Settings, Dynamic Island pane"><figcaption>Settings</figcaption></figure>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="foot">
-    <div class="wrap foot-row">
-      <span class="brand small"><img src="assets/app-icon.png" width="20" height="20" alt=""> Zenith 2.6.0</span>
-      <span>MIT licensed · Made for macOS</span>
-      <span class="foot-links">
-        <a href="https://github.com/mynameisbat/zenith-macos">Source</a>
-        <a href="https://github.com/mynameisbat/zenith-macos/issues">Issues</a>
-        <a href="https://github.com/mynameisbat/zenith-macos/releases">Releases</a>
-      </span>
+      </section>
     </div>
-  </footer>
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="main.js"></script>
+    <!-- Dock (built by desktop.js) -->
+    <nav id="dock" class="dock" aria-label="Dock"></nav>
+
+    <div id="menu-layer" class="menu-layer"></div>
+    <div id="toast-layer" class="toast-layer" aria-hidden="true"></div>
+  </div>
+
+  <div id="live" class="sr-only" aria-live="polite"></div>
+
+  <noscript>
+    <p class="noscript">The interactive demo needs JavaScript. The Read Me above still has everything about Zenith; <a href="https://github.com/mynameisbat/zenith-macos/releases/latest">download it here</a>.</p>
+  </noscript>
+
+  <!-- Icons: 24×24, stroked with currentColor -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <defs>
+      <symbol id="i-zenith" viewBox="0 0 24 24"><path d="M12 2.5 21.5 12 12 21.5 2.5 12Z"/><path d="M12 7.5 16.5 12 12 16.5 7.5 12Z"/></symbol>
+      <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M10 3.5 11.6 8.4 16.5 10 11.6 11.6 10 16.5 8.4 11.6 3.5 10 8.4 8.4Z"/><path d="M18 14.5 18.8 16.7 21 17.5 18.8 18.3 18 20.5 17.2 18.3 15 17.5 17.2 16.7Z"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></symbol>
+      <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2.5V18h15.5"/><path d="M2.5 6H18v15.5"/></symbol>
+      <symbol id="i-screen" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="13" rx="2"/><path d="M5.5 7.5h1M8 7.5h1"/><path d="M9 20.5h6"/></symbol>
+      <symbol id="i-textscan" viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M7.5 9h9M7.5 12h9M7.5 15h5"/></symbol>
+      <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="17" rx="2"/><rect x="8.5" y="2.5" width="7" height="4" rx="1"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4"/></symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.6M12 18.9v2.6M21.5 12h-2.6M5.1 12H2.5M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8M18.7 18.7l-1.8-1.8M7.1 7.1 5.3 5.3"/><circle cx="12" cy="12" r="6.6"/></symbol>
+      <symbol id="i-cmd" viewBox="0 0 24 24"><path d="M9 9V6.5A2.5 2.5 0 1 0 6.5 9H9Zm0 0h6m-6 0v6m6-6V6.5A2.5 2.5 0 1 1 17.5 9H15Zm0 0v6m0 0h-6m6 0v2.5a2.5 2.5 0 1 0 2.5-2.5H15Zm-6 0v2.5A2.5 2.5 0 1 1 6.5 15H9Z"/></symbol>
+      <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4Z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M21.5 12h-2M4.5 12h-2M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4M18.7 18.7l-1.4-1.4M6.7 6.7 5.3 5.3"/></symbol>
+      <symbol id="i-island" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="4"/></symbol>
+      <symbol id="i-snippet" viewBox="0 0 24 24"><path d="M5 4.5h10l4 4v11H5Z"/><path d="M8.5 11.5h7M8.5 15h4.5"/><path d="M15 4.5v4h4"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2.8 19.5 6v5.6c0 4.7-3.2 8.2-7.5 9.6-4.3-1.4-7.5-4.9-7.5-9.6V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.6"/></symbol>
+      <symbol id="i-network" viewBox="0 0 24 24"><path d="M8 20V4M4 8l4-4 4 4"/><path d="M16 4v16m-4-4 4 4 4-4"/></symbol>
+      <symbol id="i-mug" viewBox="0 0 24 24"><path d="M5 7.5h11v7a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5Z"/><path d="M16 9.5h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8.5 2.5c-.8 1 .8 2-0 3M12 2.5c-.8 1 .8 2 0 3"/></symbol>
+      <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11m0-6.5a1.5 1.5 0 0 1 3 0V11m0-5a1.5 1.5 0 0 1 3 0v7.5c0 4.4-2.8 7.5-6.5 7.5-2.6 0-4.1-1.3-5.4-3.4L4.4 14a1.6 1.6 0 0 1 2.7-1.7L8 13.5"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5Z" fill="currentColor"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6.5 4.5h3.5v15H6.5ZM14 4.5h3.5v15H14Z" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M2.5 6v12l9-6Zm9 0v12l9-6Z" fill="currentColor"/></symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24"><path d="M21.5 6v12l-9-6Zm-9 0v12l-9-6Z" fill="currentColor"/></symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 13V9M10 2.5h4M12 13l3 2"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+      <symbol id="i-tray" viewBox="0 0 24 24"><path d="M3.5 13.5 6 5h12l2.5 8.5V19a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19Z"/><path d="M3.5 13.5h5a3.5 3.5 0 0 0 7 0h5"/></symbol>
+      <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.5 2.5 5 13.5h6l-1 8 8.5-11h-6Z" fill="currentColor"/></symbol>
+      <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2.5" y="7" width="17" height="10" rx="2.5"/><path d="M21.5 10.5v3"/></symbol>
+      <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3.6-3.6a4 4 0 0 0-5.7-5.7L12.5 5.8"/><path d="M14 10a4 4 0 0 0-5.7 0l-3.6 3.6a4 4 0 0 0 5.7 5.7l1.1-1.1"/></symbol>
+      <symbol id="i-lines" viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h10"/></symbol>
+      <symbol id="i-photo" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m3.5 17 5-4.5 4 3.5 3-2.5 5 4"/></symbol>
+      <symbol id="i-swatch" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="8.5" cy="9.5" r="1.3" fill="currentColor"/><circle cx="12.5" cy="7.5" r="1.3" fill="currentColor"/><circle cx="15.8" cy="10.5" r="1.3" fill="currentColor"/></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 3.5h6l-1 6 3.5 3.5h-11L10 9.5Z"/><path d="M12 13v8"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 6.5h16M9.5 6.5V4h5v2.5M6 6.5l1 14h10l1-14"/><path d="M10 10.5v6.5M14 10.5v6.5"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+      <symbol id="i-xcircle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="currentColor" stroke="none" opacity=".28"/><path d="m9 9 6 6M15 9l-6 6"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20 5 15.5 15.5 5a2.1 2.1 0 0 1 3 3L8 18.5Z"/><path d="m13.5 7 3.5 3.5"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 19 19 5M9.5 5H19v9.5"/></symbol>
+      <symbol id="i-rect" viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="12" rx="1.5"/></symbol>
+      <symbol id="i-textA" viewBox="0 0 24 24"><path d="M3 19 8.5 5h1L15 19M5 14.5h8"/><path d="M20.5 19v-5.5a2.5 2.5 0 0 0-4.5-1.5m4.5 4c-3.5 0-5 .7-5 2.2 0 1 .8 1.8 2 1.8 1.7 0 3-1.3 3-3"/></symbol>
+      <symbol id="i-pixel" viewBox="0 0 24 24"><path d="M4 4h4v4H4ZM12 4h4v4h-4ZM8 8h4v4H8ZM16 8h4v4h-4ZM4 12h4v4H4ZM12 12h4v4h-4ZM8 16h4v4H8ZM16 16h4v4h-4Z" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-redact" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="1.5" fill="currentColor"/></symbol>
+      <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+      <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v12M7 11l5 5 5-5M4.5 20.5h15"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
+      <symbol id="i-cup" viewBox="0 0 24 24"><path d="M4.5 8.5h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5Z"/><path d="M16.5 10h1.2a2.3 2.3 0 0 1 0 4.6h-1.5M3.5 21h15"/></symbol>
+      <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 2.5h8.5L19 7v14.5H6Z"/><path d="M14.5 2.5V7H19M9 11.5h7M9 15h7M9 18.5h4"/></symbol>
+      <symbol id="i-notes" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M4 8h16M8 12h8M8 15.5h8M8 19h5"/></symbol>
+      <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4.5"/><path d="m11.2 11.8 8.3-8.3M16.5 6.5l2.5 2.5M14 9l2 2"/></symbol>
+      <symbol id="i-brush" viewBox="0 0 24 24"><path d="M20 4c-3.5 1-7.6 5-10 8.5l1.5 1.5C15 11.6 19 7.5 20 4Z"/><path d="M9.2 13.2c-2.2-.3-4 1.3-4.2 3.6-.1 1.4-.6 2.6-2 3.2 3.7.7 7.5-.3 7.8-3.6"/></symbol>
+      <symbol id="i-disk" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></symbol>
+      <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9.5 2.5v3.5M14.5 2.5v3.5M9.5 18v3.5M14.5 18v3.5M2.5 9.5H6M2.5 14.5H6M18 9.5h3.5M18 14.5h3.5"/></symbol>
+      <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h12a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 3v-3H4a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 4 5.5Z"/><path d="M17.5 9H20a1.5 1.5 0 0 1 1.5 1.5V17a1.5 1.5 0 0 1-1.5 1.5h-1V21l-3-2.5h-4"/></symbol>
+      <symbol id="i-code" viewBox="0 0 24 24"><path d="m8.5 7-5 5 5 5M15.5 7l5 5-5 5M13.5 4.5l-3 15"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.3l2 2.2h8.7A1.5 1.5 0 0 1 21 8.7V18a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18Z"/></symbol>
+      <symbol id="i-boost" viewBox="0 0 24 24"><path d="M13.5 2.5 5 13.5h6l-1 8 8.5-11h-6Z"/></symbol>
+      <symbol id="i-port" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="10" rx="2"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 17v3M16 17v3"/></symbol>
+      <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4.5" height="7" rx="1.5"/><rect x="16.5" y="14" width="4.5" height="7" rx="1.5"/></symbol>
+      <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 2.5v5M15 2.5v5M6.5 7.5h11V11a5.5 5.5 0 0 1-11 0Z"/><path d="M12 16.5v5"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+      <symbol id="i-return" viewBox="0 0 24 24"><path d="M19.5 5v6a3 3 0 0 1-3 3h-12m0 0 4-4m-4 4 4 4"/></symbol>
+      <symbol id="i-fullscreen" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+      <symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4" fill="currentColor"/></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2" fill="currentColor" stroke="none"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="2" fill="currentColor" stroke="none"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="2" fill="currentColor" stroke="none"/><rect x="13" y="13" width="7.5" height="7.5" rx="2" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8.5"/><path d="M6.8 6.6a8 8 0 1 0 10.4 0"/></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+      <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5.5 12h13"/></symbol>
+      <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7.5 14h9"/></symbol>
+      <symbol id="i-lockshield" viewBox="0 0 24 24"><path d="M12 2.8 19.5 6v5.6c0 4.7-3.2 8.2-7.5 9.6-4.3-1.4-7.5-4.9-7.5-9.6V6Z"/><rect x="9" y="10.8" width="6" height="4.7" rx="1.2" fill="currentColor" stroke="none"/><path d="M10.2 10.8V9.4a1.8 1.8 0 0 1 3.6 0v1.4"/></symbol>
+      <symbol id="i-drive" viewBox="0 0 24 24"><path d="M4.5 13.5 7 6h10l2.5 7.5"/><rect x="3.5" y="13.5" width="17" height="6.5" rx="2.2"/><path d="M16.5 16.75h.01"/></symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.2 3.2 3.2 14.8 0 18M12 3c-3.2 3.2-3.2 14.8 0 18"/></symbol>
+      <symbol id="i-box" viewBox="0 0 24 24"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></symbol>
+      <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6.5 2.5h11M6.5 21.5h11M7.5 2.5c0 5 9 6 9 9.5s-9 4.5-9 9.5M16.5 2.5c0 5-9 6-9 9.5s9 4.5 9 9.5"/></symbol>
+    </defs>
+  </svg>
 </body>
 </html>
