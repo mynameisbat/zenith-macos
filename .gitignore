@@ -37,3 +37,6 @@ test_output.txt
 # Agent / Tooling Workspaces
 .agents/
 .taste-skill/
+
+# Local QA reports (screenshots of the tester's Mac)
+qa-report/

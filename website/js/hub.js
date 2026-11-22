@@ -53,7 +53,7 @@ export function metersHTML() {
   return `
     <div class="meter-box"><span>CPU</span><b>${system.cpu}%</b><span class="meter"><span style="width:${system.cpu}%"></span></span></div>
     <div class="meter-box"><span>Memory</span><b>${usedPct}%</b><span class="meter"><span style="width:${usedPct}%"></span></span></div>
-    <div class="meter-box"><span>Storage</span><b>${formatBytes(system.diskFree)} free</b><span class="meter"><span style="width:${diskPct}%"></span></span></div>
+    <div class="meter-box"><span>Free Space</span><b>${formatBytes(system.diskFree)}</b><span class="meter"><span style="width:${diskPct}%"></span></span></div>
     <div class="hub-speed">${icon('download')}${formatBytes(speed.down)}/s <span>${icon('download', 'ic flip')}${formatBytes(speed.up)}/s</span></div>`;
 }
 
