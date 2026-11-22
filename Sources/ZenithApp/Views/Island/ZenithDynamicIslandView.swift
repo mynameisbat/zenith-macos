@@ -186,7 +186,7 @@ public struct ZenithDynamicIslandView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.compactActivityUsesWideWings)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: islandState.workingAIAgent?.kind)
         .animation(.spring(response: 0.32, dampingFraction: 0.8), value: islandState.isDropTargeted)
-        .onValueChange(of: islandState.isDropTargeted) { targeted in
+        .onChange(of: islandState.isDropTargeted) { _, targeted in
             if targeted {
                 NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
             }
@@ -245,12 +245,14 @@ public struct ZenithDynamicIslandView: View {
                     .font(.system(size: 11.5, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 if let subtitle = alert.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.system(size: 9.5, weight: .regular))
                         .foregroundColor(.white.opacity(0.72))
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
             }
 

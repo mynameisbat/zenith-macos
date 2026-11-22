@@ -1,28 +1,15 @@
 import Foundation
 import CoreGraphics
-import CoreImage
 import ImageIO
 import UniformTypeIdentifiers
 
 /// High-resolution image export engine.
 /// Flattens vector annotations onto native display bitmaps without downsampling,
-/// applies localized CoreImage pixelation for privacy blur, and encodes PNG/JPEG formats.
+/// pixelates blurred regions (`PrivacyPixelation`), and encodes PNG/JPEG formats.
 public final class ImageExportService: ImageExportServiceProtocol, @unchecked Sendable {
     public static let shared = ImageExportService()
 
-    private let ciContext: CIContext
-
-    public init(ciContext: CIContext? = nil) {
-        if let ciContext = ciContext {
-            self.ciContext = ciContext
-        } else {
-            // Software renderer fallback available for headless environments
-            self.ciContext = CIContext(options: [
-                .useSoftwareRenderer: false,
-                .workingColorSpace: NSNull()
-            ])
-        }
-    }
+    public init() {}
 
     // MARK: - Annotation Rendering & Flattening
 
@@ -73,20 +60,13 @@ public final class ImageExportService: ImageExportServiceProtocol, @unchecked Se
                         width: stdRect.width * scale,
                         height: stdRect.height * scale
                     )
-                    let clampedRect = scaledRect.intersection(fullRect)
-                    if !clampedRect.isNull, clampedRect.width > 0, clampedRect.height > 0 {
-                        if let pixelated = applyPixellateFilter(
-                            to: baseImage,
-                            region: clampedRect,
-                            pixelSize: blurCommand.pixelSize * scale
-                        ) {
-                            context.saveGState()
-                            context.translateBy(x: clampedRect.origin.x, y: clampedRect.origin.y + clampedRect.height)
-                            context.scaleBy(x: 1.0, y: -1.0)
-                            context.draw(pixelated, in: CGRect(x: 0, y: 0, width: clampedRect.width, height: clampedRect.height))
-                            context.restoreGState()
-                            continue
-                        }
+                    let region = scaledRect.integral.intersection(fullRect)
+                    if !region.isNull, region.width > 0, region.height > 0,
+                       let cells = PrivacyPixelation.averagedCells(
+                           of: baseImage, region: region, cellSize: blurCommand.pixelSize * scale
+                       ) {
+                        PrivacyPixelation.draw(cells, in: region, on: context)
+                        continue
                     }
                 }
                 command.apply(to: context, scale: scale)
@@ -124,29 +104,6 @@ public final class ImageExportService: ImageExportServiceProtocol, @unchecked Se
         cropRect: CGRect?
     ) -> CGImage {
         renderAnnotatedImage(baseImage: baseImage, commands: commands, cropRect: cropRect, scale: 1.0)
-    }
-
-    // MARK: - CoreImage Privacy Pixelation
-
-    private func applyPixellateFilter(
-        to baseImage: CGImage,
-        region: CGRect,
-        pixelSize: CGFloat
-    ) -> CGImage? {
-        autoreleasepool {
-            let fullRect = CGRect(x: 0, y: 0, width: baseImage.width, height: baseImage.height)
-            let clamped = region.intersection(fullRect)
-            guard !clamped.isNull, clamped.width > 0, clamped.height > 0,
-                  let cropped = baseImage.cropping(to: clamped) else { return nil }
-            let ciImage = CIImage(cgImage: cropped)
-            guard let filter = CIFilter(name: "CIPixellate") else { return nil }
-            filter.setValue(ciImage, forKey: kCIInputImageKey)
-            filter.setValue(pixelSize, forKey: kCIInputScaleKey)
-            let center = CIVector(x: clamped.width / 2.0, y: clamped.height / 2.0)
-            filter.setValue(center, forKey: kCIInputCenterKey)
-            guard let output = filter.outputImage else { return nil }
-            return ciContext.createCGImage(output, from: CGRect(origin: .zero, size: clamped.size))
-        }
     }
 
     // MARK: - Raster Format Encoders (ImageIO)

@@ -114,6 +114,82 @@ struct ImageExportServiceTests {
         #expect(composited.height == 200)
     }
 
+    /// Black and white columns one pixel wide: unreadable only if a region of it has really been pixelated.
+    private func makeStripedImage(width: Int, height: Int, colorSpace: CGColorSpace = CGColorSpaceCreateDeviceRGB()) -> CGImage {
+        let context = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.setFillColor(CGColor(gray: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        for x in stride(from: 0, to: width, by: 2) {
+            context.fill(CGRect(x: x, y: 0, width: 1, height: height))
+        }
+        return context.makeImage()!
+    }
+
+    /// How often the brightness changes along a row: on every pixel over the stripes, only at cell edges once pixelated.
+    private func changes(in image: CGImage, row y: Int, from x0: Int, to x1: Int) -> Int {
+        var count = 0
+        for x in x0..<(x1 - 1) {
+            let a = Int(getPixelColor(image: image, x: x, y: y).r)
+            let b = Int(getPixelColor(image: image, x: x + 1, y: y).r)
+            if abs(a - b) > 40 { count += 1 }
+        }
+        return count
+    }
+
+    @Test(
+        "EX-05b: The blurred region of an exported image no longer shows what was under it",
+        arguments: [
+            (scale: CGFloat(1), rect: CGRect(x: 20, y: 20, width: 60, height: 60)),
+            // A thin strip over one line of text on a Retina capture, as people draw it.
+            (scale: CGFloat(2), rect: CGRect(x: 10, y: 30, width: 80, height: 12)),
+            // Thinner than one cell, and a height that is not a whole number of cells (both came out readable).
+            (scale: CGFloat(1), rect: CGRect(x: 10, y: 30, width: 80, height: 12)),
+            (scale: CGFloat(1), rect: CGRect(x: 10, y: 30, width: 80, height: 40)),
+        ]
+    )
+    func testBlurHidesWhatIsUnderIt(scale: CGFloat, rect: CGRect) {
+        let base = makeStripedImage(width: Int(200 * scale), height: Int(100 * scale))
+        let blur = BlurAnnotationCommand(rect: rect, pixelSize: 16)
+        let exported = ImageExportService.shared.renderAnnotatedImage(baseImage: base, commands: [blur], cropRect: nil, scale: scale)
+
+        let row = Int(rect.midY * scale)
+        let x0 = Int(rect.minX * scale), x1 = Int(rect.maxX * scale)
+        let cells = Int((rect.width * scale) / (16 * scale)) + 1
+        let inside = changes(in: exported, row: row, from: x0, to: x1)
+        let outside = changes(in: exported, row: row, from: x1 + 8, to: x1 + 8 + (x1 - x0))
+        #expect(outside > (x1 - x0) / 2, "the stripes outside the blur are untouched")
+        #expect(inside <= cells, "under the blur the row only changes at cell edges (\(inside) changes, at most \(cells) cells)")
+        // The first and last rows of the region too: a partial cell at an edge is still a cell.
+        for edgeRow in [Int(rect.minY * scale), Int(rect.maxY * scale) - 1] {
+            #expect(changes(in: exported, row: edgeRow, from: x0, to: x1) <= cells, "row \(edgeRow) is hidden")
+        }
+    }
+
+    @Test("EX-05c: The mosaic keeps the region the right way up (light above, dark below stays so)")
+    func testMosaicIsUpright() {
+        // Top half white, bottom half black, in image rows (top first).
+        let width = 100, height = 100
+        let context = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.setFillColor(CGColor(gray: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height / 2))       // y-up: the lower half
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: height / 2, width: width, height: height / 2))
+        let base = context.makeImage()!
+        #expect(getPixelColor(image: base, x: 50, y: 10).r > 200, "row 10 of the source is white")
+
+        let blur = BlurAnnotationCommand(rect: CGRect(x: 20, y: 18, width: 60, height: 64), pixelSize: 16)
+        let exported = ImageExportService.shared.renderAnnotatedImage(baseImage: base, commands: [blur], cropRect: nil, scale: 1)
+        #expect(getPixelColor(image: exported, x: 50, y: 22).r > 200, "the top of the mosaic is light")
+        #expect(getPixelColor(image: exported, x: 50, y: 78).r < 60, "the bottom of the mosaic is dark")
+    }
+
     @Test("EX-06: Crop sub-image extraction crops to exact requested dimensions")
     func testCropSubImageExtraction() {
         let exportService = ImageExportService.shared

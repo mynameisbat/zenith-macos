@@ -70,6 +70,7 @@ enum ZenithToolActions {
                 // From the island the button is gone once it is clicked: say that something is happening.
                 ToastHUDController.shared.show(message: "Scanning for system junk…", icon: "sparkles")
                 await cleaner.scan()
+                CleanerScanScheduler.shared.noteManualScan(reclaimableBytes: cleaner.selectedJunkSize, itemCount: cleaner.selectedItemCount)
             }
             guard cleaner.selectedJunkSize > 0 else {
                 ToastHUDController.shared.show(message: "No system junk found", icon: "checkmark.circle.fill")
@@ -95,8 +96,10 @@ enum ZenithToolActions {
     }
 
     static func boost() {
-        ZenithCommandHubState.shared.boostSystem()
-        ToastHUDController.shared.show(message: "Boost: memory purged, DNS cache flushed", icon: "bolt.fill")
+        Task {
+            let result = await ZenithCommandHubState.shared.boostSystem()
+            ToastHUDController.shared.show(verbatim: result.message, icon: "bolt.fill")
+        }
     }
 }
 
@@ -119,12 +122,25 @@ enum CleanerSettingsLink {
     }
 }
 
+/// Carries the dialog into the run-loop block, which only ever runs on the main thread. (Whether `NSWindow` is
+/// `Sendable` differs between SDKs, so neither a plain capture nor `nonisolated(unsafe)` builds cleanly on both.)
+private struct DialogWindow: @unchecked Sendable {
+    let window: NSWindow
+}
+
 /// Dialogs asked for from an island page (a confirmation, a file chooser) must not open underneath it: the island
 /// floats above the menu bar, and a page can cover the middle of the screen.
 @MainActor
 enum IslandDialogs {
     static func raiseAboveIsland(_ window: NSWindow) {
         guard ZenithIslandState.shared.page != nil else { return }
-        window.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)
+        let level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)
+        window.level = level
+        // `runModal()` puts an alert or open panel back at the modal-panel level as it starts, which is under the
+        // island: the dialog was there but hidden, and Zenith looked stuck. Raise it again once the modal session runs.
+        let dialog = DialogWindow(window: window)
+        RunLoop.main.perform(inModes: [.modalPanel, .common]) {
+            MainActor.assumeIsolated { dialog.window.level = level }
+        }
     }
 }

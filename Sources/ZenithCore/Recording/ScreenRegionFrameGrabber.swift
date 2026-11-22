@@ -2,15 +2,13 @@ import Foundation
 import CoreGraphics
 import ScreenCaptureKit
 
-/// Captures one area of a display for scrolling capture, without the shutter sound. On macOS 14+ it uses
-/// ScreenCaptureKit and leaves Zenith's own windows (the progress panel, the outline) out; macOS 13 has no such
-/// screenshot API, so there the panel is placed outside the area instead.
+/// Captures one area of a display for scrolling capture, without the shutter sound, with ScreenCaptureKit, leaving
+/// Zenith's own windows (the progress panel, the outline) out.
 public final class ScreenRegionFrameGrabber: ScrollFrameGrabbing, @unchecked Sendable {
     private let displayID: CGDirectDisplayID
     /// Display-local points, origin at the top-left of the display.
     private let rect: CGRect
     private let scale: CGFloat
-    private let fallback = NativeScreenCaptureBackend()
     private let lock = NSLock()
     private var cachedFilter: AnyObject?
 
@@ -21,15 +19,9 @@ public final class ScreenRegionFrameGrabber: ScrollFrameGrabbing, @unchecked Sen
     }
 
     public func grab() async throws -> CGImage {
-        if #available(macOS 14, *) {
-            if let image = try? await grabWithScreenCaptureKit() {
-                return image
-            }
-        }
-        return try await fallback.captureDisplayRegion(rect, displayID: displayID)
+        try await grabWithScreenCaptureKit()
     }
 
-    @available(macOS 14, *)
     private func grabWithScreenCaptureKit() async throws -> CGImage {
         let filter: SCContentFilter
         if let cached = lock.withLock({ cachedFilter }) as? SCContentFilter {

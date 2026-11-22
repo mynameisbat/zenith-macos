@@ -324,7 +324,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
             }
         }
         if let topHog = snap.cpu.topHogs.first {
-            tip += "\n" + String(localized: "Top Hog: \(topHog.name) (\(String(format: "%.1f", topHog.cpuPercent))%)")
+            tip += "\n" + String(localized: "Top Hog: \(topHog.name) (\(LocalizedNumber.decimal(topHog.cpuPercent, fractionDigits: 1))%)")
         }
         button.toolTip = tip
     }

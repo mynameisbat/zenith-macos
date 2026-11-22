@@ -2,8 +2,8 @@ import AppKit
 import CoreGraphics
 import ZenithCore
 
-/// `Zenith --check-screen-capture`: takes the main display with the CoreGraphics call and with ScreenCaptureKit (the
-/// fallback `NativeScreenCaptureBackend` uses when the first returns nothing) and says whether they agree.
+/// `Zenith --check-screen-capture`: takes the main display the way `NativeScreenCaptureBackend` does (ScreenCaptureKit)
+/// and says whether the image has the display's native pixel size.
 enum ScreenCaptureDiagnostic {
     static func run() async -> Int32 {
         let backend = NativeScreenCaptureBackend()
@@ -26,23 +26,9 @@ enum ScreenCaptureDiagnostic {
         }
 
         var failed = false
-        let coreGraphicsImage = CGDisplayCreateImage(displayID)
-        if let image = coreGraphicsImage {
-            print("CGDisplayCreateImage:  \(image.width) x \(image.height) pixels")
-        } else {
-            print("CGDisplayCreateImage:  returned nothing (the fallback would be used)")
-        }
-
-        guard #available(macOS 14, *) else {
-            // ScreenCaptureKit's screenshot call arrives with macOS 14, so on macOS 13 there is no fallback to compare.
-            print("ScreenCaptureKit:      not available before macOS 14; CGDisplayCreateImage is the only capture path")
-            print(coreGraphicsImage == nil ? "RESULT: the display could not be captured" : "RESULT: the display is captured")
-            return coreGraphicsImage == nil ? 1 : 0
-        }
-
         do {
             if let image = try await backend.captureViaScreenCaptureKit(displayID: displayID) {
-                print("ScreenCaptureKit:      \(image.width) x \(image.height) pixels")
+                print("ScreenCaptureKit:      \(image.width) x \(image.height) pixels, \(image.colorSpace?.name as String? ?? "no color space")")
                 if image.width != expected.0 || image.height != expected.1 {
                     print("  -> not the display's native resolution")
                     failed = true
@@ -55,7 +41,7 @@ enum ScreenCaptureDiagnostic {
             print("ScreenCaptureKit:      failed: \(error.localizedDescription)")
             failed = true
         }
-        print(failed ? "RESULT: the fallback does not match" : "RESULT: the fallback captures at the display's native resolution")
+        print(failed ? "RESULT: the display could not be captured at its native resolution" : "RESULT: the display is captured at its native resolution")
         return failed ? 1 : 0
     }
 }

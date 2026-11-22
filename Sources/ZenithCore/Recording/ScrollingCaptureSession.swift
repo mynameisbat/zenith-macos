@@ -14,7 +14,8 @@ public protocol ScrollFrameGrabbing: Sendable {
 public protocol ScrollEventPosting: Sendable {
     /// Whether events can be posted (Accessibility is allowed).
     var canPost: Bool { get }
-    /// Scrolls the content under `point` (global CoreGraphics coordinates, points) down by `points`.
+    /// Scrolls the content under `point` (global CoreGraphics coordinates, points) down by `points`; a negative value
+    /// scrolls back up.
     func scrollDown(points: Int, at point: CGPoint)
 }
 
@@ -26,10 +27,11 @@ public struct CGScrollEventPoster: ScrollEventPosting {
 
     public func scrollDown(points: Int, at point: CGPoint) {
         // The scroll goes to the window under the pointer, so the pointer is moved there first. A few smaller events
-        // work with more apps than one large one.
+        // work with more apps than one large one. A negative `points` scrolls back up.
         CGWarpMouseCursorPosition(point)
         let steps = 4
-        let each = max(1, points / steps)
+        let each = points / steps
+        guard each != 0 else { return }
         for _ in 0..<steps {
             guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: Int32(-each), wheel2: 0, wheel3: 0) else { continue }
             event.location = point
@@ -147,16 +149,28 @@ public final class ScrollingCaptureSession: ObservableObject {
 
     private var shouldStop: Bool { finishRequested || cancelRequested || reachedLimit }
 
+    /// The smallest step automatic mode backs off to.
+    static let minimumStepPoints = 20
+
     private func runAutomatic() async throws {
         var unchangedInARow = 0
         var steps = 0
-        let expected = Int((CGFloat(stepPoints) * pixelScale).rounded())
+        var step = stepPoints
         while !shouldStop, steps < maxSteps {
             steps += 1
-            poster.scrollDown(points: stepPoints, at: scrollPoint)
+            poster.scrollDown(points: step, at: scrollPoint)
             try await sleep(settleDelay)
             if shouldStop { break }
-            let result = try await add(grabber.grab(), expected: expected)
+            let result = try await add(grabber.grab(), expected: Int((CGFloat(step) * pixelScale).rounded()))
+            if result == .noMatch, step > Self.minimumStepPoints {
+                // Nothing of the last frame was left to join to: the app moved further than asked, or the frame
+                // was taken while it was still moving. Go back and take smaller steps from there: the stitcher
+                // still holds the last frame that fitted.
+                poster.scrollDown(points: -step, at: scrollPoint)
+                try await sleep(settleDelay)
+                step = max(Self.minimumStepPoints, step / 2)
+                continue
+            }
             if result == .unchanged {
                 unchangedInARow += 1
                 if unchangedInARow >= 2 { break }  // the end of the page

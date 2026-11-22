@@ -58,10 +58,6 @@ public final class SystemLaunchAtLoginService: LaunchAtLoginServiceProtocol, Sen
 
     /// Deep link to macOS System Settings -> General -> Login Items.
     public static func openLoginItemsSettings() {
-        if #available(macOS 13.0, *) {
-            SMAppService.openSystemSettingsLoginItems()
-        } else if let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
-            NSWorkspace.shared.open(url)
-        }
+        SMAppService.openSystemSettingsLoginItems()
     }
 }

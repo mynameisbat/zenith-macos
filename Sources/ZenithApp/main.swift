@@ -20,7 +20,7 @@ if let flag = arguments.firstIndex(of: "--render-screenshots"), flag + 1 < argum
 }
 
 if arguments.contains("--check-screen-capture") {
-    // Runs both capture paths and compares them. Needs the Screen Recording permission of whatever started it.
+    // Captures the main display with ScreenCaptureKit and checks its pixel size. Needs the Screen Recording permission of whatever started it.
     final class ExitCode: @unchecked Sendable { var value: Int32 = 0 }
     let result = ExitCode()
     let finished = DispatchSemaphore(value: 0)
@@ -44,7 +44,7 @@ if arguments.contains("--help") {
       --render-screenshots DIR
                       Write PNGs of the main views, drawn with made-up data, into DIR (used for the website)
       --check-screen-capture
-                      Capture the main display with both methods and compare them (needs Screen Recording permission)
+                      Capture the main display and check it has the native pixel size (needs Screen Recording permission)
       --help          Show this help message
     """)
     exit(0)
@@ -56,7 +56,7 @@ let app = NSApplication.shared
 
 // 3. Set activation policy to .accessory BEFORE running event loop
 // Suppresses Dock icon and Cmd-Tab application switcher
-app.setActivationPolicy(.accessory)
+app.setActivationPolicy(.zenith)
 
 // 4. Instantiate and assign application delegate
 let delegate = AppDelegate()

@@ -195,6 +195,27 @@ struct ZenithDynamicIslandTests {
         #expect(!state.isExpanded)
     }
 
+    @Test("ISL-06b: The open island stays open while one of its context menus shows")
+    @MainActor
+    func testContextMenuKeepsIslandOpen() async {
+        let state = ZenithIslandState()
+        state.hoverOpenDelay = 0
+        state.onMouseEnter()
+        #expect(state.isExpanded)
+
+        // The pointer moves onto the menu, outside the island.
+        state.isShowingContextMenu = true
+        state.onMouseLeave()
+        try? await Task.sleep(nanoseconds: 450_000_000)   // longer than the 300 ms collapse grace
+        #expect(state.isExpanded, "the island must not close under its own menu")
+
+        // Menu gone, pointer still away: leaving closes it as usual.
+        state.isShowingContextMenu = false
+        state.onMouseLeave()
+        try? await Task.sleep(nanoseconds: 450_000_000)
+        #expect(!state.isExpanded)
+    }
+
     @Test("ISL-07: ZenithIslandGeometry bounds safety and multi-display edge cases")
     func testGeometryBoundsSafety() {
         // Test custom screen dimensions (e.g. 4K monitor 3840x2160, 5K Studio Display 5120x2880)

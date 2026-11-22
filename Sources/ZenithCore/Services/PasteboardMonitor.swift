@@ -142,11 +142,10 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
             if let pngData = bitmapRep.representation(using: .png, properties: [:]) {
                 pasteboard.setData(pngData, forType: .png)
             }
-
-            let newCount = pasteboard.changeCount
-            lastSuppressedChangeCount = newCount
-            lastObservedChangeCount = newCount
-            return newCount
+            // Not marked as Zenith's own write: copying an annotated capture is a new copy the user made, and it
+            // belongs in the history like the text that Copy Text puts there. (Writing an item back from the history
+            // stays suppressed, above, so pasting from the history does not add it twice.)
+            return pasteboard.changeCount
         }
         lock.unlock()
         notifyChange(newCount)

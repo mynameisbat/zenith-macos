@@ -287,6 +287,7 @@ public final class ZenithIslandWindowController: NSObject {
     private var localMouseMonitor: Any?
     private var globalScrollMonitor: Any?
     private var fullscreenObservers: [NSObjectProtocol] = []
+    private var menuObservers: [NSObjectProtocol] = []
     private var localScrollMonitor: Any?
     private var localClickMonitor: Any?
     /// Installed only while a page is open: a click anywhere else, or Escape, closes it.
@@ -328,6 +329,7 @@ public final class ZenithIslandWindowController: NSObject {
         islandPanel.contentView = hosted
         islandPanel.setFrame(initialFrame, display: false)
         islandPanel.orderFrontRegardless()
+        observeContextMenus()
 
         if let frameView = islandPanel.contentView?.superview {
             ZenithIslandHostingView.enableFrameHitTestPassthrough(for: frameView)
@@ -563,6 +565,34 @@ public final class ZenithIslandWindowController: NSObject {
 
     /// Where the pointer has to be for a mouse move to matter: around the closed island, or around the page while
     /// one is open (a page stays open with the pointer away, and must wake up when it comes back).
+    /// Keeps the open island open while a context menu from it (a dock icon's Move Left, Remove from Dock…) shows,
+    /// then gives the user a moment to see what the choice did before closing it if the pointer has left.
+    private func observeContextMenus() {
+        guard menuObservers.isEmpty else { return }
+        let center = NotificationCenter.default
+        menuObservers.append(center.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let state = ZenithIslandState.shared
+                if state.isExpanded, self.activeScreenRect.contains(NSEvent.mouseLocation) {
+                    state.isShowingContextMenu = true
+                }
+            }
+        })
+        menuObservers.append(center.addObserver(forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                let state = ZenithIslandState.shared
+                guard state.isShowingContextMenu else { return }
+                state.isShowingContextMenu = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                    guard let self, state.isExpanded, state.page == nil,
+                          !self.activeScreenRect.contains(NSEvent.mouseLocation) else { return }
+                    state.onMouseLeave()
+                }
+            }
+        })
+    }
+
     private var pointerInteractionRect: CGRect {
         mouseStateLock.lock()
         defer { mouseStateLock.unlock() }

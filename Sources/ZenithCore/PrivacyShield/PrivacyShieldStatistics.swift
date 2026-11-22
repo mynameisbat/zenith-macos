@@ -54,10 +54,10 @@ public struct PrivacyRequestLogRecord: Identifiable, Sendable, Equatable {
         }
         let kb = Double(bytes) / 1024.0
         if kb < 1024 {
-            return String(format: "%.1f KB", kb)
+            return "\(LocalizedNumber.decimal(kb, fractionDigits: 1)) KB"
         }
         let mb = kb / 1024.0
-        return String(format: "%.1f MB", mb)
+        return "\(LocalizedNumber.decimal(mb, fractionDigits: 1)) MB"
     }
 
     private static let timeFormatter: DateFormatter = {
@@ -207,9 +207,9 @@ public final class PrivacyShieldStatistics: ObservableObject {
         }
         let kb = Double(totalBytesShielded) / 1024.0
         if kb < 1024 {
-            return String(format: "%.1f KB", kb)
+            return "\(LocalizedNumber.decimal(kb, fractionDigits: 1)) KB"
         }
         let mb = kb / 1024.0
-        return String(format: "%.1f MB", mb)
+        return "\(LocalizedNumber.decimal(mb, fractionDigits: 1)) MB"
     }
 }

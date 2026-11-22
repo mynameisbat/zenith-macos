@@ -75,7 +75,7 @@ struct AIAgentsSettingsSection: View {
             }
         }
         .onAppear(perform: refreshInstalled)
-        .onValueChange(of: settings.isEnabled) { _ in refreshInstalled() }
+        .onChange(of: settings.isEnabled) { _, _ in refreshInstalled() }
     }
 
     private func refreshInstalled() {

@@ -66,6 +66,7 @@ struct AppUninstallerView: View {
                     .controlSize(.small)
                     .help("Pick an app that is not in the Applications folder")
                 }
+                .fixedSize()  // the description beside them wraps instead; "Choose Ap…" was cut short
             }
             if let notice = model.notice {
                 Text(verbatim: notice).font(.system(size: 11)).foregroundColor(.secondary)

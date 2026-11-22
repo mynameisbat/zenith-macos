@@ -15,7 +15,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         NSLog("[Zenith] Application did finish launching in accessory mode.")
 
         // 1. Reassert accessory activation policy for LaunchServices / login items
-        NSApplication.shared.setActivationPolicy(.accessory)
+        NSApplication.shared.setActivationPolicy(.zenith)
 
         // 2. Disable macOS automatic termination so closing Settings never kills the background app
         ProcessInfo.processInfo.disableAutomaticTermination("Zenith persistent menu bar accessory")
@@ -236,5 +236,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             }
         }
+    }
+}
+
+extension NSApplication.ActivationPolicy {
+    /// `.accessory` (no Dock icon, not in ⌘Tab), unless the bundle's Info.plist sets `LSUIElement` to false. Zenith
+    /// ships with it true; a copy with it false shows in the Dock so UI automation tools, which do not list accessory
+    /// apps, can drive it.
+    static var zenith: NSApplication.ActivationPolicy {
+        (Bundle.main.object(forInfoDictionaryKey: "LSUIElement") as? Bool) == false ? .regular : .accessory
     }
 }

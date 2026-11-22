@@ -141,6 +141,17 @@ public struct ZenithPreferencesView: View {
             TextField("Search", text: $viewModel.searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12.5))
+                // As System Settings does: the pane follows the search, so the content never shows a section the
+                // sidebar has filtered away ("proxy" listed Privacy Shield while General stayed open).
+                .onChange(of: viewModel.searchText) { _, _ in
+                    let results = filteredTabs
+                    if let first = results.first, !results.contains(viewModel.selectedTab) {
+                        viewModel.selectedTab = first
+                    }
+                }
+                .onSubmit {
+                    if let first = filteredTabs.first { viewModel.selectedTab = first }
+                }
             if !viewModel.searchText.isEmpty {
                 Button {
                     viewModel.searchText = ""

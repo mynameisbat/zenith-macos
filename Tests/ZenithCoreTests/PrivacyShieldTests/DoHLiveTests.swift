@@ -75,7 +75,7 @@ struct DoHLiveTests {
                 var addr = sin.pointee.sin_addr
                 inet_ntop(AF_INET, &addr, &buffer, socklen_t(INET_ADDRSTRLEN))
             }
-            system.append(String(cString: buffer))
+            system.append(String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self))
             cursor = entry.pointee.ai_next
         }
         freeaddrinfo(result)

@@ -448,6 +448,7 @@ public struct NowPlayingExpandedView: View {
                     HStack(spacing: 3) {
                         Image(systemName: track.app.iconName)
                             .font(.system(size: 8.5))
+                            .accessibilityHidden(true)  // the app's name says it; VoiceOver read "Globe" for a browser
                         Text(track.app.displayName)
                             .font(.system(size: 9, weight: .bold))
                     }
@@ -590,6 +591,8 @@ public struct NowPlayingExpandedView: View {
                 .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
         )
         .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Artwork")
     }
 }
 

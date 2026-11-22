@@ -5,7 +5,9 @@ import CoreGraphics
 public protocol AnnotationCommand: Sendable {
     /// Renders the annotation onto the provided CGContext.
     /// - Parameters:
-    ///   - context: The CoreGraphics bitmap context.
+    ///   - context: A context whose coordinates start top left with y growing downwards: the export flips its bitmap
+    ///     to that, and the editor's SwiftUI canvas already is (with a positive `ctm.d`, so the CTM cannot tell).
+    ///     Text and images are drawn upright for that space.
     ///   - scale: Display backing scale factor (e.g. 2.0 for Retina displays).
     func apply(to context: CGContext, scale: CGFloat)
 }

@@ -401,6 +401,16 @@ public final class CleanerScanScheduler: ObservableObject {
         return true
     }
 
+    /// A scan run by hand counts as the last scan while scheduled scans are on: the Settings line next to its result
+    /// kept showing the older scheduled figure ("21 hours ago, 504,9 MB" under a fresh 2,67 GB), and the next
+    /// scheduled scan need not repeat it so soon. No notice: the user is looking at the result.
+    public func noteManualScan(reclaimableBytes: Int64, itemCount: Int) {
+        guard settings.isEnabled else { return }
+        let result = ScheduledCleanerScanResult(date: now(), reclaimableBytes: reclaimableBytes, itemCount: itemCount)
+        settings.lastResult = result
+        scheduleCheck(at: result.date.addingTimeInterval(settings.interval.seconds))
+    }
+
     private func scheduleCheck(at date: Date?) {
         timer?.invalidate()
         timer = nil

@@ -19,29 +19,17 @@ public final class EventKitUpcomingEventProvider: UpcomingEventProviding, @unche
     public func accessState() -> CalendarAccessState {
         guard hasUsageDescription else { return .unavailable }
         let status = EKEventStore.authorizationStatus(for: .event)
-        if #available(macOS 14, *) {
-            switch status {
-            case .notDetermined: return .notDetermined
-            case .fullAccess: return .granted
-            case .denied, .restricted, .writeOnly: return .denied
-            @unknown default: return .denied
-            }
-        }
-        // macOS 13 has no write-only access, and `.authorized` is what `.fullAccess` was called there.
         switch status {
         case .notDetermined: return .notDetermined
-        case .authorized: return .granted
-        default: return .denied
+        case .fullAccess: return .granted
+        case .denied, .restricted, .writeOnly: return .denied
+        @unknown default: return .denied
         }
     }
 
     public func requestAccess() async -> Bool {
         guard hasUsageDescription else { return false }
-        if #available(macOS 14, *) {
-            return (try? await store.requestFullAccessToEvents()) ?? false
-        }
-        // macOS 13 only has the older call, which asks for the same full access.
-        return (try? await store.requestAccess(to: .event)) ?? false
+        return (try? await store.requestFullAccessToEvents()) ?? false
     }
 
     public func events(from start: Date, to end: Date) -> [UpcomingEvent] {

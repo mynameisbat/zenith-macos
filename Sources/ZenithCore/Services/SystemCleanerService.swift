@@ -117,10 +117,15 @@ public final class SystemCleanerService: ObservableObject {
     @Published public private(set) var lastFailedItemNames: [String] = []
 
     private let homeOverride: String?
+    /// Runs the cache flushes of `optimizeMemory` (tests pass a recording runner).
+    private let commandRunner: SystemCommandRunner
 
-    /// - Parameter homeDirectory: The home directory to scan and clean; the current user's when `nil`.
-    public init(homeDirectory: String? = nil) {
+    /// - Parameters:
+    ///   - homeDirectory: The home directory to scan and clean; the current user's when `nil`.
+    ///   - commandRunner: Runs `qlmanage` and `dscacheutil` for `optimizeMemory`.
+    public init(homeDirectory: String? = nil, commandRunner: @escaping SystemCommandRunner = SystemCommand.processRunner) {
         self.homeOverride = homeDirectory
+        self.commandRunner = commandRunner
         refreshDiskSpace()
         refreshMemoryTelemetry()
     }
@@ -841,22 +846,14 @@ public final class SystemCleanerService: ObservableObject {
         malloc_zone_pressure_relief(nil, 0)
 
         // 2. Flush system QuickLook cache and Directory Services cache
+        // The runner drains both pipes before waiting and returns nil for a command that cannot start, so neither a
+        // chatty child nor a missing binary can hang or crash this. (Waiting on a `Process` that never launched raises
+        // an Objective-C exception Swift cannot catch.) Both are best-effort cache flushes: a failure only means less
+        // was reclaimed, which the before/after figures already show.
+        let runner = commandRunner
         await Task.detached(priority: .userInitiated) {
-            let p1 = Process()
-            p1.executableURL = URL(fileURLWithPath: "/usr/bin/qlmanage")
-            p1.arguments = ["-r", "cache"]
-            p1.standardOutput = Pipe()
-            p1.standardError = Pipe()
-            try? p1.run()
-            p1.waitUntilExit()
-
-            let p2 = Process()
-            p2.executableURL = URL(fileURLWithPath: "/usr/bin/dscacheutil")
-            p2.arguments = ["-flushcache"]
-            p2.standardOutput = Pipe()
-            p2.standardError = Pipe()
-            try? p2.run()
-            p2.waitUntilExit()
+            _ = runner("/usr/bin/qlmanage", ["-r", "cache"])
+            _ = runner("/usr/bin/dscacheutil", ["-flushcache"])
         }.value
 
         // Allow kernel virtual memory manager a moment to reclaim pages
@@ -1036,19 +1033,20 @@ public final class SystemCleanerService: ObservableObject {
 
     // MARK: - Byte Formatting Utility
 
-    nonisolated public static func formatBytes(_ bytes: Int64) -> String {
+    /// Binary units (1 KB = 1024 B), with the decimal separator of `locale` (the user's region by default).
+    nonisolated public static func formatBytes(_ bytes: Int64, locale: Locale = .autoupdatingCurrent) -> String {
         if bytes < 1024 {
             return "\(bytes) B"
         }
         let kb = Double(bytes) / 1024.0
         if kb < 1024 {
-            return String(format: "%.1f KB", kb)
+            return "\(LocalizedNumber.decimal(kb, fractionDigits: 1, locale: locale)) KB"
         }
         let mb = kb / 1024.0
         if mb < 1024 {
-            return String(format: "%.1f MB", mb)
+            return "\(LocalizedNumber.decimal(mb, fractionDigits: 1, locale: locale)) MB"
         }
         let gb = mb / 1024.0
-        return String(format: "%.2f GB", gb)
+        return "\(LocalizedNumber.decimal(gb, fractionDigits: 2, locale: locale)) GB"
     }
 }

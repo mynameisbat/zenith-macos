@@ -119,7 +119,7 @@ public struct ZenithCommandHubView: View {
             hubState.refreshHardwareSnapshot()
             if !inIsland { PortManagerModel.shared.refresh() }
         }
-        .onValueChange(of: hubState.presentationID) { _ in
+        .onChange(of: hubState.presentationID) { _, _ in
             isSearchFocused = true
             hubState.refreshLaunchButtonPlacement()
         }
@@ -412,7 +412,7 @@ public struct ZenithCommandHubView: View {
 
             Spacer(minLength: 6)
 
-            Text(String(format: "%.1f%%", hog.cpuPercent))
+            Text(verbatim: LocalizedNumber.percent(hog.cpuPercent))
                 .font(.system(size: 12, weight: .medium))
                 .monospacedDigit()
                 .foregroundStyle(cpuColor(hog.cpuPercent))
@@ -459,7 +459,7 @@ public struct ZenithCommandHubView: View {
                     fraction: cpuPercent / 100,
                     tint: cpuPercent > 75 ? ZenithTheme.danger : (cpuPercent > 40 ? ZenithTheme.warning : ZenithTheme.accent)
                 )
-                .help(String(format: "CPU: %.1f%% across %d cores", cpuPercent, snapshot.cpu.coreCount))
+                .help("CPU: \(LocalizedNumber.percent(cpuPercent)) across \(snapshot.cpu.coreCount) cores")
 
                 HubMeterView(
                     title: "Memory",
@@ -470,8 +470,10 @@ public struct ZenithCommandHubView: View {
                 .help("Memory: \(HardwareTelemetryService.formatBytes(memory.usedBytes)) used of \(HardwareTelemetryService.formatBytes(memory.totalBytes)), \(memory.pressureLevel.rawValue) pressure")
 
                 HubMeterView(
-                    title: "Storage",
-                    value: String(localized: "\(HardwareTelemetryService.formatBytes(disk.freeBytes)) free"),
+                    // "Free Space" as the title, so the value is just the size: "387,9 GB free" was cut off
+                    // in the island's four-meter row.
+                    title: "Free Space",
+                    value: HardwareTelemetryService.formatBytes(disk.freeBytes),
                     fraction: disk.usedPercent / 100,
                     tint: disk.usedPercent > 90 ? ZenithTheme.danger : ZenithTheme.accent
                 )

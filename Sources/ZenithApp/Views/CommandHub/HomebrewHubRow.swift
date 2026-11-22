@@ -36,7 +36,7 @@ struct HomebrewHubRow: View {
             }
         }
         .onAppear(perform: check)
-        .onValueChange(of: hubState.presentationID) { _ in check() }
+        .onChange(of: hubState.presentationID) { _, _ in check() }
     }
 
     private var updatesText: LocalizedStringKey {

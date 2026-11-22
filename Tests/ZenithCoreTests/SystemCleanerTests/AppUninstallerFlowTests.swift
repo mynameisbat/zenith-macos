@@ -288,7 +288,7 @@ struct AppUninstallerFlowTests {
     }
 
     @Test("UNINST-14: The app and the chosen files go to the Trash; anything else stays, even if a list names it")
-    func testUninstallMovesOnlyWhatWasChosen() throws {
+    func testUninstallMovesOnlyWhatWasChosen() async throws {
         let box = try Sandbox()
         defer { box.cleanup() }
         let acme = try installAcme(in: box)
@@ -298,7 +298,7 @@ struct AppUninstallerFlowTests {
         let chosen = acme.plan.leftovers.filter { !$0.matchedByName }
             // A hand-made entry for another app's folder: inside ~/Library, but not this app's.
             + [AppLeftoverItem(name: "OtherApp", path: other.path, kind: .appSupport, sizeBytes: 999)]
-        let freed = try box.service().uninstall(plan: acme.plan, selectedLeftovers: chosen)
+        let freed = try await box.service().uninstall(plan: acme.plan, selectedLeftovers: chosen)
 
         #expect(box.trashedNames == ["Acme.app", "com.acme.app", "com.acme.app.agent.plist", "com.acme.app.plist"])
         #expect(!box.exists(acme.app) && !box.exists(acme.cache) && !box.exists(acme.prefs) && !box.exists(acme.agent))
@@ -313,25 +313,25 @@ struct AppUninstallerFlowTests {
     }
 
     @Test("UNINST-15: Leftovers alone can go while the app stays")
-    func testUninstallLeftoversOnly() throws {
+    func testUninstallLeftoversOnly() async throws {
         let box = try Sandbox()
         defer { box.cleanup() }
         let acme = try installAcme(in: box)
 
-        try box.service().uninstall(plan: acme.plan, selectedLeftovers: [acme.plan.leftovers.first { $0.kind == .caches }!], includeApp: false)
+        try await box.service().uninstall(plan: acme.plan, selectedLeftovers: [acme.plan.leftovers.first { $0.kind == .caches }!], includeApp: false)
         #expect(box.trashedNames == ["com.acme.app"])
         #expect(box.exists(acme.app) && box.exists(acme.prefs))
     }
 
     @Test("UNINST-16: An open app is asked to quit; if it stays open nothing is removed")
-    func testRunningAppMustQuitFirst() throws {
+    func testRunningAppMustQuitFirst() async throws {
         let box = try Sandbox()
         defer { box.cleanup() }
         let acme = try installAcme(in: box)
 
         let stubborn = FakeRunningApps(running: true, quitsWhenAsked: false)
-        #expect(throws: UninstallError.appStillRunning("Acme")) {
-            try box.service(running: stubborn.control).uninstall(plan: acme.plan)
+        await #expect(throws: UninstallError.appStillRunning("Acme")) {
+            try await box.service(running: stubborn.control).uninstall(plan: acme.plan)
         }
         #expect(stubborn.quitRequests == 1)
         #expect(box.trashedNames.isEmpty)
@@ -341,19 +341,19 @@ struct AppUninstallerFlowTests {
         let polite = FakeRunningApps(running: true, quitsWhenAsked: true)
         let service = box.service(running: polite.control)
         #expect(service.isAppRunning(acme.plan.app))
-        try service.uninstall(plan: acme.plan)
+        try await service.uninstall(plan: acme.plan)
         #expect(polite.quitRequests == 1)
         #expect(!box.exists(acme.app))
     }
 
     @Test("UNINST-17: If the app cannot be moved, its files are left where they are")
-    func testAppThatCannotBeTrashedStopsEverything() throws {
+    func testAppThatCannotBeTrashedStopsEverything() async throws {
         let box = try Sandbox()
         defer { box.cleanup() }
         let acme = try installAcme(in: box)
 
-        #expect(throws: (any Error).self) {
-            try box.service(refusingToTrash: ["Acme.app"]).uninstall(plan: acme.plan)
+        await #expect(throws: (any Error).self) {
+            try await box.service(refusingToTrash: ["Acme.app"]).uninstall(plan: acme.plan)
         }
         #expect(box.trashedNames.isEmpty)
         #expect(box.exists(acme.app) && box.exists(acme.cache) && box.exists(acme.prefs) && box.exists(acme.agent))
@@ -362,13 +362,13 @@ struct AppUninstallerFlowTests {
     }
 
     @Test("UNINST-18: A file that cannot be moved is named; the rest still goes")
-    func testLeftoverFailureIsReported() throws {
+    func testLeftoverFailureIsReported() async throws {
         let box = try Sandbox()
         defer { box.cleanup() }
         let acme = try installAcme(in: box)
 
         do {
-            try box.service(refusingToTrash: ["com.acme.app.plist"]).uninstall(plan: acme.plan)
+            try await box.service(refusingToTrash: ["com.acme.app.plist"]).uninstall(plan: acme.plan)
             Issue.record("the failure should be thrown")
         } catch let UninstallError.someFailed(names, _) {
             #expect(names == ["com.acme.app.plist"])
@@ -379,7 +379,7 @@ struct AppUninstallerFlowTests {
     }
 
     @Test("UNINST-19: Apple's apps and Zenith are refused even with a hand-made plan")
-    func testProtectedAppsAreRefusedAtRemoval() throws {
+    func testProtectedAppsAreRefusedAtRemoval() async throws {
         let box = try Sandbox()
         defer { box.cleanup() }
         let service = box.service()
@@ -389,14 +389,14 @@ struct AppUninstallerFlowTests {
             app: InstalledAppInfo(bundlePath: apple.path, bundleIdentifier: "com.apple.Notes", displayName: "Notes", version: "1", appSizeBytes: 1),
             leftovers: []
         )
-        #expect(throws: UninstallError.protectedSystemApplication) { try service.uninstall(plan: applePlan) }
+        await #expect(throws: UninstallError.protectedSystemApplication) { try await service.uninstall(plan: applePlan) }
 
         let own = try box.makeApp("Zenith.app", bundleID: "dev.zenith.self")
         let ownPlan = AppUninstallPlan(
             app: InstalledAppInfo(bundlePath: own.path, bundleIdentifier: "dev.zenith.self", displayName: "Zenith", version: "1", appSizeBytes: 1),
             leftovers: []
         )
-        #expect(throws: UninstallError.cannotUninstallZenith) { try service.uninstall(plan: ownPlan) }
+        await #expect(throws: UninstallError.cannotUninstallZenith) { try await service.uninstall(plan: ownPlan) }
         #expect(box.exists(apple) && box.exists(own))
         #expect(box.trashedNames.isEmpty)
     }

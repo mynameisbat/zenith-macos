@@ -8,7 +8,6 @@
 "%@ available of %@" = "可用 %1$@，共 %2$@";
 "%@ characters · %@ words · %@ lines" = "%@ 个字符 · %@ 个单词 · %@ 行";
 "%@ characters · %@ words · 1 line" = "%@ 个字符 · %@ 个单词 · 1 行";
-"%@ free" = "可用 %@";
 "%@ line" = "%@线";
 "%@ shortcut, %@" = "%1$@快捷键，%2$@";
 "%@ timer, %@ left" = "%1$@计时器，剩余 %2$@";
@@ -33,6 +32,8 @@
 "%lld found, %@ in all." = "找到 %lld 项，共 %@。";
 "%lld items" = "%lld 个项目";
 "%lld junk files" = "%lld 个垃圾文件";
+"1 junk file" = "1 个垃圾文件";
+"No external drive is connected." = "未连接外置磁盘。";
 "%lld min" = "%lld 分钟";
 "%lld min · %lld done today" = "%lld 分钟 · 今天完成 %lld 次";
 "%lld ms" = "%lld 毫秒";
@@ -92,7 +93,8 @@
 "Blocks ads, trackers, and malicious domains" = "拦截广告、跟踪器和恶意域名";
 "Blue" = "蓝色";
 "Boost" = "加速";
-"Boost: memory purged, DNS cache flushed" = "加速：已释放内存，已清除 DNS 缓存";
+"Boost done: memory freed" = "加速完成：已释放内存";
+"Boost done: memory freed, DNS flushed" = "加速完成：已释放内存，已刷新 DNS";
 "Bootstrap IP (Optional):" = "引导 IP（可选）：";
 "Break" = "休息";
 "Break Length" = "休息时长";
@@ -267,7 +269,14 @@
 "NextDNS" = "NextDNS";
 "NextDNS (%@)" = "NextDNS（%@）";
 "NextDNS profile ID: %@" = "NextDNS 配置 ID：%@";
-"No %@ in the history yet." = "历史记录中还没有%@。";
+"“%@” is in the history, but not as text." = "历史记录中有“%@”，但不是文本。";
+"“%@” is in the history, but not as a link." = "历史记录中有“%@”，但不是链接。";
+"“%@” is in the history, but not as an image." = "历史记录中有“%@”，但不是图像。";
+"“%@” is in the history, but not pinned." = "历史记录中有“%@”，但未固定。";
+"No text in the history yet." = "历史记录中还没有文本。";
+"No links in the history yet." = "历史记录中还没有链接。";
+"No images in the history yet." = "历史记录中还没有图像。";
+"Nothing is pinned yet." = "还没有固定的项目。";
 "No Clipboard History" = "没有剪贴板历史记录";
 "No Results" = "无结果";
 "No Selection" = "未选择";
@@ -449,7 +458,7 @@
 "Stop Privacy Shield to reconfigure local proxy port." = "停止隐私护盾后才能更改本地代理端口。";
 "Stop searching %@" = "停止搜索“%@”";
 "Stop timer" = "停止计时器";
-"Storage" = "储存空间";
+"Free Space" = "可用空间";
 "Successfully freed %@!" = "已成功释放 %@！";
 "System Sounds" = "系统声音";
 "Temporary internet and app runtime caches stored in ~/Library/Caches." = "存储在 ~/Library/Caches 中的临时互联网缓存和 App 运行缓存。";
@@ -472,6 +481,7 @@
 "Today" = "今天";
 "Tomorrow at %@" = "明天 %@";
 "Top Hog: %@ (%@%%)" = "占用最多：%@（%@%%）";
+"CPU: %@ across %lld cores" = "CPU：%@，共 %lld 个核心";
 "Trash Bin" = "废纸篓";
 "Turn on Privacy Shield above to start intercepting and shielding requests." = "打开上方的隐私护盾，即可开始拦截并保护请求。";
 "Type" = "类型";
@@ -573,6 +583,7 @@
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "如果在隐私护盾打开时推出该宗卷，Zenith 会退出，网络可能中断，直到你再次打开 Zenith。请将 Zenith 拖到“应用程序”文件夹，并从那里打开。";
 "Turn On Anyway" = "仍然打开";
 "Playback position" = "播放位置";
+"Artwork" = "插图";
 "Behavior" = "行为";
 "Swipe Gestures" = "轻扫手势";
 "Swipe down on the island to open it, up to close it, and sideways to change track." = "在灵动岛上向下轻扫以打开，向上轻扫以关闭，左右轻扫以切换曲目。";
@@ -940,7 +951,6 @@
 "The sound cannot be written in this format." = "无法以此格式写入声音。";
 "The video cannot be written in this format." = "无法以此格式写入视频。";
 "This file cannot be trimmed." = "无法修剪此文件。";
-"Trimming failed." = "修剪失败。";
 "Trimming…" = "正在修剪…";
 "Trim…" = "修剪…";
 "Video Format" = "视频格式";

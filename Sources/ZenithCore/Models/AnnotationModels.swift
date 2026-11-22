@@ -320,7 +320,6 @@ public struct TextAnnotationCommand: AnnotationCommand, Sendable, Identifiable {
         }
 
         let line = CTLineCreateWithAttributedString(attrString)
-        let isFlipped = context.ctm.d < 0
         let scaledOrigin = CGPoint(x: origin.x * scale, y: origin.y * scale)
 
         // Draw background contrast pill if requested
@@ -333,7 +332,7 @@ public struct TextAnnotationCommand: AnnotationCommand, Sendable, Identifiable {
 
             let padX = 8.0 * scale
             let padY = 4.0 * scale
-            let pillY = isFlipped ? (scaledOrigin.y - ascent - padY) : (scaledOrigin.y - descent - padY)
+            let pillY = scaledOrigin.y - ascent - padY
             let pillRect = CGRect(
                 x: scaledOrigin.x - padX,
                 y: pillY,
@@ -348,11 +347,10 @@ public struct TextAnnotationCommand: AnnotationCommand, Sendable, Identifiable {
             context.fillPath()
         }
 
-        if isFlipped {
-            context.textMatrix = CGAffineTransform(scaleX: 1.0, y: -1.0)
-        } else {
-            context.textMatrix = .identity
-        }
+        // Annotations are drawn with the origin top left and y growing downwards (see `AnnotationCommand`), so the
+        // glyphs are always flipped back upright. Guessing from `ctm.d` failed in the editor: SwiftUI's canvas is
+        // y-down with a positive `d`, and the text came out upside down there while the export was right.
+        context.textMatrix = CGAffineTransform(scaleX: 1.0, y: -1.0)
         context.textPosition = scaledOrigin
         CTLineDraw(line, context)
         context.restoreGState()
@@ -385,49 +383,59 @@ public struct BlurAnnotationCommand: AnnotationCommand, Sendable, Identifiable {
             height: stdRect.height * scale
         )
 
-        // Native CoreGraphics Nearest-Neighbor Pixelation if bitmap is readable
-        let blockSize = max(2.0, pixelSize * scale)
-
+        // Pixelate what the context already holds, when it is a bitmap (the export path).
         if let fullImage = context.makeImage() {
             let fullRect = CGRect(x: 0, y: 0, width: fullImage.width, height: fullImage.height)
-            let clampedRect = scaledRect.intersection(fullRect)
-            let sW = max(1, Int((clampedRect.width > 0 ? clampedRect.width : scaledRect.width) / blockSize))
-            let sH = max(1, Int((clampedRect.height > 0 ? clampedRect.height : scaledRect.height) / blockSize))
-
-            if !clampedRect.isNull, clampedRect.width > 0, clampedRect.height > 0,
-               let surfaceImage = fullImage.cropping(to: clampedRect),
-               let miniContext = CGContext(
-                   data: nil,
-                   width: sW,
-                   height: sH,
-                   bitsPerComponent: 8,
-                   bytesPerRow: sW * 4,
-                   space: CGColorSpaceCreateDeviceRGB(),
-                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-               ) {
-                miniContext.interpolationQuality = .none
-                miniContext.draw(surfaceImage, in: CGRect(x: 0, y: 0, width: sW, height: sH))
-
-                if let pixellatedTile = miniContext.makeImage() {
-                    context.interpolationQuality = .none
-                    if context.ctm.d < 0 {
-                        context.saveGState()
-                        context.translateBy(x: clampedRect.origin.x, y: clampedRect.origin.y + clampedRect.height)
-                        context.scaleBy(x: 1.0, y: -1.0)
-                        context.draw(pixellatedTile, in: CGRect(x: 0, y: 0, width: clampedRect.width, height: clampedRect.height))
-                        context.restoreGState()
-                    } else {
-                        context.draw(pixellatedTile, in: clampedRect)
-                    }
-                    context.restoreGState()
-                    return
-                }
+            let region = scaledRect.integral.intersection(fullRect)
+            if !region.isNull, region.width > 0, region.height > 0,
+               let cells = PrivacyPixelation.averagedCells(of: fullImage, region: region, cellSize: pixelSize * scale) {
+                PrivacyPixelation.draw(cells, in: region, on: context)
+                context.restoreGState()
+                return
             }
         }
 
         // Fallback tint mask (safe for non-bitmap contexts or initial rendering)
         context.setFillColor(CGColor(gray: 0.2, alpha: 0.85))
         context.fill(scaledRect)
+        context.restoreGState()
+    }
+}
+
+// MARK: - Privacy pixelation
+
+/// The mosaic behind the Blur tool, shared by the editor and the exported image so both show the same thing.
+public enum PrivacyPixelation {
+    /// One pixel per cell, each the average colour of the image pixels the cell covers. Cells cover the whole region,
+    /// a partial one at an edge included, so a region thinner than one cell (a single line of text) is hidden too.
+    /// (`CIPixellate`, used before, took one sample per cell from a grid centred on the region: a strip thinner than a
+    /// cell came out untouched, and a taller one only partly.) `region` is in the image's pixels, origin top left.
+    public static func averagedCells(of image: CGImage, region: CGRect, cellSize: CGFloat) -> CGImage? {
+        let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        let clamped = region.integral.intersection(bounds)
+        guard !clamped.isNull, clamped.width >= 1, clamped.height >= 1,
+              let crop = image.cropping(to: clamped),
+              let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        let cell = max(2, cellSize)
+        let columns = max(1, Int((clamped.width / cell).rounded(.up)))
+        let rows = max(1, Int((clamped.height / cell).rounded(.up)))
+        guard let small = CGContext(
+            data: nil, width: columns, height: rows, bitsPerComponent: 8, bytesPerRow: 0,
+            space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        // High-quality downsampling filters over every source pixel of a cell, which is what averages it.
+        small.interpolationQuality = .high
+        small.draw(crop, in: CGRect(x: 0, y: 0, width: columns, height: rows))
+        return small.makeImage()
+    }
+
+    /// Draws `cells` stretched over `rect` with hard edges, upright in an annotation context (origin top left).
+    public static func draw(_ cells: CGImage, in rect: CGRect, on context: CGContext) {
+        context.saveGState()
+        context.interpolationQuality = .none
+        context.translateBy(x: rect.origin.x, y: rect.origin.y + rect.height)
+        context.scaleBy(x: 1, y: -1)
+        context.draw(cells, in: CGRect(origin: .zero, size: rect.size))
         context.restoreGState()
     }
 }

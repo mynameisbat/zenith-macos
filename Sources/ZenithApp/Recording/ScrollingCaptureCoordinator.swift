@@ -94,7 +94,7 @@ final class ScrollingCaptureCoordinator {
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        // Outside the area when possible: on macOS 13 the frames would otherwise include the panel.
+        // Outside the area when possible, so the panel does not hide what is being captured (the frames leave it out).
         let visible = screen.visibleFrame
         var origin = CGPoint(x: rect.midX - size.width / 2, y: rect.minY - size.height - 12)
         if origin.y < visible.minY + 4 { origin.y = rect.maxY + 12 }

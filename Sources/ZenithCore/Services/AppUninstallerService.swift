@@ -448,7 +448,7 @@ public final class AppUninstallerService: @unchecked Sendable {
         selectedLeftovers: [AppLeftoverItem]? = nil,
         includeApp: Bool = true,
         moveToTrash: Bool = true
-    ) throws -> Int64 {
+    ) async throws -> Int64 {
         let app = plan.app
         // Safety guard: Reject protected system or Apple apps
         if isSystemPath(app.bundlePath) || isProtectedAppleBundle(app.bundleIdentifier) {
@@ -459,7 +459,7 @@ public final class AppUninstallerService: @unchecked Sendable {
         }
 
         // 1. An open app keeps writing to the very files that are about to go: it has to quit first.
-        try quitIfRunning(app)
+        try await quitIfRunning(app)
 
         var totalFreed: Int64 = 0
         var removedCount = 0
@@ -502,13 +502,14 @@ public final class AppUninstallerService: @unchecked Sendable {
 
     /// Asks an open app to quit and waits for it. Throws, with nothing removed, if it is still open afterwards
     /// (it may be asking about unsaved documents).
-    private func quitIfRunning(_ app: InstalledAppInfo) throws {
+    /// The wait is a `Task.sleep`, so it holds no thread while the app saves and quits.
+    private func quitIfRunning(_ app: InstalledAppInfo) async throws {
         guard runningApps.isRunning(app.bundleIdentifier, app.bundlePath) else { return }
         runningApps.requestQuit(app.bundleIdentifier, app.bundlePath)
         let deadline = Date().addingTimeInterval(quitTimeout)
         while runningApps.isRunning(app.bundleIdentifier, app.bundlePath) {
             guard Date() < deadline else { throw UninstallError.appStillRunning(app.displayName) }
-            Thread.sleep(forTimeInterval: 0.1)
+            try await Task.sleep(for: .milliseconds(100))
         }
     }
 

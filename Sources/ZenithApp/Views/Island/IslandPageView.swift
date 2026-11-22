@@ -85,6 +85,7 @@ struct IslandPageView: View {
         HStack(spacing: 4) {
             Image(systemName: page.icon)
                 .font(.system(size: 9.5, weight: .semibold))
+                .accessibilityHidden(true)  // VoiceOver read the symbol's name ("Grid 2x2") as a heading
             Text(verbatim: page.title)
                 .font(.system(size: 10.5, weight: .semibold))
                 .lineLimit(1)

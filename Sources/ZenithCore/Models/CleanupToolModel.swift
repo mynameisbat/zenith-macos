@@ -51,6 +51,8 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
     private let scanWork: @Sendable () async -> [CleanupCandidate]
     private let cleanWork: @Sendable ([CleanupCandidate]) async throws -> Int64
     private let customConfirmation: (@MainActor (_ selected: [CleanupCandidate], _ summary: String) -> CleanupConfirmation?)?
+    /// What an empty result means for this tool, when "Nothing to clean here" would mislead (no drive to look at).
+    private let emptyStatus: (@MainActor () -> String?)?
 
     public init(
         kind: Kind,
@@ -60,7 +62,8 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
         movesToTrash: Bool,
         scan: @escaping @Sendable () async -> [CleanupCandidate],
         clean: @escaping @Sendable ([CleanupCandidate]) async throws -> Int64,
-        confirmation: (@MainActor (_ selected: [CleanupCandidate], _ summary: String) -> CleanupConfirmation?)? = nil
+        confirmation: (@MainActor (_ selected: [CleanupCandidate], _ summary: String) -> CleanupConfirmation?)? = nil,
+        emptyStatus: (@MainActor () -> String?)? = nil
     ) {
         self.kind = kind
         self.title = title
@@ -70,6 +73,7 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
         self.scanWork = scan
         self.cleanWork = clean
         self.customConfirmation = confirmation
+        self.emptyStatus = emptyStatus
     }
 
     // MARK: Selection
@@ -128,7 +132,7 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
         hasScanned = true
         isScanning = false
         status = found.isEmpty
-            ? String(localized: "Nothing to clean here.")
+            ? (emptyStatus?() ?? String(localized: "Nothing to clean here."))
             : String(localized: "\(found.count) found, \(Self.format(totalBytes)) in all.")
     }
 
@@ -167,6 +171,16 @@ public final class CleanupToolModel: ObservableObject, Identifiable {
 // MARK: - The tools
 
 /// Keeps the service's own items, by candidate id, between the scan and the removal.
+/// How many external volumes the last drive scan saw.
+private final class VolumeCount: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    var value: Int {
+        get { lock.withLock { count } }
+        set { lock.withLock { count = newValue } }
+    }
+}
+
 private final class ItemStore<Item: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var items: [String: Item] = [:]
@@ -269,6 +283,7 @@ extension CleanupToolModel {
         discover: (@Sendable () -> [ExternalVolumeItem])? = nil
     ) -> CleanupToolModel {
         let store = ItemStore<ExternalVolumeItem>()
+        let seen = VolumeCount()
         return CleanupToolModel(
             kind: .drives,
             title: String(localized: "External drive junk"),
@@ -277,10 +292,14 @@ extension CleanupToolModel {
             movesToTrash: false,
             scan: {
                 let volumes = await Task.detached { discover?() ?? service.discoverExternalVolumes() }.value
+                seen.value = volumes.count
                 let withJunk = volumes.filter { $0.phantomFileCount > 0 }
                 store.replace(Dictionary(withJunk.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }))
                 return withJunk.map {
-                    CleanupCandidate(id: $0.id, title: $0.name, detail: String(localized: "\($0.phantomFileCount) junk files"), bytes: $0.phantomBytes, isSelected: true)
+                    CleanupCandidate(id: $0.id, title: $0.name, detail: $0.phantomFileCount == 1
+                        ? String(localized: "1 junk file")
+                        : String(localized: "\($0.phantomFileCount) junk files"),
+                        bytes: $0.phantomBytes, isSelected: true)
                 }
             },
             clean: { chosen in
@@ -289,7 +308,9 @@ extension CleanupToolModel {
                     freed += try await service.sanitize(volumeURL: volume.url).freedBytes
                 }
                 return freed
-            }
+            },
+            // With no external drive there was nothing to look at: "Nothing to clean here" read as a clean drive.
+            emptyStatus: { seen.value == 0 ? String(localized: "No external drive is connected.") : nil }
         )
     }
 
@@ -342,7 +363,7 @@ extension CleanupToolModel {
                 let leftovers = store.items(for: ids)
                 let target = measured.items(for: [appID]).first
                 return try await Task.detached {
-                    try service.uninstall(
+                    try await service.uninstall(
                         plan: AppUninstallPlan(app: target ?? app, leftovers: leftovers),
                         selectedLeftovers: leftovers,
                         includeApp: target != nil && ids.contains(appID),
