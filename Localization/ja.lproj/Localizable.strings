@@ -8,7 +8,6 @@
 "%@ available of %@" = "%2$@中%1$@使用可能";
 "%@ characters · %@ words · %@ lines" = "%@文字 · %@語 · %@行";
 "%@ characters · %@ words · 1 line" = "%@文字 · %@語 · 1行";
-"%@ free" = "空き%@";
 "%@ line" = "線（%@）";
 "%@ shortcut, %@" = "%1$@のショートカット、%2$@";
 "%@ timer, %@ left" = "%1$@タイマー、残り%2$@";
@@ -33,6 +32,8 @@
 "%lld found, %@ in all." = "%lld件見つかりました。合計%@です。";
 "%lld items" = "%lld項目";
 "%lld junk files" = "%lld個の不要ファイル";
+"1 junk file" = "不要ファイル 1 件";
+"No external drive is connected." = "外部ドライブが接続されていません。";
 "%lld min" = "%lld分";
 "%lld min · %lld done today" = "%lld分 · 今日%lld回完了";
 "%lld ms" = "%lld ms";
@@ -92,7 +93,8 @@
 "Blocks ads, trackers, and malicious domains" = "広告、トラッカー、悪意のあるドメインをブロック";
 "Blue" = "青";
 "Boost" = "ブースト";
-"Boost: memory purged, DNS cache flushed" = "ブースト: メモリを解放し、DNSキャッシュを消去しました";
+"Boost done: memory freed" = "ブースト完了：メモリを解放";
+"Boost done: memory freed, DNS flushed" = "ブースト完了：メモリを解放、DNS をフラッシュ";
 "Bootstrap IP (Optional):" = "ブートストラップIP（オプション）:";
 "Break" = "休憩";
 "Break Length" = "休憩の長さ";
@@ -267,7 +269,14 @@
 "NextDNS" = "NextDNS";
 "NextDNS (%@)" = "NextDNS（%@）";
 "NextDNS profile ID: %@" = "NextDNSプロファイルID: %@";
-"No %@ in the history yet." = "履歴にはまだ%@がありません。";
+"“%@” is in the history, but not as text." = "「%@」は履歴にありますが、テキストではありません。";
+"“%@” is in the history, but not as a link." = "「%@」は履歴にありますが、リンクではありません。";
+"“%@” is in the history, but not as an image." = "「%@」は履歴にありますが、画像ではありません。";
+"“%@” is in the history, but not pinned." = "「%@」は履歴にありますが、ピン留めされていません。";
+"No text in the history yet." = "履歴にテキストはまだありません。";
+"No links in the history yet." = "履歴にリンクはまだありません。";
+"No images in the history yet." = "履歴に画像はまだありません。";
+"Nothing is pinned yet." = "ピン留めした項目はまだありません。";
 "No Clipboard History" = "クリップボード履歴はありません";
 "No Results" = "結果なし";
 "No Selection" = "選択されていません";
@@ -449,7 +458,7 @@
 "Stop Privacy Shield to reconfigure local proxy port." = "ローカルプロキシのポートを変更するには、Privacy Shieldを停止してください。";
 "Stop searching %@" = "%@の検索を停止";
 "Stop timer" = "タイマーを停止";
-"Storage" = "ストレージ";
+"Free Space" = "空き容量";
 "Successfully freed %@!" = "%@を解放しました！";
 "System Sounds" = "システムサウンド";
 "Temporary internet and app runtime caches stored in ~/Library/Caches." = "~/Library/Cachesにある、インターネットとアプリ実行時の一時キャッシュ。";
@@ -472,6 +481,7 @@
 "Today" = "今日";
 "Tomorrow at %@" = "明日 %@開始";
 "Top Hog: %@ (%@%%)" = "最大の負荷: %@（%@%%）";
+"CPU: %@ across %lld cores" = "CPU: %@(%lld コア)";
 "Trash Bin" = "ゴミ箱";
 "Turn on Privacy Shield above to start intercepting and shielding requests." = "上のPrivacy Shieldをオンにすると、リクエストの中継と保護を開始します。";
 "Type" = "種類";
@@ -573,6 +583,7 @@
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "Privacy Shieldがオンのときにそのボリュームを取り出すとZenithが終了し、Zenithを再度開くまでインターネットが使えなくなる場合があります。Zenithを「アプリケーション」フォルダにドラッグし、そこから開いてください。";
 "Turn On Anyway" = "このままオンにする";
 "Playback position" = "再生位置";
+"Artwork" = "アートワーク";
 "Behavior" = "動作";
 "Swipe Gestures" = "スワイプジェスチャ";
 "Swipe down on the island to open it, up to close it, and sideways to change track." = "アイランド上で下にスワイプすると開き、上にスワイプすると閉じ、左右にスワイプするとトラックを変更します。";
@@ -940,7 +951,6 @@
 "The sound cannot be written in this format." = "このフォーマットではサウンドを書き込めません。";
 "The video cannot be written in this format." = "このフォーマットではビデオを書き込めません。";
 "This file cannot be trimmed." = "このファイルはトリミングできません。";
-"Trimming failed." = "トリミングに失敗しました。";
 "Trimming…" = "トリミング中…";
 "Trim…" = "トリミング…";
 "Video Format" = "ビデオフォーマット";

@@ -167,7 +167,11 @@ public struct InlineTextEditorView: View {
         .onSubmit {
             viewModel.commitTextDraft()
         }
-        .onAppear {
+        // Focus each new box (keyed by the draft, since placing a second one reuses this view and
+        // `onAppear` does not run again), and only after the field is in the window: set in `onAppear`, macOS
+        // dropped the request and what was typed right after placing the box went nowhere.
+        .task(id: draft.id) {
+            try? await Task.sleep(for: .milliseconds(50))
             isFocused = true
         }
     }

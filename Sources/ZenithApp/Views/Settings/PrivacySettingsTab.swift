@@ -388,10 +388,11 @@ public struct PrivacySettingsTab: View {
                         .foregroundColor(controller.isRunning ? .accentColor : .secondary)
                 }
 
+                // Never cut short: the end of it ("not a VPN") is the part people need to read.
                 Text("Looks up site names over encrypted DNS and splits the first TLS packet of each connection. It is not a VPN and does not hide your IP address.")
                     .font(.system(size: 11.5))
                     .foregroundColor(.secondary)
-                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer()

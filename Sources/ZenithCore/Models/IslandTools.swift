@@ -47,10 +47,11 @@ public enum IslandPage: String, CaseIterable, Sendable, Identifiable {
     public var contentSize: CGSize {
         switch self {
         case .system: return CGSize(width: 420, height: 392)
-        case .cleaner: return CGSize(width: 580, height: 480)
+        case .cleaner: return CGSize(width: 600, height: 540)
         case .ports: return CGSize(width: 580, height: 440)
         case .homebrew: return CGSize(width: 620, height: 480)
-        case .settings: return CGSize(width: 720, height: 500)
+        // The Settings window's own size and a little more: at 720 × 500 its long panes needed a lot of scrolling.
+        case .settings: return CGSize(width: 780, height: 600)
         case .tools: return CGSize(width: 520, height: 264)
         }
     }

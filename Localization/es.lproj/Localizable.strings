@@ -8,7 +8,6 @@
 "%@ available of %@" = "%1$@ disponibles de %2$@";
 "%@ characters · %@ words · %@ lines" = "%@ caracteres · %@ palabras · %@ líneas";
 "%@ characters · %@ words · 1 line" = "%@ caracteres · %@ palabras · 1 línea";
-"%@ free" = "%@ libres";
 "%@ line" = "Trazo %@";
 "%@ shortcut, %@" = "Atajo de %1$@, %2$@";
 "%@ timer, %@ left" = "Temporizador de %1$@, quedan %2$@";
@@ -33,6 +32,8 @@
 "%lld found, %@ in all." = "%lld encontrados, %@ en total.";
 "%lld items" = "%lld ítems";
 "%lld junk files" = "%lld archivos basura";
+"1 junk file" = "1 archivo basura";
+"No external drive is connected." = "No hay ningún disco externo conectado.";
 "%lld min" = "%lld min";
 "%lld min · %lld done today" = "%lld min · %lld hechas hoy";
 "%lld ms" = "%lld ms";
@@ -92,7 +93,8 @@
 "Blocks ads, trackers, and malicious domains" = "Bloquea anuncios, rastreadores y dominios maliciosos";
 "Blue" = "Azul";
 "Boost" = "Acelerar";
-"Boost: memory purged, DNS cache flushed" = "Acelerar: memoria liberada, caché DNS vaciada";
+"Boost done: memory freed" = "Boost listo: memoria liberada";
+"Boost done: memory freed, DNS flushed" = "Boost listo: memoria liberada, DNS vaciado";
 "Bootstrap IP (Optional):" = "IP de arranque (opcional):";
 "Break" = "Descanso";
 "Break Length" = "Duración del descanso";
@@ -267,7 +269,14 @@
 "NextDNS" = "NextDNS";
 "NextDNS (%@)" = "NextDNS (%@)";
 "NextDNS profile ID: %@" = "ID de perfil de NextDNS: %@";
-"No %@ in the history yet." = "Todavía no hay %@ en el historial.";
+"“%@” is in the history, but not as text." = "«%@» está en el historial, pero no como texto.";
+"“%@” is in the history, but not as a link." = "«%@» está en el historial, pero no como enlace.";
+"“%@” is in the history, but not as an image." = "«%@» está en el historial, pero no como imagen.";
+"“%@” is in the history, but not pinned." = "«%@» está en el historial, pero no está fijado.";
+"No text in the history yet." = "Aún no hay texto en el historial.";
+"No links in the history yet." = "Aún no hay enlaces en el historial.";
+"No images in the history yet." = "Aún no hay imágenes en el historial.";
+"Nothing is pinned yet." = "Aún no hay nada fijado.";
 "No Clipboard History" = "No hay historial del portapapeles";
 "No Results" = "Sin resultados";
 "No Selection" = "Sin selección";
@@ -449,7 +458,7 @@
 "Stop Privacy Shield to reconfigure local proxy port." = "Detén Privacy Shield para cambiar el puerto del proxy local.";
 "Stop searching %@" = "Dejar de buscar en %@";
 "Stop timer" = "Detener temporizador";
-"Storage" = "Almacenamiento";
+"Free Space" = "Espacio libre";
 "Successfully freed %@!" = "¡Se han liberado %@!";
 "System Sounds" = "Sonidos del sistema";
 "Temporary internet and app runtime caches stored in ~/Library/Caches." = "Cachés temporales de internet y de apps guardadas en ~/Library/Caches.";
@@ -472,6 +481,7 @@
 "Today" = "Hoy";
 "Tomorrow at %@" = "Mañana a las %@";
 "Top Hog: %@ (%@%%)" = "Mayor consumo: %@ (%@%%)";
+"CPU: %@ across %lld cores" = "CPU: %@ en %lld núcleos";
 "Trash Bin" = "Papelera";
 "Turn on Privacy Shield above to start intercepting and shielding requests." = "Activa Privacy Shield arriba para empezar a interceptar y proteger solicitudes.";
 "Type" = "Tipo";
@@ -573,6 +583,7 @@
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "Si ese volumen se expulsa con Privacy Shield activado, Zenith se cierra y puedes quedarte sin internet hasta que vuelvas a abrir Zenith. Arrastra Zenith a la carpeta Aplicaciones y ábrelo desde allí.";
 "Turn On Anyway" = "Activar de todos modos";
 "Playback position" = "Posición de reproducción";
+"Artwork" = "Ilustración";
 "Behavior" = "Comportamiento";
 "Swipe Gestures" = "Gestos de deslizamiento";
 "Swipe down on the island to open it, up to close it, and sideways to change track." = "Desliza hacia abajo sobre la isla para abrirla, hacia arriba para cerrarla y hacia los lados para cambiar de pista.";
@@ -940,7 +951,6 @@
 "The sound cannot be written in this format." = "El sonido no se puede escribir en este formato.";
 "The video cannot be written in this format." = "El vídeo no se puede escribir en este formato.";
 "This file cannot be trimmed." = "Este archivo no se puede recortar.";
-"Trimming failed." = "El recorte ha fallado.";
 "Trimming…" = "Recortando…";
 "Trim…" = "Recortar…";
 "Video Format" = "Formato de vídeo";

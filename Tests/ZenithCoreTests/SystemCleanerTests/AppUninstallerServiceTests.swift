@@ -70,7 +70,7 @@ struct AppUninstallerServiceTests {
     }
 
     @Test("UNINST-03: Safety invariants prevent deleting root user directories or protected apps")
-    func testSafetyInvariants() {
+    func testSafetyInvariants() async {
         let service = AppUninstallerService()
         let home = NSHomeDirectory()
 
@@ -102,8 +102,8 @@ struct AppUninstallerServiceTests {
             ),
             leftovers: []
         )
-        #expect(throws: UninstallError.protectedSystemApplication) {
-            try service.uninstall(plan: systemPlan)
+        await #expect(throws: UninstallError.protectedSystemApplication) {
+            try await service.uninstall(plan: systemPlan)
         }
     }
 }

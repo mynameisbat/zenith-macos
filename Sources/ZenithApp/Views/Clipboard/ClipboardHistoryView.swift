@@ -169,7 +169,7 @@ public struct ClipboardHistoryView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
                 }
-                .onValueChange(of: viewModel.selectedIndex) { newIndex in
+                .onChange(of: viewModel.selectedIndex) { _, newIndex in
                     if newIndex >= 0 && newIndex < viewModel.filteredItems.count {
                         let selectedID = viewModel.filteredItems[newIndex].id
                         withAnimation(.easeOut(duration: 0.12)) {
@@ -191,19 +191,22 @@ public struct ClipboardHistoryView: View {
             Text(isSearching ? "No Results" : (isFiltered ? "Nothing Here" : "No Clipboard History"))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.secondary)
-            Text(isSearching
-                    ? "Nothing matches \u{201C}\(viewModel.searchText)\u{201D}."
-                    : (isFiltered ? "No \(viewModel.kindFilter.title.lowercased()) in the history yet." : "Things you copy will appear here."))
+            Text(verbatim: viewModel.kindFilter.emptyMessage(
+                searchText: viewModel.searchText,
+                matchesElsewhere: viewModel.searchMatchesOutsideFilter
+            ))
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
             if isSearching || isFiltered {
-                Button(isSearching ? "Clear Search" : "Show All") {
-                    if isSearching {
-                        viewModel.searchText = ""
-                    } else {
+                // When the filter hides what the search found, showing all keeps the search and finds it.
+                let showAll = !isSearching || viewModel.searchMatchesOutsideFilter
+                Button(showAll ? "Show All" : "Clear Search") {
+                    if showAll {
                         viewModel.kindFilter = .all
+                    } else {
+                        viewModel.searchText = ""
                     }
                 }
                 .buttonStyle(.bordered)

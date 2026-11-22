@@ -19,7 +19,7 @@ public enum CleaningModeAppearance: String, CaseIterable, Sendable, Identifiable
 }
 
 /// The Cleaning Mode preferences: how long it lasts, how it looks, and whether its global shortcut is on.
-/// An `ObservableObject` (not `@Observable`, which needs macOS 14); every setter calls `objectWillChange.send()`.
+/// An `ObservableObject` (not `@Observable`, like the other stores); every setter calls `objectWillChange.send()`.
 @MainActor
 public final class CleaningModeSettings: ObservableObject {
     public static let shared = CleaningModeSettings()

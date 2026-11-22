@@ -45,8 +45,13 @@ public final class IslandAppActionCoordinator {
                 destructiveTitle: "Move to Trash"
             ) else { return }
 
-            let outcome = await Task.detached(priority: .userInitiated) {
-                Result { try AppUninstallerService.shared.uninstall(plan: plan, moveToTrash: true) }
+            // Detached: the moves to the Trash are blocking file work that must not run on the main actor.
+            let outcome = await Task.detached(priority: .userInitiated) { () async -> Result<Int64, any Error> in
+                do {
+                    return .success(try await AppUninstallerService.shared.uninstall(plan: plan, moveToTrash: true))
+                } catch {
+                    return .failure(error)
+                }
             }.value
 
             switch outcome {

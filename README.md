@@ -1,6 +1,6 @@
 # Zenith 🌌
 
-[![macOS](https://img.shields.io/badge/macOS-13.0%2B%20%7C%20Ventura%20%7C%20Sonoma%20%7C%20Sequoia-000000.svg?style=flat&logo=apple&logoColor=white)](https://www.apple.com/macos/)
+[![macOS](https://img.shields.io/badge/macOS-15.0%2B%20%7C%20Sequoia%20%7C%20Tahoe-000000.svg?style=flat&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Swift 6](https://img.shields.io/badge/Swift-6.0%20Native-F05138.svg?style=flat&logo=swift&logoColor=white)](https://swift.org)
 [![Tests](https://img.shields.io/badge/Tests-Swift%20Testing-1FC16B.svg?style=flat)](https://github.com/mynameisbat/zenith-macos/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -50,7 +50,7 @@ open /Applications/Zenith.app
 Zenith checks GitHub for a new release once a day while it runs (Settings › General › Updates; switch off **Check Automatically** to stop it) and tells you once per version. **Install and Relaunch** downloads the DMG, checks that the app inside is signed with the same certificate as the copy you are running, replaces it (the old copy goes to the Trash) and reopens Zenith; nothing is installed without that click. A copy that cannot verify an update (signed ad hoc, run from a disk image, or translocated by macOS) offers **Download…** instead, which saves the DMG in Downloads for you to install by hand. Quitting for the update turns Privacy Shield off; turn it on again afterwards.
 
 ### Option 2: Build from Source
-**Prerequisites:** macOS 13.0 (Ventura) or higher, Xcode 16+ or Command Line Tools with Swift 6.0 toolchain.
+**Prerequisites:** macOS 15.0 (Sequoia) or higher, Xcode 16+ or Command Line Tools with Swift 6.0 toolchain.
 
 ```bash
 # Clone the repository

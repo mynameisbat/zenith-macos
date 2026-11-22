@@ -116,7 +116,8 @@ export async function boost() {
   const freed = Math.min(system.memUsed - 4e9, 1.1e9 + Math.random() * 6e8);
   system.memUsed -= freed;
   bus.emit('system');
-  notify({ icon: 'boost', title: 'Boost done', subtitle: `Freed ${formatBytes(freed)} of inactive memory and flushed the DNS cache`, tint: 'green', duration: 3600 });
+  // As the app says it for a normal user: flushing DNS needs an administrator, so it is not claimed.
+  notify({ icon: 'boost', title: 'Boost done: memory freed', subtitle: `Freed ${formatBytes(freed)} of inactive memory`, tint: 'green', duration: 3600 });
 }
 
 // ---------------------------------------------------------------- Keep Awake

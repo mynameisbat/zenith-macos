@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import CoreGraphics
+import CoreText
 @testable import ZenithCore
 
 // Scrolling capture with synthetic pictures: a tall image is cut into overlapping frames at known offsets, and the
@@ -177,6 +178,52 @@ struct ScrollingCaptureTests {
         #expect(ScrollOverlapMatcher.match(previous: Self.signatures(a), next: Self.signatures(b))?.offset == 0)
     }
 
+    /// Lines of text drawn with their top `shift` pixels above the frame's top, as a text view scrolled that far
+    /// shows them. `noiseSeed` shifts each pixel by a few levels, as the glyph edges of text that scrolled by a
+    /// fraction of a pixel come out in a real capture (no row of TextEdit text was identical twice).
+    static func textFrame(shift: CGFloat, noiseSeed: UInt64? = nil, width: Int = 780, height: Int = 400) -> CGImage {
+        let context = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.setFillColor(CGColor(gray: 0.12, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        let font = CTFontCreateWithName("Menlo" as CFString, 22, nil)
+        let lineHeight: CGFloat = 26
+        for index in 0..<40 {
+            let top = CGFloat(index) * lineHeight - shift
+            guard top > -lineHeight, top < CGFloat(height) else { continue }
+            let text = NSAttributedString(string: "Line \(index + 1) - Zenith scrolling capture test", attributes: [
+                NSAttributedString.Key(kCTFontAttributeName as String): font,
+                NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(gray: 1, alpha: 1),
+            ])
+            context.textPosition = CGPoint(x: 8, y: CGFloat(height) - top - 20)
+            CTLineDraw(CTLineCreateWithAttributedString(text), context)
+        }
+        if var state = noiseSeed, let data = context.data {
+            let pixels = data.assumingMemoryBound(to: UInt8.self)
+            for index in 0..<(width * height) where pixels[index * 4] > 60 {   // the edges and strokes of the glyphs
+                state = state &* 6364136223846793005 &+ 1442695040888963407
+                let delta = Int((state >> 33) % 25) - 12                         // -12 ... +12
+                for channel in 0..<3 {
+                    let value = Int(pixels[index * 4 + channel]) + delta
+                    pixels[index * 4 + channel] = UInt8(max(0, min(255, value)))
+                }
+            }
+        }
+        return context.makeImage()!
+    }
+
+    @Test("SCR-12: text whose glyph edges come out a little different in each frame still joins (it never did in TextEdit)")
+    func fractionalScrollMatches() throws {
+        let first = try #require(LumaImage(Self.textFrame(shift: 0, noiseSeed: 1))).rowSignatures()
+        let next = try #require(LumaImage(Self.textFrame(shift: 57, noiseSeed: 2))).rowSignatures()
+        let match = try #require(ScrollOverlapMatcher.match(previous: first, next: next), "the frames must join")
+        #expect(match.offset == 57, "offset \(match.offset)")
+        // The repeating lines must not be joined one line off: 26 px either way scores far lower.
+        #expect(abs(match.offset - 57) < 13)
+    }
+
     // MARK: - Session with a fake screen
 
     /// A page of `tall` seen through a window of `frameHeight` pixels; the fake wheel moves it.
@@ -185,16 +232,19 @@ struct ScrollingCaptureTests {
         let frameHeight: Int
         let scale: Int
         let canPost: Bool
+        /// How much further than asked the page moves.
+        let amplification: Double
         private let lock = NSLock()
         private var offset = 0
         private(set) var scrolls: [Int] = []
         private(set) var grabs = 0
 
-        init(tall: CGImage, frameHeight: Int, scale: Int, canPost: Bool = true) {
+        init(tall: CGImage, frameHeight: Int, scale: Int, canPost: Bool = true, amplification: Double = 1) {
             self.tall = tall
             self.frameHeight = frameHeight
             self.scale = scale
             self.canPost = canPost
+            self.amplification = amplification
         }
 
         func grab() async throws -> CGImage {
@@ -205,7 +255,8 @@ struct ScrollingCaptureTests {
         func scrollDown(points: Int, at point: CGPoint) {
             lock.withLock {
                 scrolls.append(points)
-                offset = min(tall.height - frameHeight, offset + points * scale)
+                let moved = Int((Double(points * scale) * amplification).rounded())
+                offset = max(0, min(tall.height - frameHeight, offset + moved))
             }
         }
 
@@ -216,6 +267,27 @@ struct ScrollingCaptureTests {
 
         var scrollCount: Int { lock.withLock { scrolls.count } }
         var grabCount: Int { lock.withLock { grabs } }
+    }
+
+    @MainActor
+    @Test("SCR-08b: an app that scrolls further than asked is followed with smaller steps, and the page is whole")
+    func sessionAutomaticWithOvershoot() async {
+        let tall = Self.tallImage(height: 1400)
+        // A step of 60% that the app turns into 120% of the area: no overlap is left.
+        let page = FakePage(tall: tall, frameHeight: 200, scale: 2, amplification: 2)
+        let session = ScrollingCaptureSession(
+            mode: .automatic, grabber: page, poster: page, scrollPoint: CGPoint(x: 10, y: 10),
+            areaHeightPoints: 100, pixelScale: 2, sleep: { _ in }
+        )
+        let image = await session.run()
+        #expect(session.phase == .finished)
+        #expect(page.scrolls.contains { $0 < 0 }, "it went back after the first step that overshot")
+        guard let result = image else {
+            Issue.record("no picture")
+            return
+        }
+        #expect(result.height == 1400)
+        #expect(Self.pixels(result) == Self.pixels(tall))
     }
 
     @MainActor

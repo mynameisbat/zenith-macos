@@ -52,7 +52,7 @@ echo "==> Removing old DMG if present..."
 rm -f "$DMG_OUTPUT"
 
 # HFS+ on purpose. Without -fs, a Mac on a recent macOS makes the image APFS, which an older macOS may refuse to mount
-# ("no mountable file systems"); Zenith runs on macOS 13, and an app this size gains nothing from APFS.
+# ("no mountable file systems"); HFS+ mounts everywhere, and an app this size gains nothing from APFS.
 echo "==> Building compressed DMG image using hdiutil..."
 hdiutil create \
     -fs HFS+ \

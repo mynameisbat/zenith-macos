@@ -2,9 +2,26 @@ import Foundation
 import CoreGraphics
 import AppKit
 import ScreenCaptureKit
+import Synchronization
 
-/// Production macOS screen capture backend using CoreGraphics Quartz Display Services (CGDisplayCreateImage)
-/// and, as a fallback on macOS 14+, ScreenCaptureKit (SCScreenshotManager) for Retina display capture.
+/// Windows a capture leaves out: the dimmed overlay Zenith puts over every screen while the user picks an area.
+/// `CaptureOverlayController` (App) registers its panels here while they are on screen. ScreenCaptureKit answers tens
+/// of milliseconds after it is asked, by which time the overlay is showing, so without this the loupe's cached image
+/// would be the screen darkened by the overlay.
+public enum ScreenCaptureExclusions {
+    private static let windowIDs = Mutex<Set<CGWindowID>>([])
+
+    public static func set(_ ids: some Sequence<CGWindowID>) {
+        windowIDs.withLock { $0 = Set(ids) }
+    }
+
+    public static var current: Set<CGWindowID> {
+        windowIDs.withLock { $0 }
+    }
+}
+
+/// Production macOS screen capture backend: ScreenCaptureKit (`SCScreenshotManager`), at the display's pixel size.
+/// (The CoreGraphics call it used before, `CGDisplayCreateImage`, is obsolete since macOS 15.)
 public final class NativeScreenCaptureBackend: ScreenCaptureBackendProtocol, Sendable {
     public init() {}
 
@@ -23,23 +40,15 @@ public final class NativeScreenCaptureBackend: ScreenCaptureBackendProtocol, Sen
         }
 
         let effectiveID = (displayID != 0) ? displayID : CGMainDisplayID()
-
-        // 1. Primary native CoreGraphics display capture (<1ms latency)
-        if let image = CGDisplayCreateImage(effectiveID) {
-            return image
+        do {
+            // A display ID that went stale (a display was unplugged) falls back to the first display.
+            if let image = try await captureViaScreenCaptureKit(displayID: effectiveID) {
+                return image
+            }
+        } catch {
+            throw ScreenCaptureError.captureFailed(reason: "ScreenCaptureKit failed for displayID \(effectiveID): \(error.localizedDescription)")
         }
-
-        // 2. Modern ScreenCaptureKit fallback for macOS 14+
-        if let scImage = try? await captureViaScreenCaptureKit(displayID: effectiveID) {
-            return scImage
-        }
-
-        // 3. Fallback to main display if external display ID was stale
-        if effectiveID != CGMainDisplayID(), let mainImage = CGDisplayCreateImage(CGMainDisplayID()) {
-            return mainImage
-        }
-
-        throw ScreenCaptureError.captureFailed(reason: "CGDisplayCreateImage and ScreenCaptureKit returned nil for displayID \(effectiveID)")
+        throw ScreenCaptureError.captureFailed(reason: "ScreenCaptureKit found no display for displayID \(effectiveID)")
     }
 
     /// Captures a cropped region of the specified display.
@@ -102,17 +111,17 @@ public final class NativeScreenCaptureBackend: ScreenCaptureBackendProtocol, Sen
         return (max(1, Int((CGFloat(pointWidth) * scale).rounded())), max(1, Int((CGFloat(pointHeight) * scale).rounded())))
     }
 
-    /// Captures a display with ScreenCaptureKit alone. This is the fallback of `captureDisplay`; it is public so the
-    /// `--check-screen-capture` diagnostic can exercise it directly.
+    /// Captures a display (the first one if `displayID` is not among them), without the windows in
+    /// `ScreenCaptureExclusions`; `nil` if there is no display at all. Public so the `--check-screen-capture`
+    /// diagnostic can call it.
     public func captureViaScreenCaptureKit(displayID: CGDirectDisplayID) async throws -> CGImage? {
-        // `SCScreenshotManager` and `SCContentFilter.pointPixelScale` arrive with macOS 14. On macOS 13 the
-        // CoreGraphics capture is the only path (and it is the one that normally succeeds), so this has nothing to add.
-        guard #available(macOS 14, *) else { return nil }
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first(where: { $0.displayID == displayID }) ?? content.displays.first else {
             return nil
         }
-        let filter = SCContentFilter(display: display, excludingWindows: [])
+        let excluded = ScreenCaptureExclusions.current
+        let excludedWindows = excluded.isEmpty ? [] : content.windows.filter { excluded.contains($0.windowID) }
+        let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
         let config = SCStreamConfiguration()
         let size = Self.capturePixelSize(pointWidth: display.width, pointHeight: display.height, pointPixelScale: filter.pointPixelScale)
         config.width = size.width

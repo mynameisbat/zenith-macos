@@ -124,6 +124,7 @@ public struct CleanerSettingsTab: View {
             if cleaner.categories.isEmpty && !cleaner.isScanning {
                 Task {
                     await cleaner.scan()
+                    CleanerScanScheduler.shared.noteManualScan(reclaimableBytes: cleaner.selectedJunkSize, itemCount: cleaner.selectedItemCount)
                 }
             }
         }
@@ -239,6 +240,7 @@ public struct CleanerSettingsTab: View {
                 Button {
                     Task {
                         await cleaner.scan()
+                        CleanerScanScheduler.shared.noteManualScan(reclaimableBytes: cleaner.selectedJunkSize, itemCount: cleaner.selectedItemCount)
                     }
                 } label: {
                     if cleaner.isScanning {
@@ -531,6 +533,8 @@ public struct CleanerSettingsTab: View {
                     .foregroundColor(item.isSelected ? .accentColor : .secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(item.isSelected ? "Deselect \(item.name)" : "Select \(item.name)")
+            .accessibilityAddTraits(item.isSelected ? [.isButton, .isSelected] : .isButton)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.name)
@@ -595,11 +599,5 @@ public struct CleanerSettingsTab: View {
             return "~" + path.dropFirst(home.count)
         }
         return path
-    }
-}
-
-extension SystemCleanerService {
-    public var formatSelectedSize: String {
-        Self.formatBytes(selectedJunkSize)
     }
 }

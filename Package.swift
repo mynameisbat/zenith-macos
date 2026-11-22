@@ -19,7 +19,7 @@ let testingMacroSettings: [SwiftSetting] =
 let package = Package(
     name: "Zenith",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v15)
     ],
     products: [
         .library(

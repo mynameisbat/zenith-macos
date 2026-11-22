@@ -324,6 +324,10 @@ public final class ZenithIslandState: ObservableObject {
     @Published public var isHoverEmphasized: Bool = false
     @Published public var isDropTargeted: Bool = false
     @Published public var isDraggingOut: Bool = false
+    /// A context menu opened from the open island is showing. The pointer is on the menu, outside the island, and
+    /// leaving must not close it: the island used to close under the menu, so a Move Left or Remove from Dock took
+    /// effect out of sight. `ZenithIslandWindowController` sets it from the menu-tracking notifications.
+    public var isShowingContextMenu = false
     @Published public var isEnabled: Bool = true
     @Published public var isRimLightVisible: Bool = false
     @Published public var droppedItems: [IslandDropItem] = []
@@ -682,6 +686,7 @@ public final class ZenithIslandState: ObservableObject {
         guard previewItem == nil else { return }
         // A page stays until it is closed: the pointer leaves it for a confirmation, or just to read something else.
         guard page == nil else { return }
+        guard !isShowingContextMenu else { return }
 
         // Instantly hide rim light when leaving so border never leaks or flashes on rapid re-hover
         rimLightFadeTask?.cancel()

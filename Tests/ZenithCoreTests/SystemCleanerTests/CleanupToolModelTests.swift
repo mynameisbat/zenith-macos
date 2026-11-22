@@ -259,4 +259,13 @@ struct ProjectSearchRootsTests {
         ProjectSearchRoots.remove("/Volumes/Work/Code", defaults: defaults)
         #expect(ProjectSearchRoots.custom(defaults: defaults).isEmpty)
     }
+
+    @Test("CTM-DRIVES-01: With no external drive connected, the scan says so instead of 'Nothing to clean here'")
+    @MainActor
+    func testDrivesWithoutAnyDrive() async {
+        let model = CleanupToolModel.drives(discover: { [] })
+        await model.scan()
+        #expect(model.candidates.isEmpty)
+        #expect(model.status == "No external drive is connected.")
+    }
 }

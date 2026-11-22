@@ -120,7 +120,7 @@ struct PrivacyShieldTests {
         stats.recordProtectedRequest(domain: "bbc.com", bytes: 2048, chunkSize: 2)
         #expect(stats.totalRequestsProtected == 2)
         #expect(stats.totalBytesShielded == 2560)
-        #expect(stats.formattedShieldedBytes == "2.5 KB")
+        #expect(stats.formattedShieldedBytes == "\(LocalizedNumber.decimal(2.5, fractionDigits: 1)) KB")
 
         stats.updateLatency(12)
         #expect(stats.dohLatencyMs == 12)
@@ -179,7 +179,7 @@ struct PrivacyShieldTests {
         #expect(first.status == .shielded)
         #expect(first.chunkSize == 2)
         #expect(first.bytes == 1420)
-        #expect(first.formattedBytes == "1.4 KB")
+        #expect(first.formattedBytes == "\(LocalizedNumber.decimal(1420.0 / 1024, fractionDigits: 1)) KB")
         #expect(!first.formattedTime.isEmpty)
 
         // 2. Record a failed request

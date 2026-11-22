@@ -112,6 +112,22 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
 }
 
 /// State controller for hover states, active search query, and selections in Zenith Command Hub.
+/// What a Boost managed to do.
+public struct BoostResult: Sendable, Equatable {
+    public let flushedDNS: Bool
+
+    public init(flushedDNS: Bool) {
+        self.flushedDNS = flushedDNS
+    }
+
+    /// The notice after a Boost. Short, because the island shows one line.
+    public var message: String {
+        flushedDNS
+            ? String(localized: "Boost done: memory freed, DNS flushed")
+            : String(localized: "Boost done: memory freed")
+    }
+}
+
 @MainActor
 public final class ZenithCommandHubState: ObservableObject {
     public static let shared = ZenithCommandHubState()
@@ -223,21 +239,25 @@ public final class ZenithCommandHubState: ObservableObject {
 
     /// Performs a full system and memory boost: flushes DNS, purges zombie processes,
     /// releases thumbnail cache, and triggers Darwin VM malloc pressure relief.
-    public func boostSystem() {
+    /// Frees Zenith's own caches and memory, refreshes Quick Look, flushes DNS and nudges zombie processes, and says
+    /// which of it happened: the DNS responder can only be reset by an administrator, and the notice used to claim
+    /// a flush that had failed.
+    @discardableResult
+    public func boostSystem() async -> BoostResult {
         ImageThumbnailService.shared.clearCache()
         malloc_zone_pressure_relief(nil, 0)
         HardwareTelemetryService.shared.invalidateProcessCache()
         refreshHardwareSnapshot(sync: true)
 
         let optimizer = self.optimizer
-        Task.detached(priority: .utility) { [weak self] in
+        let flushedDNS = await Task.detached(priority: .utility) { () -> Bool in
             _ = try? optimizer.execute(taskId: .quickLookCacheRefresh)
-            _ = try? optimizer.execute(taskId: .dnsCacheFlush)
+            let flushed = (try? optimizer.execute(taskId: .dnsCacheFlush)) != nil
             _ = try? optimizer.execute(taskId: .zombieProcessCleanup)
-            await MainActor.run { [weak self] in
-                self?.refreshHardwareSnapshot(sync: true)
-            }
-        }
+            return flushed
+        }.value
+        refreshHardwareSnapshot(sync: true)
+        return BoostResult(flushedDNS: flushedDNS)
     }
 
     public func setSearchText(_ text: String) {

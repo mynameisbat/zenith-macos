@@ -10,15 +10,28 @@ struct SystemCleanerServiceTests {
 
     @Test("CLN-01: formatBytes formats various scales correctly")
     func testFormatBytes() {
-        #expect(SystemCleanerService.formatBytes(0) == "0 B")
-        #expect(SystemCleanerService.formatBytes(512) == "512 B")
-        #expect(SystemCleanerService.formatBytes(1023) == "1023 B")
-        #expect(SystemCleanerService.formatBytes(1024) == "1.0 KB")
-        #expect(SystemCleanerService.formatBytes(1536) == "1.5 KB")
-        #expect(SystemCleanerService.formatBytes(1024 * 1024) == "1.0 MB")
-        #expect(SystemCleanerService.formatBytes(1024 * 1024 * 50) == "50.0 MB")
-        #expect(SystemCleanerService.formatBytes(1024 * 1024 * 1024) == "1.00 GB")
-        #expect(SystemCleanerService.formatBytes(Int64(3.45 * 1024 * 1024 * 1024)) == "3.45 GB")
+        let posix = Locale(identifier: "en_US_POSIX")
+        #expect(SystemCleanerService.formatBytes(0, locale: posix) == "0 B")
+        #expect(SystemCleanerService.formatBytes(512, locale: posix) == "512 B")
+        #expect(SystemCleanerService.formatBytes(1023, locale: posix) == "1023 B")
+        #expect(SystemCleanerService.formatBytes(1024, locale: posix) == "1.0 KB")
+        #expect(SystemCleanerService.formatBytes(1536, locale: posix) == "1.5 KB")
+        #expect(SystemCleanerService.formatBytes(1024 * 1024, locale: posix) == "1.0 MB")
+        #expect(SystemCleanerService.formatBytes(1024 * 1024 * 50, locale: posix) == "50.0 MB")
+        #expect(SystemCleanerService.formatBytes(1024 * 1024 * 1024, locale: posix) == "1.00 GB")
+        #expect(SystemCleanerService.formatBytes(Int64(3.45 * 1024 * 1024 * 1024), locale: posix) == "3.45 GB")
+    }
+
+    @Test("CLN-01b: Sizes and percentages use the region's decimal separator, without digit grouping")
+    func testLocalizedDecimals() {
+        let vietnam = Locale(identifier: "vi_VN")
+        #expect(SystemCleanerService.formatBytes(1536, locale: vietnam) == "1,5 KB")
+        #expect(SystemCleanerService.formatBytes(Int64(3.45 * 1024 * 1024 * 1024), locale: vietnam) == "3,45 GB")
+        #expect(SystemCleanerService.formatBytes(512, locale: vietnam) == "512 B")
+        #expect(LocalizedNumber.decimal(1023.5, fractionDigits: 1, locale: vietnam) == "1023,5")
+        #expect(LocalizedNumber.decimal(1023.5, fractionDigits: 1, locale: Locale(identifier: "en_US")) == "1023.5")
+        #expect(LocalizedNumber.percent(38.5, locale: Locale(identifier: "en_US")) == "38.5%")
+        #expect(LocalizedNumber.percent(38.5, locale: vietnam).hasPrefix("38,5"))
     }
 
     // MARK: - JunkItem Model Tests
@@ -30,7 +43,7 @@ struct SystemCleanerServiceTests {
         #expect(item.path == "/tmp/DerivedData_App1")
         #expect(item.size == 1024 * 1024 * 12)
         #expect(item.isSelected == true)
-        #expect(item.formattedSize == "12.0 MB")
+        #expect(item.formattedSize == "\(LocalizedNumber.decimal(12.0, fractionDigits: 1)) MB")
     }
 
     // MARK: - JunkCategory Model Tests
@@ -53,8 +66,8 @@ struct SystemCleanerServiceTests {
 
         #expect(category.totalSize == 1024 * 1024 * 60)
         #expect(category.selectedSize == 1024 * 1024 * 40)
-        #expect(category.formattedTotalSize == "60.0 MB")
-        #expect(category.formattedSelectedSize == "40.0 MB")
+        #expect(category.formattedTotalSize == "\(LocalizedNumber.decimal(60.0, fractionDigits: 1)) MB")
+        #expect(category.formattedSelectedSize == "\(LocalizedNumber.decimal(40.0, fractionDigits: 1)) MB")
     }
 
     // MARK: - DiskSpaceInfo Telemetry Tests
@@ -67,9 +80,9 @@ struct SystemCleanerServiceTests {
 
         let disk = DiskSpaceInfo(totalBytes: total, freeBytes: free, usedBytes: used)
         #expect(disk.usedPercentage == 0.6)
-        #expect(disk.formattedTotal == "500.00 GB")
-        #expect(disk.formattedFree == "200.00 GB")
-        #expect(disk.formattedUsed == "300.00 GB")
+        #expect(disk.formattedTotal == "\(LocalizedNumber.decimal(500.00, fractionDigits: 2)) GB")
+        #expect(disk.formattedFree == "\(LocalizedNumber.decimal(200.00, fractionDigits: 2)) GB")
+        #expect(disk.formattedUsed == "\(LocalizedNumber.decimal(300.00, fractionDigits: 2)) GB")
     }
 
     // MARK: - Service State Management & Toggles

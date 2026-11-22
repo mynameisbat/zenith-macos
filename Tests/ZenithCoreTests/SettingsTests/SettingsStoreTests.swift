@@ -230,7 +230,7 @@ struct SettingsStoreTests {
     }
 
     // MARK: - Test 9: Every setting publishes a change
-    // The store is an ObservableObject, not @Observable (that macro needs macOS 14), so `objectWillChange` is the only
+    // The store is an ObservableObject, not @Observable, so `objectWillChange` is the only
     // way SwiftUI and the view models learn that a setting changed. Each setter has to publish it.
     @Test("Every setting publishes objectWillChange")
     @MainActor

@@ -37,7 +37,8 @@ public final class ToastHUDController: NSObject {
         // A full-screen app has taken the island off the display; the floating panel still shows there.
         if ZenithIslandState.shared.showsNotices {
             // The island alert is read aloud by `triggerAlert`.
-            ZenithIslandState.shared.triggerAlert(icon: icon, title: message, subtitle: subtitle)
+            let text = IslandNoticeText.split(title: message, subtitle: subtitle)
+            ZenithIslandState.shared.triggerAlert(icon: icon, title: text.title, subtitle: text.subtitle)
             if let panel = panel, panel.isVisible {
                 panel.orderOut(nil)
             }

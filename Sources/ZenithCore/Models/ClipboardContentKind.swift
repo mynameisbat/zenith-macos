@@ -176,3 +176,30 @@ public extension ClipboardItem {
         return ClipboardTextStats(characters: text.count, words: words, lines: lines)
     }
 }
+
+extension ClipboardKindFilter {
+    /// The line under an empty clipboard list. A whole sentence per filter: a filter name dropped into one sentence
+    /// ("No \(name) in the history yet") reads badly once translated.
+    /// - Parameter matchesElsewhere: the search finds items, just none under this filter. Saying only "Nothing
+    ///   matches" then was wrong: the item was there, the filter hid it.
+    public func emptyMessage(searchText: String, matchesElsewhere: Bool) -> String {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !query.isEmpty {
+            guard matchesElsewhere else { return String(localized: "Nothing matches \u{201C}\(query)\u{201D}.") }
+            switch self {
+            case .all: return String(localized: "Nothing matches \u{201C}\(query)\u{201D}.")
+            case .text: return String(localized: "\u{201C}\(query)\u{201D} is in the history, but not as text.")
+            case .links: return String(localized: "\u{201C}\(query)\u{201D} is in the history, but not as a link.")
+            case .images: return String(localized: "\u{201C}\(query)\u{201D} is in the history, but not as an image.")
+            case .pinned: return String(localized: "\u{201C}\(query)\u{201D} is in the history, but not pinned.")
+            }
+        }
+        switch self {
+        case .all: return String(localized: "Things you copy will appear here.")
+        case .text: return String(localized: "No text in the history yet.")
+        case .links: return String(localized: "No links in the history yet.")
+        case .images: return String(localized: "No images in the history yet.")
+        case .pinned: return String(localized: "Nothing is pinned yet.")
+        }
+    }
+}

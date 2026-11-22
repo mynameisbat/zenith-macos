@@ -129,6 +129,27 @@ struct CleanerScanSchedulerTests {
         #expect(scans == 2)
     }
 
+    @Test("SCH-08b: A scan run by hand becomes the last scan while scheduled scans are on, and moves the next one")
+    func testManualScanIsTheLastScan() throws {
+        let (settings, _) = try makeSettings()
+        settings.interval = .daily
+        let clock = Clock(t0)
+        let scheduler = CleanerScanScheduler(
+            settings: settings, scanner: { .init(reclaimableBytes: 0, itemCount: 0) },
+            isBusy: { false }, now: { clock.now }, autoSchedule: false
+        )
+
+        settings.isEnabled = false
+        scheduler.noteManualScan(reclaimableBytes: 2 * gb, itemCount: 9)
+        #expect(settings.lastResult == nil, "with scheduled scans off there is no last-scan line to keep current")
+
+        settings.isEnabled = true
+        scheduler.noteManualScan(reclaimableBytes: 2 * gb, itemCount: 9)
+        #expect(settings.lastResult == ScheduledCleanerScanResult(date: t0, reclaimableBytes: 2 * gb, itemCount: 9))
+        #expect(scheduler.nextCheckDate == t0.addingTimeInterval(day))
+        #expect(settings.lastScanDescription(now: t0.addingTimeInterval(60)).contains(SystemCleanerService.formatBytes(2 * gb)))
+    }
+
     @Test("SCH-09: No scheduled scan while a manual scan or a clean is in progress, nor while off")
     func testSchedulerSkipsWhileBusy() async throws {
         let (settings, _) = try makeSettings()

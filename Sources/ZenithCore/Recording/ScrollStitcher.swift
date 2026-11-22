@@ -36,7 +36,8 @@ public struct LumaImage: Equatable, Sendable {
 
     /// One number per row (top row first) that changes when any sampled pixel of the row changes noticeably.
     public func rowSignatures() -> [RowSignature] {
-        (0..<height).map { row in
+        let buckets = min(RowSignature.profileLength, width)
+        return (0..<height).map { row in
             var hash: UInt64 = 0xcbf2_9ce4_8422_2325
             var low: UInt8 = 255
             var high: UInt8 = 0
@@ -48,7 +49,15 @@ public struct LumaImage: Equatable, Sendable {
                 // Ignore the lowest bits so tiny rendering noise does not break a match.
                 hash = (hash ^ UInt64(value >> 3)) &* 0x100_0000_01b3
             }
-            return RowSignature(hash: hash, isDistinctive: high - low > 12)
+            var profile = [UInt8](repeating: 0, count: buckets)
+            for bucket in 0..<buckets {
+                let start = bucket * width / buckets
+                let end = max(start + 1, (bucket + 1) * width / buckets)
+                var sum = 0
+                for x in start..<end { sum += Int(pixels[base + x]) }
+                profile[bucket] = UInt8(sum / (end - start))
+            }
+            return RowSignature(hash: hash, isDistinctive: high - low > 12, profile: profile)
         }
     }
 }
@@ -57,6 +66,26 @@ public struct RowSignature: Equatable, Sendable {
     public var hash: UInt64
     /// Whether the row has visible detail. Blank rows match anything and say nothing about the offset.
     public var isDistinctive: Bool
+    /// The row's average brightness in `profileLength` stretches from left to right.
+    public var profile: [UInt8] = []
+
+    public static let profileLength = 32
+    /// How far one stretch may differ and the rows still count as the same.
+    public static let profileTolerance = 8
+
+    /// The same row of content in two frames. Exact pixels are not required: text that scrolls by a fraction of a
+    /// pixel is drawn with slightly different edges, and once the frame is narrowed for matching no row of text was
+    /// ever identical again (TextEdit: the best offset scored 0.62 against the 0.97 needed, so every frame after the
+    /// first was dropped). A stretch whose average moves by more than the tolerance (another digit, another word)
+    /// still tells rows apart: the true offset scores 0.996 there, the next best 0.58.
+    public func matches(_ other: RowSignature) -> Bool {
+        if hash == other.hash { return true }
+        guard profile.count == other.profile.count, !profile.isEmpty else { return false }
+        for index in profile.indices where abs(Int(profile[index]) - Int(other.profile[index])) > Self.profileTolerance {
+            return false
+        }
+        return true
+    }
 }
 
 /// How a new frame relates to the previous one.
@@ -73,7 +102,7 @@ public struct ScrollMatch: Equatable, Sendable {
 public enum ScrollOverlapMatcher {
     /// Identical frames: nothing scrolled.
     public static func isUnchanged(_ previous: [RowSignature], _ next: [RowSignature]) -> Bool {
-        previous.count == next.count && zip(previous, next).allSatisfy { $0.hash == $1.hash }
+        previous.count == next.count && zip(previous, next).allSatisfy { $0.matches($1) }
     }
 
     /// Finds how far the content moved between two frames of the same size, or `nil` when no offset fits (the
@@ -86,9 +115,9 @@ public enum ScrollOverlapMatcher {
         // A band that stays the same at the top or bottom is a fixed bar, at most a third of the frame each.
         let cap = height / 3
         var fixedTop = 0
-        while fixedTop < cap, previous[fixedTop].hash == next[fixedTop].hash { fixedTop += 1 }
+        while fixedTop < cap, previous[fixedTop].matches(next[fixedTop]) { fixedTop += 1 }
         var fixedBottom = 0
-        while fixedBottom < cap, previous[height - 1 - fixedBottom].hash == next[height - 1 - fixedBottom].hash { fixedBottom += 1 }
+        while fixedBottom < cap, previous[height - 1 - fixedBottom].matches(next[height - 1 - fixedBottom]) { fixedBottom += 1 }
 
         let bandEnd = height - fixedBottom
         let bandHeight = bandEnd - fixedTop
@@ -104,7 +133,7 @@ public enum ScrollOverlapMatcher {
                 let old = previous[row + offset]
                 if old.isDistinctive || next[row].isDistinctive {
                     compared += 1
-                    if old.hash == next[row].hash { matched += 1 }
+                    if old.matches(next[row]) { matched += 1 }
                 }
                 row += 1
             }

@@ -163,11 +163,24 @@ struct Zenith2EnhancementsTests {
     @Test("MEM-02: SystemCleanerService optimizeMemory flushes caches and returns telemetry")
     @MainActor
     func testSystemCleanerOptimizeMemory() async {
-        let cleaner = SystemCleanerService()
+        let commands = RecordingCommandRunner()
+        let cleaner = SystemCleanerService(commandRunner: commands.runner)
         let result = await cleaner.optimizeMemory()
 
         #expect(result.availableBytes > 0)
         #expect(cleaner.memoryTelemetry != nil)
+        #expect(cleaner.isOptimizingMemory == false)
+        #expect(commands.didRun("qlmanage", containing: "cache"))
+        #expect(commands.didRun("dscacheutil", containing: "-flushcache"))
+    }
+
+    @Test("MEM-02b: A cache flush that cannot be started is skipped instead of crashing the app")
+    @MainActor
+    func testOptimizeMemorySurvivesCommandsThatCannotStart() async {
+        let cleaner = SystemCleanerService(commandRunner: { _, _ in nil })
+        let result = await cleaner.optimizeMemory()
+
+        #expect(result.availableBytes > 0)
         #expect(cleaner.isOptimizingMemory == false)
     }
 

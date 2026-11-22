@@ -19,6 +19,8 @@ public final class ClipboardHistoryViewModel: ObservableObject {
     }
 
     @Published public private(set) var filteredItems: [ClipboardItem] = []
+    /// The search finds nothing under the current filter but does find items under All.
+    @Published public private(set) var searchMatchesOutsideFilter = false
     @Published public var selectedIndex: Int = 0
 
     /// The kind chip chosen above the list (All, Text, Links, Images, Pinned).
@@ -249,6 +251,9 @@ public final class ClipboardHistoryViewModel: ObservableObject {
         } else {
             filteredItems = FuzzySearchEngine().search(query: trimmed, in: candidates)
         }
+
+        searchMatchesOutsideFilter = filteredItems.isEmpty && kindFilter != .all && !trimmed.isEmpty
+            && !FuzzySearchEngine().search(query: trimmed, in: items).isEmpty
 
         if filteredItems.isEmpty {
             selectedIndex = 0

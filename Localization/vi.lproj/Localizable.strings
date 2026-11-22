@@ -8,7 +8,6 @@
 "%@ available of %@" = "Còn trống %1$@ trên %2$@";
 "%@ characters · %@ words · %@ lines" = "%@ ký tự · %@ từ · %@ dòng";
 "%@ characters · %@ words · 1 line" = "%@ ký tự · %@ từ · 1 dòng";
-"%@ free" = "còn trống %@";
 "%@ line" = "Nét %@";
 "%@ shortcut, %@" = "Phím tắt %1$@, %2$@";
 "%@ timer, %@ left" = "Hẹn giờ %1$@, còn %2$@";
@@ -33,6 +32,8 @@
 "%lld found, %@ in all." = "Tìm thấy %lld mục, tổng cộng %@.";
 "%lld items" = "%lld mục";
 "%lld junk files" = "%lld tệp rác";
+"1 junk file" = "1 tệp rác";
+"No external drive is connected." = "Chưa có ổ ngoài nào được gắn.";
 "%lld min" = "%lld phút";
 "%lld min · %lld done today" = "%lld phút · hôm nay xong %lld";
 "%lld ms" = "%lld ms";
@@ -92,7 +93,8 @@
 "Blocks ads, trackers, and malicious domains" = "Chặn quảng cáo, trình theo dõi và tên miền độc hại";
 "Blue" = "Xanh dương";
 "Boost" = "Tăng tốc";
-"Boost: memory purged, DNS cache flushed" = "Tăng tốc: đã giải phóng bộ nhớ, xoá bộ nhớ đệm DNS";
+"Boost done: memory freed" = "Đã tăng tốc: giải phóng bộ nhớ";
+"Boost done: memory freed, DNS flushed" = "Đã tăng tốc: giải phóng bộ nhớ, xoá cache DNS";
 "Bootstrap IP (Optional):" = "IP khởi động (tuỳ chọn):";
 "Break" = "Nghỉ";
 "Break Length" = "Thời lượng nghỉ";
@@ -267,7 +269,14 @@
 "NextDNS" = "NextDNS";
 "NextDNS (%@)" = "NextDNS (%@)";
 "NextDNS profile ID: %@" = "ID hồ sơ NextDNS: %@";
-"No %@ in the history yet." = "Lịch sử chưa có %@ nào.";
+"“%@” is in the history, but not as text." = "“%@” có trong lịch sử, nhưng không phải dạng chữ.";
+"“%@” is in the history, but not as a link." = "“%@” có trong lịch sử, nhưng không phải đường dẫn.";
+"“%@” is in the history, but not as an image." = "“%@” có trong lịch sử, nhưng không phải hình ảnh.";
+"“%@” is in the history, but not pinned." = "“%@” có trong lịch sử, nhưng chưa được ghim.";
+"No text in the history yet." = "Lịch sử chưa có mục chữ nào.";
+"No links in the history yet." = "Lịch sử chưa có đường dẫn nào.";
+"No images in the history yet." = "Lịch sử chưa có hình ảnh nào.";
+"Nothing is pinned yet." = "Chưa ghim mục nào.";
 "No Clipboard History" = "Chưa có lịch sử bảng nhớ tạm";
 "No Results" = "Không có kết quả";
 "No Selection" = "Chưa chọn mục nào";
@@ -449,7 +458,7 @@
 "Stop Privacy Shield to reconfigure local proxy port." = "Tắt Privacy Shield để đổi cổng proxy cục bộ.";
 "Stop searching %@" = "Ngừng tìm trong %@";
 "Stop timer" = "Dừng hẹn giờ";
-"Storage" = "Dung lượng";
+"Free Space" = "Còn trống";
 "Successfully freed %@!" = "Đã giải phóng %@!";
 "System Sounds" = "Âm thanh hệ thống";
 "Temporary internet and app runtime caches stored in ~/Library/Caches." = "Bộ nhớ đệm internet và ứng dụng tạm thời trong ~/Library/Caches.";
@@ -472,6 +481,7 @@
 "Today" = "Hôm nay";
 "Tomorrow at %@" = "Ngày mai lúc %@";
 "Top Hog: %@ (%@%%)" = "Tốn tài nguyên nhất: %@ (%@%%)";
+"CPU: %@ across %lld cores" = "CPU: %@ trên %lld nhân";
 "Trash Bin" = "Thùng rác";
 "Turn on Privacy Shield above to start intercepting and shielding requests." = "Bật Privacy Shield ở trên để bắt đầu chặn và bảo vệ các yêu cầu.";
 "Type" = "Loại";
@@ -573,6 +583,7 @@
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "Nếu ổ đó bị tháo ra khi Privacy Shield đang bật, Zenith sẽ thoát và mạng của bạn có thể mất cho đến khi bạn mở lại Zenith. Hãy kéo Zenith vào thư mục Applications rồi mở từ đó.";
 "Turn On Anyway" = "Vẫn bật";
 "Playback position" = "Vị trí phát";
+"Artwork" = "Ảnh bìa";
 "Behavior" = "Hành vi";
 "Swipe Gestures" = "Cử chỉ vuốt";
 "Swipe down on the island to open it, up to close it, and sideways to change track." = "Vuốt xuống trên island để mở, vuốt lên để đóng, vuốt ngang để chuyển bài.";
@@ -940,7 +951,6 @@
 "The sound cannot be written in this format." = "Không ghi được âm thanh ở định dạng này.";
 "The video cannot be written in this format." = "Không ghi được video ở định dạng này.";
 "This file cannot be trimmed." = "Không cắt được tệp này.";
-"Trimming failed." = "Cắt không thành công.";
 "Trimming…" = "Đang cắt…";
 "Trim…" = "Cắt…";
 "Video Format" = "Định dạng video";

@@ -39,7 +39,7 @@ struct SnippetPickerView: View {
                         }
                         .padding(6)
                     }
-                    .onValueChange(of: model.selected?.id) { id in
+                    .onChange(of: model.selected?.id) { _, id in
                         if let id { proxy.scrollTo(id) }
                     }
                 }

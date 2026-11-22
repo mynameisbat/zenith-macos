@@ -137,16 +137,12 @@ public enum RecordingExporter {
         guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough) else {
             throw RecordingExportError.exportFailed(String(localized: "This file cannot be trimmed."))
         }
-        session.outputURL = destination
-        session.outputFileType = destination.pathExtension.lowercased() == "mp4" ? .mp4 : .mov
         session.timeRange = range.cmTimeRange
         session.shouldOptimizeForNetworkUse = true
-        let box = ExportSessionBox(session)
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            box.session.exportAsynchronously { continuation.resume() }
-        }
-        if session.status != .completed {
-            throw RecordingExportError.exportFailed(session.error?.localizedDescription ?? String(localized: "Trimming failed."))
+        do {
+            try await session.export(to: destination, as: destination.pathExtension.lowercased() == "mp4" ? .mp4 : .mov)
+        } catch {
+            throw RecordingExportError.exportFailed(error.localizedDescription)
         }
     }
 
@@ -197,10 +193,4 @@ public enum RecordingExporter {
         let name = suffix.map { "\(base) (\($0))" } ?? base
         return RecordingFileNamer.uniqueURL(in: folder, fileName: "\(name).\(pathExtension)")
     }
-}
-
-/// `AVAssetExportSession` is not `Sendable`; it is only touched before the export starts and after it ends.
-private final class ExportSessionBox: @unchecked Sendable {
-    let session: AVAssetExportSession
-    init(_ session: AVAssetExportSession) { self.session = session }
 }

@@ -683,7 +683,7 @@ private struct HomebrewLogView: View {
             .frame(height: 150)
             .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.05)))
             .onAppear { proxy.scrollTo("logEnd", anchor: .bottom) }
-            .onValueChange(of: model.log.text.count) { _ in
+            .onChange(of: model.log.text.count) { _, _ in
                 proxy.scrollTo("logEnd", anchor: .bottom)
             }
         }

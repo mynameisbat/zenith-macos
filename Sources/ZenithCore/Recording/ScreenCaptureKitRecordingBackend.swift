@@ -48,8 +48,8 @@ public final class ScreenCaptureKitRecordingBackend: NSObject, ScreenRecordingBa
         if case .region(_, let rect) = request.target {
             config.sourceRect = rect
         }
-        if #available(macOS 15, *), case .window = request.target {
-            // A window recording cannot include the click rings (they are separate windows); macOS 15 draws its own.
+        if case .window = request.target {
+            // A window recording cannot include the click rings (they are separate windows); macOS draws its own.
             config.showMouseClicks = request.highlightsClicks
         }
         if request.audio.capturesSystemAudio {

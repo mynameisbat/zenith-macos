@@ -214,6 +214,7 @@ public final class CaptureOverlayController: NSObject {
         for panel in overlayPanels {
             panel.orderFrontRegardless()
         }
+        excludeOverlayPanelsFromCapture()
 
         NSApp.activate(ignoringOtherApps: true)
 
@@ -337,6 +338,13 @@ public final class CaptureOverlayController: NSObject {
         overlayPanels.removeAll()
         overlayViews.removeAll()
         cachedScreenImage = nil
+        ScreenCaptureExclusions.set([])
+    }
+
+    /// Keeps the dimmed overlay out of the screen images taken while it shows (the loupe samples them). A window has
+    /// its number once it is on screen, so this runs after the panels are ordered in.
+    private func excludeOverlayPanelsFromCapture() {
+        ScreenCaptureExclusions.set(overlayPanels.compactMap { $0.windowNumber > 0 ? CGWindowID($0.windowNumber) : nil })
     }
 
     private func installMonitors() {
@@ -375,6 +383,7 @@ public final class CaptureOverlayController: NSObject {
             for panel in overlayPanels {
                 panel.orderFrontRegardless()
             }
+            excludeOverlayPanelsFromCapture()
             for view in overlayViews {
                 view.hintText = pickerModel?.mode.hint
             }

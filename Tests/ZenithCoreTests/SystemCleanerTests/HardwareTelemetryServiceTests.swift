@@ -170,4 +170,17 @@ struct HardwareTelemetryServiceTests {
         #expect(!safeHogs.contains { $0.pid == 900100 })
         #expect(!safeHogs.contains { $0.pid == 900300 })
     }
+
+    @Test("HW-05b: Zenith's own child processes (the ps that takes the sample) are not listed")
+    func testOwnChildrenAreLeftOut() {
+        let sample = """
+         4000     1 S     30.0  1.0  100000 Google Chrome
+         4100  2000 R      7.4  0.0    3100 (ps)
+         4200  2000 S      1.0  0.1   20000 perl
+         4300  2000 Z      0.0  0.0       0 (sh)
+        """
+        let (hogs, zombies) = HardwareTelemetryService().parseProcessOutput(sample, topLimit: 5, ownPID: 2000)
+        #expect(hogs.map(\.pid) == [4000])
+        #expect(zombies.map(\.pid) == [4300], "a zombie child is still reported, so Boost can ask Zenith to reap it")
+    }
 }

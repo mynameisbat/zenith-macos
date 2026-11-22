@@ -479,7 +479,14 @@ public final class HardwareTelemetryService: @unchecked Sendable {
         return false
     }
 
-    public func parseProcessOutput(_ output: String, topLimit: Int = 5, filterSafeOnly: Bool = false) -> (topHogs: [ProcessTelemetry], zombies: [ProcessTelemetry]) {
+    /// - Parameter ownPID: Zenith's own process. Its children (the `ps` that took this very sample, the Now Playing
+    ///   watcher, the proxy watchdog) are left out: the list showed "(ps)" as one of the busiest apps.
+    public func parseProcessOutput(
+        _ output: String,
+        topLimit: Int = 5,
+        filterSafeOnly: Bool = false,
+        ownPID: Int = Int(ProcessInfo.processInfo.processIdentifier)
+    ) -> (topHogs: [ProcessTelemetry], zombies: [ProcessTelemetry]) {
         var activeProcs: [ProcessTelemetry] = []
         var zombies: [ProcessTelemetry] = []
 
@@ -502,6 +509,7 @@ public final class HardwareTelemetryService: @unchecked Sendable {
             let cleanName = (rawCommand as NSString).lastPathComponent
 
             let isZombie = state.contains("Z")
+            if ppid == ownPID && !isZombie { continue }
 
             let proc = ProcessTelemetry(
                 pid: pid,

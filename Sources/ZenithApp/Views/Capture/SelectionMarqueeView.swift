@@ -19,8 +19,11 @@ public final class CaptureOverlayPanel: NSPanel {
             self.setFrame(contentRect, display: false)
         }
 
-        self.level = .screenSaver
+        // `isFloatingPanel` sets the level itself (false means `.normal`), so it has to come before the level: the
+        // other way round the overlay sat at the normal window level, under the menu bar and the Dock, and a drag that
+        // started on the menu bar opened Control Center instead of selecting.
         self.isFloatingPanel = false
+        self.level = .screenSaver
         self.isOpaque = false
         self.backgroundColor = .clear
         self.hasShadow = false
@@ -292,6 +295,21 @@ public final class SelectionMarqueeView: NSView {
 
     override public func mouseMoved(with event: NSEvent) {
         CaptureOverlayController.shared.handleMouseMoved(event: event)
+    }
+
+    /// Mouse moves reach this view on every display, not only on the one panel that is key: the window's
+    /// `acceptsMouseMovedEvents` delivers them to the key window alone, so on a second display the loupe never showed.
+    override public func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas where area.owner === self {
+            removeTrackingArea(area)
+        }
+        addTrackingArea(NSTrackingArea(
+            rect: .zero,
+            options: [.mouseMoved, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        ))
     }
 
     override public func keyDown(with event: NSEvent) {

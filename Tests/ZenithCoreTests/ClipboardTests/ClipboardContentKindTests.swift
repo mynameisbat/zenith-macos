@@ -95,4 +95,28 @@ struct ClipboardContentKindTests {
         viewModel.searchText = "zzz-nothing"
         #expect(viewModel.selectedItem == nil)
     }
+
+    @Test("CCK-06: When the filter hides what the search found, the empty list says so instead of 'Nothing matches'")
+    @MainActor
+    func testEmptyStateNamesTheFilter() {
+        let viewModel = ClipboardHistoryViewModel(
+            items: [ClipboardItem.text("Zenith OCR test https://example.com/?id=7"), ClipboardItem.text("Meeting notes")],
+            pasteboardService: MockPasteboardService()
+        )
+        viewModel.kindFilter = .links
+        viewModel.searchText = "Meeting"
+        #expect(viewModel.filteredItems.isEmpty)
+        #expect(viewModel.searchMatchesOutsideFilter)
+        #expect(viewModel.kindFilter.emptyMessage(searchText: "Meeting", matchesElsewhere: true)
+            == "\u{201C}Meeting\u{201D} is in the history, but not as a link.")
+
+        viewModel.searchText = "zzz-nothing"
+        #expect(!viewModel.searchMatchesOutsideFilter)
+        #expect(viewModel.kindFilter.emptyMessage(searchText: "zzz-nothing", matchesElsewhere: false)
+            == "Nothing matches \u{201C}zzz-nothing\u{201D}.")
+
+        viewModel.searchText = ""
+        #expect(ClipboardKindFilter.images.emptyMessage(searchText: "", matchesElsewhere: false) == "No images in the history yet.")
+        #expect(ClipboardKindFilter.pinned.emptyMessage(searchText: "  ", matchesElsewhere: false) == "Nothing is pinned yet.")
+    }
 }

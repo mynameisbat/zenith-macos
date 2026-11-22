@@ -8,7 +8,6 @@
 "%@ available of %@" = "%2$@ 중 %1$@ 사용 가능";
 "%@ characters · %@ words · %@ lines" = "%@자 · %@단어 · %@줄";
 "%@ characters · %@ words · 1 line" = "%@자 · %@단어 · 1줄";
-"%@ free" = "%@ 사용 가능";
 "%@ line" = "%@ 선";
 "%@ shortcut, %@" = "%1$@ 단축키, %2$@";
 "%@ timer, %@ left" = "%1$@ 타이머, %2$@ 남음";
@@ -33,6 +32,8 @@
 "%lld found, %@ in all." = "%lld개 발견, 총 %@.";
 "%lld items" = "%lld개 항목";
 "%lld junk files" = "정크 파일 %lld개";
+"1 junk file" = "불필요한 파일 1개";
+"No external drive is connected." = "연결된 외장 드라이브가 없습니다.";
 "%lld min" = "%lld분";
 "%lld min · %lld done today" = "%lld분 · 오늘 %lld회 완료";
 "%lld ms" = "%lld ms";
@@ -92,7 +93,8 @@
 "Blocks ads, trackers, and malicious domains" = "광고, 추적기 및 악성 도메인 차단";
 "Blue" = "파랑";
 "Boost" = "부스트";
-"Boost: memory purged, DNS cache flushed" = "부스트: 메모리 정리, DNS 캐시 비움";
+"Boost done: memory freed" = "부스트 완료: 메모리 확보";
+"Boost done: memory freed, DNS flushed" = "부스트 완료: 메모리 확보, DNS 비움";
 "Bootstrap IP (Optional):" = "부트스트랩 IP(선택 사항):";
 "Break" = "휴식";
 "Break Length" = "휴식 시간";
@@ -267,7 +269,14 @@
 "NextDNS" = "NextDNS";
 "NextDNS (%@)" = "NextDNS(%@)";
 "NextDNS profile ID: %@" = "NextDNS 프로필 ID: %@";
-"No %@ in the history yet." = "기록에 아직 %@ 항목이 없습니다.";
+"“%@” is in the history, but not as text." = "“%@”은(는) 기록에 있지만 텍스트가 아닙니다.";
+"“%@” is in the history, but not as a link." = "“%@”은(는) 기록에 있지만 링크가 아닙니다.";
+"“%@” is in the history, but not as an image." = "“%@”은(는) 기록에 있지만 이미지가 아닙니다.";
+"“%@” is in the history, but not pinned." = "“%@”은(는) 기록에 있지만 고정되지 않았습니다.";
+"No text in the history yet." = "기록에 아직 텍스트가 없습니다.";
+"No links in the history yet." = "기록에 아직 링크가 없습니다.";
+"No images in the history yet." = "기록에 아직 이미지가 없습니다.";
+"Nothing is pinned yet." = "아직 고정된 항목이 없습니다.";
 "No Clipboard History" = "클립보드 기록 없음";
 "No Results" = "결과 없음";
 "No Selection" = "선택 항목 없음";
@@ -449,7 +458,7 @@
 "Stop Privacy Shield to reconfigure local proxy port." = "로컬 프록시 포트를 변경하려면 Privacy Shield를 끄십시오.";
 "Stop searching %@" = "%@ 검색 중지";
 "Stop timer" = "타이머 중지";
-"Storage" = "저장 공간";
+"Free Space" = "여유 공간";
 "Successfully freed %@!" = "%@ 확보 완료!";
 "System Sounds" = "시스템 사운드";
 "Temporary internet and app runtime caches stored in ~/Library/Caches." = "~/Library/Caches에 저장된 임시 인터넷 및 앱 실행 캐시.";
@@ -472,6 +481,7 @@
 "Today" = "오늘";
 "Tomorrow at %@" = "내일 %@";
 "Top Hog: %@ (%@%%)" = "CPU 최다 사용: %@ (%@%%)";
+"CPU: %@ across %lld cores" = "CPU: %@ (코어 %lld개)";
 "Trash Bin" = "휴지통";
 "Turn on Privacy Shield above to start intercepting and shielding requests." = "요청을 가로채고 보호하려면 위에서 Privacy Shield를 켜십시오.";
 "Type" = "유형";
@@ -573,6 +583,7 @@
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "Privacy Shield가 켜져 있는 동안 해당 볼륨이 추출되면 Zenith가 종료되고 Zenith를 다시 열 때까지 인터넷이 끊길 수 있습니다. Zenith를 응용 프로그램 폴더로 드래그한 다음 그곳에서 여십시오.";
 "Turn On Anyway" = "그래도 켜기";
 "Playback position" = "재생 위치";
+"Artwork" = "앨범 아트";
 "Behavior" = "동작";
 "Swipe Gestures" = "쓸어넘기기 제스처";
 "Swipe down on the island to open it, up to close it, and sideways to change track." = "Island에서 아래로 쓸어넘기면 열리고, 위로 쓸어넘기면 닫히며, 옆으로 쓸어넘기면 트랙이 바뀝니다.";
@@ -940,7 +951,6 @@
 "The sound cannot be written in this format." = "이 형식으로는 사운드를 쓸 수 없습니다.";
 "The video cannot be written in this format." = "이 형식으로는 비디오를 쓸 수 없습니다.";
 "This file cannot be trimmed." = "이 파일은 다듬을 수 없습니다.";
-"Trimming failed." = "다듬기 실패.";
 "Trimming…" = "다듬는 중…";
 "Trim…" = "다듬기…";
 "Video Format" = "비디오 포맷";

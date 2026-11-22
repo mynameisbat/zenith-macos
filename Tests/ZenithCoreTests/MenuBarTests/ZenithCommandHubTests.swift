@@ -223,6 +223,22 @@ struct ZenithCommandHubTests {
         #expect(state.hoveredProcessId == nil)
     }
 
+    @Test("HUB-BOOST-02: Without administrator rights Boost does not claim a DNS flush")
+    @MainActor
+    func testBoostSaysWhenDNSWasNotFlushed() async throws {
+        let home = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Zenith_Boost_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let commands = RecordingCommandRunner()
+        commands.failing = ["killall"]   // what a normal user gets from `killall -HUP mDNSResponder`
+        let state = ZenithCommandHubState(optimizer: SystemOptimizerService(homeDirectory: home.path, runner: commands.runner))
+
+        let result = await state.boostSystem()
+
+        #expect(!result.flushedDNS)
+        #expect(!result.message.contains("DNS"))
+    }
+
     @Test("HUB-10: Boost system executes maintenance operations and refreshes snapshot")
     @MainActor
     func testBoostSystemExecution() async throws {
@@ -234,15 +250,14 @@ struct ZenithCommandHubTests {
         let commands = RecordingCommandRunner()
         let state = ZenithCommandHubState(optimizer: SystemOptimizerService(homeDirectory: home.path, runner: commands.runner))
 
-        state.boostSystem()
+        let result = await state.boostSystem()
 
         #expect(state.hardwareSnapshot.timestamp <= Date())
         #expect(state.showTopHogs == true)
+        #expect(result.flushedDNS, "the recorder lets every command succeed")
+        #expect(result.message.contains("DNS"))
 
-        // The maintenance steps run in the background; they must all go through the injected runner.
-        for _ in 0..<40 where !commands.didRun("dscacheutil") {
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
+        // The maintenance steps must all go through the injected runner.
         #expect(commands.didRun("qlmanage"))
         #expect(commands.didRun("dscacheutil"))
         // Boost is a one-click action; it must not quietly change persistent Finder preferences.

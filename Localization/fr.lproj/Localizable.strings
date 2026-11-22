@@ -8,7 +8,6 @@
 "%@ available of %@" = "%1$@ disponibles sur %2$@";
 "%@ characters · %@ words · %@ lines" = "%@ caractères · %@ mots · %@ lignes";
 "%@ characters · %@ words · 1 line" = "%@ caractères · %@ mots · 1 ligne";
-"%@ free" = "%@ libres";
 "%@ line" = "Trait %@";
 "%@ shortcut, %@" = "Raccourci %1$@, %2$@";
 "%@ timer, %@ left" = "Minuteur %1$@, encore %2$@";
@@ -33,6 +32,8 @@
 "%lld found, %@ in all." = "%lld éléments trouvés, %@ au total.";
 "%lld items" = "%lld éléments";
 "%lld junk files" = "%lld fichiers inutiles";
+"1 junk file" = "1 fichier inutile";
+"No external drive is connected." = "Aucun disque externe n’est connecté.";
 "%lld min" = "%lld min";
 "%lld min · %lld done today" = "%lld min · %lld terminées aujourd’hui";
 "%lld ms" = "%lld ms";
@@ -92,7 +93,8 @@
 "Blocks ads, trackers, and malicious domains" = "Bloque publicités, traqueurs et domaines malveillants";
 "Blue" = "Bleu";
 "Boost" = "Accélération";
-"Boost: memory purged, DNS cache flushed" = "Accélération : mémoire libérée, cache DNS vidé";
+"Boost done: memory freed" = "Boost terminé : mémoire libérée";
+"Boost done: memory freed, DNS flushed" = "Boost terminé : mémoire libérée, DNS vidé";
 "Bootstrap IP (Optional):" = "IP d’amorçage (facultatif) :";
 "Break" = "Pause";
 "Break Length" = "Durée de la pause";
@@ -267,7 +269,14 @@
 "NextDNS" = "NextDNS";
 "NextDNS (%@)" = "NextDNS (%@)";
 "NextDNS profile ID: %@" = "ID de profil NextDNS : %@";
-"No %@ in the history yet." = "Aucun élément de type « %@ » dans l’historique pour l’instant.";
+"“%@” is in the history, but not as text." = "« %@ » est dans l’historique, mais pas comme texte.";
+"“%@” is in the history, but not as a link." = "« %@ » est dans l’historique, mais pas comme lien.";
+"“%@” is in the history, but not as an image." = "« %@ » est dans l’historique, mais pas comme image.";
+"“%@” is in the history, but not pinned." = "« %@ » est dans l’historique, mais n’est pas épinglé.";
+"No text in the history yet." = "Aucun texte dans l’historique pour l’instant.";
+"No links in the history yet." = "Aucun lien dans l’historique pour l’instant.";
+"No images in the history yet." = "Aucune image dans l’historique pour l’instant.";
+"Nothing is pinned yet." = "Rien n’est épinglé pour l’instant.";
 "No Clipboard History" = "Historique du presse-papiers vide";
 "No Results" = "Aucun résultat";
 "No Selection" = "Aucune sélection";
@@ -449,7 +458,7 @@
 "Stop Privacy Shield to reconfigure local proxy port." = "Arrêtez Privacy Shield pour modifier le port du proxy local.";
 "Stop searching %@" = "Arrêter la recherche dans %@";
 "Stop timer" = "Arrêter le minuteur";
-"Storage" = "Stockage";
+"Free Space" = "Espace libre";
 "Successfully freed %@!" = "%@ libérés !";
 "System Sounds" = "Sons système";
 "Temporary internet and app runtime caches stored in ~/Library/Caches." = "Caches temporaires d’Internet et des apps, stockés dans ~/Library/Caches.";
@@ -472,6 +481,7 @@
 "Today" = "Aujourd’hui";
 "Tomorrow at %@" = "Demain à %@";
 "Top Hog: %@ (%@%%)" = "Plus gourmand : %@ (%@ %%)";
+"CPU: %@ across %lld cores" = "CPU : %@ sur %lld cœurs";
 "Trash Bin" = "Corbeille";
 "Turn on Privacy Shield above to start intercepting and shielding requests." = "Activez Privacy Shield ci-dessus pour commencer à intercepter et protéger les requêtes.";
 "Type" = "Type";
@@ -573,6 +583,7 @@
 "If that volume is ejected while Privacy Shield is on, Zenith quits and your internet may stop until you open Zenith again. Drag Zenith to your Applications folder and open it from there." = "Si ce volume est éjecté pendant que Privacy Shield est activé, Zenith quitte et votre connexion Internet peut s’interrompre jusqu’à ce que vous rouvriez Zenith. Faites glisser Zenith dans le dossier Applications et ouvrez-le depuis celui-ci.";
 "Turn On Anyway" = "Activer quand même";
 "Playback position" = "Position de lecture";
+"Artwork" = "Illustration";
 "Behavior" = "Comportement";
 "Swipe Gestures" = "Gestes de balayage";
 "Swipe down on the island to open it, up to close it, and sideways to change track." = "Balayez vers le bas sur la Dynamic Island pour l’ouvrir, vers le haut pour la fermer, et sur le côté pour changer de morceau.";
@@ -940,7 +951,6 @@
 "The sound cannot be written in this format." = "Impossible d’écrire le son dans ce format.";
 "The video cannot be written in this format." = "Impossible d’écrire la vidéo dans ce format.";
 "This file cannot be trimmed." = "Impossible de raccourcir ce fichier.";
-"Trimming failed." = "Échec du raccourcissement.";
 "Trimming…" = "Raccourcissement…";
 "Trim…" = "Raccourcir…";
 "Video Format" = "Format vidéo";
