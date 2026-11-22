@@ -660,6 +660,8 @@
 "Download…" = "ダウンロード…";
 "Zenith %@ is available" = "Zenith %@が利用可能です";
 "Zenith %@ is available." = "Zenith %@が利用可能です。";
+"Zenith %@ needs macOS %@ or later." = "Zenith %1$@にはmacOS %2$@以降が必要です。";
+"This Mac runs macOS %@." = "このMacではmacOS %@が動作しています。";
 "Open Settings › General to install it" = "インストールするには設定 › 一般を開いてください";
 "Not checked yet." = "まだ確認していません。";
 "Last checked %@." = "最終確認: %@。";
@@ -692,6 +694,7 @@
 "The download was announced as Zenith %@ but contains version %@. Nothing was changed." = "ダウンロードはZenith %1$@とされていましたが、中身はバージョン%2$@です。何も変更されていません。";
 "The downloaded Zenith %@ is not newer than this copy (%@). Nothing was changed." = "ダウンロードしたZenith %1$@は、このコピー（%2$@）より新しくありません。何も変更されていません。";
 "The downloaded app is not signed by the same signer as this copy of Zenith (%@). Nothing was changed." = "ダウンロードしたアプリは、このZenithのコピーと同じ署名者によって署名されていません（%@）。何も変更されていません。";
+"The downloaded Zenith needs macOS %@ or later, and this Mac runs macOS %@. Nothing was changed." = "ダウンロードしたZenithにはmacOS %1$@以降が必要ですが、このMacではmacOS %2$@が動作しています。何も変更されていません。";
 "The release does not point at a Zenith download Zenith can trust. Nothing was changed." = "このリリースは、Zenithが信頼できるZenithのダウンロードを指していません。何も変更されていません。";
 "The download failed (%@). Nothing was changed." = "ダウンロードに失敗しました（%@）。何も変更されていません。";
 "The download is far larger than a Zenith release, so it was stopped. Nothing was changed." = "ダウンロードがZenithのリリースよりはるかに大きいため、中止しました。何も変更されていません。";

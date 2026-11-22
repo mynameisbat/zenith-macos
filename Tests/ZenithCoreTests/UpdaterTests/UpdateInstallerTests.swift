@@ -31,12 +31,13 @@ struct UpdateInstallerTests {
 
         deinit { try? FileManager.default.removeItem(at: root) }
 
-        static func makeBundle(at url: URL, version: String, identifier: String = "com.zenith.workspace", marker: String) throws {
+        static func makeBundle(at url: URL, version: String, identifier: String = "com.zenith.workspace", minimumSystem: Any? = nil, marker: String) throws {
             let macOS = url.appendingPathComponent("Contents/MacOS")
             try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
-            let info: [String: Any] = [
+            var info: [String: Any] = [
                 "CFBundleIdentifier": identifier, "CFBundleShortVersionString": version, "CFBundleExecutable": "Zenith"
             ]
+            if let minimumSystem { info["LSMinimumSystemVersion"] = minimumSystem }
             let data = try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
             try data.write(to: url.appendingPathComponent("Contents/Info.plist"))
             try Data(marker.utf8).write(to: macOS.appendingPathComponent("Zenith"))
@@ -133,6 +134,8 @@ struct UpdateInstallerTests {
         let hdiutil: FakeHdiutil
         let verifier = FakeVerifier()
         var operations: UpdateFileOperations
+        /// The macOS the fake Mac runs. Never the real one.
+        var system = AppVersion("26.0")!
 
         init() throws {
             sandbox = try Sandbox()
@@ -147,16 +150,17 @@ struct UpdateInstallerTests {
 
         func installer() -> UpdateInstaller {
             UpdateInstaller(
-                appURL: sandbox.installed, runningVersion: AppVersion("2.4.0")!, verifier: verifier, downloader: downloader,
+                appURL: sandbox.installed, runningVersion: AppVersion("2.4.0")!, systemVersion: system, verifier: verifier, downloader: downloader,
                 runner: hdiutil.runner, fileOperations: operations, temporaryRoot: sandbox.tmp, downloadsDirectory: sandbox.downloads
             )
         }
 
-        func release(version: String = "2.5.0", sha256: String? = nil, size: Int64? = nil) -> UpdateRelease {
+        func release(version: String = "2.5.0", sha256: String? = nil, size: Int64? = nil, minimumSystem: String? = nil) -> UpdateRelease {
             UpdateRelease(
                 version: AppVersion(version)!, tag: "v\(version)", assetName: "Zenith-\(version).dmg",
                 downloadURL: URL(string: "https://github.com/mynameisbat/zenith-macos/releases/download/v\(version)/Zenith-\(version).dmg")!,
-                assetSize: size ?? Int64(downloader.payload.count), sha256: sha256
+                assetSize: size ?? Int64(downloader.payload.count), sha256: sha256,
+                minimumSystemVersion: minimumSystem.flatMap { AppVersion($0) }
             )
         }
 
@@ -389,6 +393,62 @@ struct UpdateInstallerTests {
         // copyItem of the template copies the link itself into the mount point.
         await #expect(throws: UpdateInstallError.appMissingInImage) { try await h.installer().install(h.release()) { _ in } }
         h.sandbox.expectUntouched()
+    }
+
+    // MARK: - The macOS the new app needs
+
+    @Test("UPD-I15: The staged app needs a newer macOS than this Mac runs: refused after staging, nothing replaced, image detached")
+    func testStagedAppNeedsNewerSystem() async throws {
+        var h = try Harness()
+        h.system = AppVersion("15.6")!
+        try FileManager.default.removeItem(at: h.sandbox.template)
+        try Sandbox.makeBundle(at: h.sandbox.template, version: "2.5.0", minimumSystem: "26.0", marker: "new")
+        // The release notes said nothing, so the download happens; the app's own Info.plist is what stops it.
+        await #expect(throws: UpdateInstallError.rejected(.needsNewerSystem(required: "26", running: "15.6"))) {
+            try await h.installer().install(h.release()) { _ in }
+        }
+        h.sandbox.expectUntouched("staged app needs macOS 26")
+        #expect(h.downloader.urls.count == 1)
+        #expect(h.hdiutil.detaches.count == 1)
+    }
+
+    @Test("UPD-I16: The staged app's minimum is met, absent, or equal to the Mac's: installs")
+    func testStagedAppSystemMet() async throws {
+        for (minimum, system) in [(nil, "15.6"), ("26.0", "26.0"), ("15.0", "26.1.1")] as [(String?, String)] {
+            var h = try Harness()
+            h.system = AppVersion(system)!
+            try FileManager.default.removeItem(at: h.sandbox.template)
+            try Sandbox.makeBundle(at: h.sandbox.template, version: "2.5.0", minimumSystem: minimum, marker: "new")
+            _ = try await h.installer().install(h.release()) { _ in }
+            #expect(h.sandbox.marker(of: h.sandbox.installed) == "new", "minimum \(minimum ?? "none") on \(system)")
+        }
+    }
+
+    @Test("UPD-I17: A staged app whose minimum is garbage is refused rather than guessed at")
+    func testStagedAppSystemGarbage() async throws {
+        let h = try Harness()
+        try FileManager.default.removeItem(at: h.sandbox.template)
+        try Sandbox.makeBundle(at: h.sandbox.template, version: "2.5.0", minimumSystem: "soon", marker: "new")
+        await #expect(throws: UpdateInstallError.rejected(.unreadableInfo)) { try await h.installer().install(h.release()) { _ in } }
+        h.sandbox.expectUntouched("garbage minimum")
+    }
+
+    @Test("UPD-I18: A release whose notes state a newer macOS is not downloaded at all, to install or by hand")
+    func testReleaseStatesNewerSystem() async throws {
+        var h = try Harness()
+        h.system = AppVersion("15.6")!
+        let expected = UpdateInstallError.rejected(.needsNewerSystem(required: "26", running: "15.6"))
+        await #expect(throws: expected) { try await h.installer().install(h.release(minimumSystem: "26.0")) { _ in } }
+        await #expect(throws: expected) { try await h.installer().downloadForManualInstall(h.release(minimumSystem: "26.0")) { _ in } }
+        #expect(h.downloader.urls.isEmpty)
+        #expect(h.hdiutil.commands.isEmpty)
+        #expect(h.sandbox.contents(h.sandbox.downloads).isEmpty)
+        h.sandbox.expectUntouched("release states macOS 26")
+
+        // The same release on a Mac that meets it installs.
+        h.system = AppVersion("26.0")!
+        _ = try await h.installer().install(h.release(minimumSystem: "26.0")) { _ in }
+        #expect(h.sandbox.marker(of: h.sandbox.installed) == "new")
     }
 
     // MARK: - Manual download

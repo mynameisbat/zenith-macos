@@ -7,7 +7,8 @@ import CoreServices
 //   2. the release's URL, name, size and version are re-checked
 //   3. download into a private temporary folder; exact size, size cap, SHA-256 when GitHub publishes one
 //   4. mount read-only, without Finder, at a mount point inside that folder; copy Zenith.app out; detach (always)
-//   5. verify THAT COPY: bundle identifier, announced version == bundle version > running version, and its signature
+//   5. verify THAT COPY: bundle identifier, announced version == bundle version > running version, its
+//      LSMinimumSystemVersion is not newer than this Mac's macOS, and its signature
 //      satisfies the running app's designated requirement (same certificate)
 //   6. swap that same copy in with one atomic replace, beside the installed app (same volume), old app to the Trash
 // A failure at any step leaves the installed app where it was.
@@ -101,6 +102,7 @@ public protocol UpdateInstalling: Sendable {
 public final class UpdateInstaller: UpdateInstalling, @unchecked Sendable {
     private let appURL: URL
     private let runningVersion: AppVersion
+    private let systemVersion: AppVersion
     private let verifier: CodeSignatureVerifying
     private let downloader: UpdateDownloading
     private let runner: SystemCommandRunner
@@ -110,12 +112,14 @@ public final class UpdateInstaller: UpdateInstalling, @unchecked Sendable {
 
     /// - Parameters:
     ///   - appURL: The installed bundle to replace (the running app's).
+    ///   - systemVersion: The macOS this Mac runs (injected so tests do not depend on the Mac they run on).
     ///   - runner: Runs `hdiutil`; tests record it.
     ///   - temporaryRoot: Where the private download folder is made.
     ///   - downloadsDirectory: Where a manual download is saved (default: the user's Downloads).
     public init(
         appURL: URL = Bundle.main.bundleURL,
         runningVersion: AppVersion = .running,
+        systemVersion: AppVersion = .runningOperatingSystem,
         verifier: CodeSignatureVerifying = SecurityFrameworkSignatureVerifier(),
         downloader: UpdateDownloading = URLSessionUpdateDownloader(),
         runner: @escaping SystemCommandRunner = SystemCommand.processRunner,
@@ -125,6 +129,7 @@ public final class UpdateInstaller: UpdateInstalling, @unchecked Sendable {
     ) {
         self.appURL = appURL.standardizedFileURL
         self.runningVersion = runningVersion
+        self.systemVersion = systemVersion
         self.verifier = verifier
         self.downloader = downloader
         self.runner = runner
@@ -173,8 +178,10 @@ public final class UpdateInstaller: UpdateInstalling, @unchecked Sendable {
         if let rejection = UpdateInstallPolicy.candidateRejection(
             bundleIdentifier: info?["CFBundleIdentifier"] as? String,
             shortVersion: info?["CFBundleShortVersionString"] as? String,
+            minimumSystemVersion: info?["LSMinimumSystemVersion"],
             claimed: release.version,
             running: runningVersion,
+            system: systemVersion,
             signature: signature
         ) {
             throw UpdateInstallError.rejected(rejection)
@@ -189,6 +196,11 @@ public final class UpdateInstaller: UpdateInstalling, @unchecked Sendable {
     private func checkReleaseAgain(_ release: UpdateRelease) throws {
         guard release.version > runningVersion else {
             throw UpdateInstallError.rejected(.notNewer(found: release.version.description, running: runningVersion.description))
+        }
+        // The notes' `Minimum macOS` line: do not download what cannot run here. (Absent means unknown, so go on;
+        // the staged app's own LSMinimumSystemVersion is checked after the copy.)
+        if let required = release.minimumSystemVersion, systemVersion < required {
+            throw UpdateInstallError.rejected(.needsNewerSystem(required: required.shortDescription, running: systemVersion.shortDescription))
         }
         guard AppVersion(release.tag) == release.version,
               release.assetName == UpdateLimits.assetName(forVersionText: Self.versionText(ofTag: release.tag)),

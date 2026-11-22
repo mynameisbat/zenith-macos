@@ -660,6 +660,8 @@
 "Download…" = "下载…";
 "Zenith %@ is available" = "Zenith %@ 现已推出";
 "Zenith %@ is available." = "Zenith %@ 现已推出。";
+"Zenith %@ needs macOS %@ or later." = "Zenith %1$@ 需要 macOS %2$@ 或更高版本。";
+"This Mac runs macOS %@." = "这台 Mac 运行的是 macOS %@。";
 "Open Settings › General to install it" = "打开“设置”›“通用”进行安装";
 "Not checked yet." = "尚未检查。";
 "Last checked %@." = "上次检查：%@。";
@@ -692,6 +694,7 @@
 "The download was announced as Zenith %@ but contains version %@. Nothing was changed." = "下载内容标称为 Zenith %1$@，但实际包含版本 %2$@。未做任何更改。";
 "The downloaded Zenith %@ is not newer than this copy (%@). Nothing was changed." = "下载的 Zenith %1$@ 并不比当前副本（%2$@）新。未做任何更改。";
 "The downloaded app is not signed by the same signer as this copy of Zenith (%@). Nothing was changed." = "下载的 App 与此 Zenith 副本（%@）的签名者不同。未做任何更改。";
+"The downloaded Zenith needs macOS %@ or later, and this Mac runs macOS %@. Nothing was changed." = "下载的 Zenith 需要 macOS %1$@ 或更高版本，而这台 Mac 运行的是 macOS %2$@。未做任何更改。";
 "The release does not point at a Zenith download Zenith can trust. Nothing was changed." = "该发布版本未指向 Zenith 可以信任的下载文件。未做任何更改。";
 "The download failed (%@). Nothing was changed." = "下载失败（%@）。未做任何更改。";
 "The download is far larger than a Zenith release, so it was stopped. Nothing was changed." = "下载内容远大于 Zenith 发布版本，因此已停止。未做任何更改。";

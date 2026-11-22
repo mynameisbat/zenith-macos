@@ -67,10 +67,13 @@ struct UpdatePolicyAndScheduleTests {
         version: String? = "2.5.0",
         claimed: String = "2.5.0",
         running: String = "2.4.0",
+        minimumSystem: Any? = nil,
+        system: String = "26.0",
         signature: CandidateSignatureCheck = .satisfiesRunningRequirement
     ) -> UpdateCandidateRejection? {
         UpdateInstallPolicy.candidateRejection(
-            bundleIdentifier: id, shortVersion: version, claimed: v(claimed), running: v(running), signature: signature
+            bundleIdentifier: id, shortVersion: version, minimumSystemVersion: minimumSystem,
+            claimed: v(claimed), running: v(running), system: v(system), signature: signature
         )
     }
 
@@ -99,6 +102,35 @@ struct UpdatePolicyAndScheduleTests {
     @Test("UPD-P07: A failed signature check refuses even when everything else is right")
     func testCandidateSignature() {
         #expect(rejection(signature: .rejected("different certificate")) == .signature("different certificate"))
+    }
+
+    @Test("UPD-P08: A candidate that needs a newer macOS than this Mac runs is refused; no key, or enough macOS, is fine")
+    func testCandidateMinimumSystem() {
+        #expect(rejection(minimumSystem: nil, system: "15.6") == nil)
+        #expect(rejection(minimumSystem: "26.0", system: "26.0") == nil)
+        #expect(rejection(minimumSystem: "26.0", system: "26.1.2") == nil)
+        #expect(rejection(minimumSystem: "26", system: "26.0.0") == nil)
+        #expect(rejection(minimumSystem: "26.0", system: "15.6") == .needsNewerSystem(required: "26", running: "15.6"))
+        #expect(rejection(minimumSystem: "26.1", system: "26.0") == .needsNewerSystem(required: "26.1", running: "26"))
+        #expect(rejection(minimumSystem: "15.6.1", system: "15.6") == .needsNewerSystem(required: "15.6.1", running: "15.6"))
+        // A key that is present but not a version is not guessed at.
+        #expect(rejection(minimumSystem: "twenty-six", system: "26.0") == .unreadableInfo)
+        #expect(rejection(minimumSystem: 26, system: "26.0") == .unreadableInfo)
+        // Identity and version problems are reported before the system check.
+        #expect(rejection(id: "com.example.other", minimumSystem: "99", system: "15.6") == .wrongIdentifier)
+        #expect(rejection(minimumSystem: "26.0", system: "15.6", signature: .rejected("x")) == .needsNewerSystem(required: "26", running: "15.6"))
+        let message = UpdateCandidateRejection.needsNewerSystem(required: "26", running: "15.6").errorDescription
+        #expect(message == "The downloaded Zenith needs macOS 26 or later, and this Mac runs macOS 15.6. Nothing was changed.")
+    }
+
+    @Test("UPD-P09: The running macOS is read as major.minor.patch")
+    func testSystemVersion() {
+        let system = AppVersion(operatingSystem: OperatingSystemVersion(majorVersion: 15, minorVersion: 6, patchVersion: 0))
+        #expect(system == v("15.6"))
+        #expect(system.shortDescription == "15.6")
+        #expect(AppVersion(operatingSystem: OperatingSystemVersion(majorVersion: 26, minorVersion: 0, patchVersion: 0)).shortDescription == "26")
+        #expect(AppVersion(operatingSystem: OperatingSystemVersion(majorVersion: 26, minorVersion: 2, patchVersion: 1)).shortDescription == "26.2.1")
+        #expect(AppVersion.runningOperatingSystem.components.count == 3)
     }
 
     // MARK: - Check schedule
@@ -191,11 +223,13 @@ struct UpdatePolicyAndScheduleTests {
         )
     }
 
-    private func makeUpdater(feed: StubFeed, installer: StubInstaller = StubInstaller(), clock: Clock) throws -> (ZenithUpdater, UpdateSettings) {
+    private func makeUpdater(
+        feed: StubFeed, installer: StubInstaller = StubInstaller(), clock: Clock, system: String = "26.0"
+    ) throws -> (ZenithUpdater, UpdateSettings) {
         let defaults = try #require(TestDefaults.make("updates.\(UUID().uuidString)"))
         let settings = UpdateSettings(userDefaults: defaults)
         let updater = ZenithUpdater(
-            settings: settings, feed: feed, installer: installer, runningVersion: v("2.4.0"),
+            settings: settings, feed: feed, installer: installer, runningVersion: v("2.4.0"), systemVersion: v(system),
             now: { clock.now }, autoSchedule: false
         )
         return (updater, settings)
@@ -301,5 +335,100 @@ struct UpdatePolicyAndScheduleTests {
         #expect(await updater.install(confirm: { _ in true }) != nil)
         #expect(installer.installs == 1)
         #expect(updater.phase == .installed)
+    }
+
+    // MARK: - A release that needs a newer macOS
+
+    private static func release(_ version: String, minimumSystem: String?) -> UpdateRelease {
+        let base = release(version)
+        return UpdateRelease(
+            version: base.version, tag: base.tag, assetName: base.assetName, downloadURL: base.downloadURL,
+            assetSize: base.assetSize, sha256: nil, minimumSystemVersion: minimumSystem.flatMap { AppVersion($0) }
+        )
+    }
+
+    @Test("UPD-S11: A newer release that needs a newer macOS is shown as information: no notice, no Install, nothing downloaded")
+    func testUnsupportedRelease() async throws {
+        let clock = Clock(t0)
+        let installer = StubInstaller()
+        let feed = StubFeed(.success(Self.release("3.0.0", minimumSystem: "26.0")))
+        let (updater, settings) = try makeUpdater(feed: feed, installer: installer, clock: clock, system: "15.6")
+        var notices: [String] = []
+        updater.notifier = { title, _ in notices.append(title) }
+
+        #expect(await updater.evaluate())
+        #expect(notices.isEmpty)
+        #expect(settings.lastNotifiedVersion == nil)
+        #expect(updater.phase == .requiresNewerSystem)
+        #expect(updater.availableRelease == nil)
+        #expect(updater.installRefusal == nil)
+        #expect(updater.unsupportedRelease?.version == v("3.0.0"))
+        #expect(updater.unsupportedTitle(for: Self.release("3.0.0", minimumSystem: "26.0")) == "Zenith 3.0.0 needs macOS 26 or later.")
+        #expect(updater.statusDescription(at: t0) == "Zenith 3.0.0 needs macOS 26 or later. This Mac runs macOS 15.6.")
+        #expect(settings.lastCheckDate == t0)
+        #expect(updater.nextCheckDate == t0.addingTimeInterval(day))
+        #expect(!updater.isBusy)
+
+        // There is nothing to install or download, whatever the caller presses.
+        var asked = 0
+        #expect(await updater.install(confirm: { _ in asked += 1; return true }) == nil)
+        #expect(await updater.downloadForManualInstall() == nil)
+        #expect(asked == 0)
+        #expect(installer.installs == 0)
+
+        // Another daily check of the same release stays quiet and keeps the state.
+        clock.now = t0.addingTimeInterval(day + 1)
+        #expect(await updater.evaluate())
+        #expect(notices.isEmpty)
+        #expect(updater.phase == .requiresNewerSystem)
+    }
+
+    @Test("UPD-S12: Enough macOS, or no stated minimum, is offered as before; a later compatible release replaces the state")
+    func testSupportedAndUnstatedReleases() async throws {
+        let clock = Clock(t0)
+        let feed = StubFeed(.success(Self.release("2.5.0", minimumSystem: "15.0")))
+        let (updater, _) = try makeUpdater(feed: feed, clock: clock, system: "15.6")
+        var notices: [String] = []
+        updater.notifier = { title, _ in notices.append(title) }
+
+        #expect(await updater.evaluate())
+        #expect(updater.phase == .available)
+        #expect(notices == ["Zenith 2.5.0 is available"])
+        #expect(updater.unsupportedRelease == nil)
+
+        // Not stated: compatible (the install-time check still protects).
+        feed.result = .success(Self.release("2.6.0", minimumSystem: nil))
+        await updater.checkNow()
+        #expect(updater.phase == .available)
+        #expect(updater.availableRelease?.version == v("2.6.0"))
+
+        // Needs a newer macOS: the offer is withdrawn, the information shown.
+        feed.result = .success(Self.release("3.0.0", minimumSystem: "26.0"))
+        await updater.checkNow()
+        #expect(updater.phase == .requiresNewerSystem)
+        #expect(updater.availableRelease == nil)
+
+        // A failed check keeps what was known.
+        feed.result = .failure(UpdateFeedError.offline)
+        await updater.checkNow()
+        #expect(updater.phase == .requiresNewerSystem)
+        #expect(updater.unsupportedRelease != nil)
+
+        // The release is withdrawn or this Mac is up to date: the information goes away.
+        feed.result = .success(Self.release("2.4.0"))
+        await updater.checkNow()
+        #expect(updater.phase == .upToDate)
+        #expect(updater.unsupportedRelease == nil)
+    }
+
+    @Test("UPD-S13: A release is compatible at exactly its minimum, and one that states none always is")
+    func testReleaseCompatibility() {
+        let needs26 = Self.release("3.0.0", minimumSystem: "26.0")
+        #expect(needs26.isCompatible(withSystem: v("26.0")))
+        #expect(needs26.isCompatible(withSystem: v("26.0.1")))
+        #expect(needs26.isCompatible(withSystem: v("27.2")))
+        #expect(!needs26.isCompatible(withSystem: v("15.6")))
+        #expect(!needs26.isCompatible(withSystem: v("25.9.9")))
+        #expect(Self.release("3.0.0").isCompatible(withSystem: v("10.15")))
     }
 }

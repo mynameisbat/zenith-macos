@@ -660,6 +660,8 @@
 "Download…" = "다운로드…";
 "Zenith %@ is available" = "Zenith %@ 사용 가능";
 "Zenith %@ is available." = "Zenith %@을(를) 사용할 수 있습니다.";
+"Zenith %@ needs macOS %@ or later." = "Zenith %1$@에는 macOS %2$@ 이상이 필요합니다.";
+"This Mac runs macOS %@." = "이 Mac은 macOS %@을(를) 사용 중입니다.";
 "Open Settings › General to install it" = "설치하려면 설정 › 일반을 여십시오";
 "Not checked yet." = "아직 확인하지 않았습니다.";
 "Last checked %@." = "마지막 확인: %@.";
@@ -692,6 +694,7 @@
 "The download was announced as Zenith %@ but contains version %@. Nothing was changed." = "다운로드가 Zenith %1$@(으)로 공지되었지만 버전 %2$@을(를) 포함하고 있습니다. 아무것도 변경되지 않았습니다.";
 "The downloaded Zenith %@ is not newer than this copy (%@). Nothing was changed." = "다운로드한 Zenith %1$@은(는) 이 사본(%2$@)보다 최신이 아닙니다. 아무것도 변경되지 않았습니다.";
 "The downloaded app is not signed by the same signer as this copy of Zenith (%@). Nothing was changed." = "다운로드한 앱이 이 Zenith 사본과 동일한 서명자로 서명되지 않았습니다(%@). 아무것도 변경되지 않았습니다.";
+"The downloaded Zenith needs macOS %@ or later, and this Mac runs macOS %@. Nothing was changed." = "다운로드한 Zenith에는 macOS %1$@ 이상이 필요하지만 이 Mac은 macOS %2$@을(를) 사용 중입니다. 아무것도 변경되지 않았습니다.";
 "The release does not point at a Zenith download Zenith can trust. Nothing was changed." = "릴리스가 Zenith가 신뢰할 수 있는 Zenith 다운로드를 가리키지 않습니다. 아무것도 변경되지 않았습니다.";
 "The download failed (%@). Nothing was changed." = "다운로드에 실패했습니다(%@). 아무것도 변경되지 않았습니다.";
 "The download is far larger than a Zenith release, so it was stopped. Nothing was changed." = "다운로드가 Zenith 릴리스보다 훨씬 커서 중단되었습니다. 아무것도 변경되지 않았습니다.";

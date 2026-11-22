@@ -660,6 +660,8 @@
 "Download…" = "Télécharger…";
 "Zenith %@ is available" = "Zenith %@ est disponible";
 "Zenith %@ is available." = "Zenith %@ est disponible.";
+"Zenith %@ needs macOS %@ or later." = "Zenith %1$@ nécessite macOS %2$@ ou version ultérieure.";
+"This Mac runs macOS %@." = "Ce Mac fonctionne sous macOS %@.";
 "Open Settings › General to install it" = "Ouvrez Réglages › Général pour l’installer";
 "Not checked yet." = "Aucune recherche pour l’instant.";
 "Last checked %@." = "Dernière recherche : %@.";
@@ -692,6 +694,7 @@
 "The download was announced as Zenith %@ but contains version %@. Nothing was changed." = "Le téléchargement était annoncé comme Zenith %1$@, mais contient la version %2$@. Rien n’a été modifié.";
 "The downloaded Zenith %@ is not newer than this copy (%@). Nothing was changed." = "Le Zenith %1$@ téléchargé n’est pas plus récent que cette copie (%2$@). Rien n’a été modifié.";
 "The downloaded app is not signed by the same signer as this copy of Zenith (%@). Nothing was changed." = "L’app téléchargée n’est pas signée par le même signataire que cette copie de Zenith (%@). Rien n’a été modifié.";
+"The downloaded Zenith needs macOS %@ or later, and this Mac runs macOS %@. Nothing was changed." = "Le Zenith téléchargé nécessite macOS %1$@ ou version ultérieure, et ce Mac fonctionne sous macOS %2$@. Rien n’a été modifié.";
 "The release does not point at a Zenith download Zenith can trust. Nothing was changed." = "La version publiée ne renvoie à aucun téléchargement de Zenith auquel Zenith puisse se fier. Rien n’a été modifié.";
 "The download failed (%@). Nothing was changed." = "Le téléchargement a échoué (%@). Rien n’a été modifié.";
 "The download is far larger than a Zenith release, so it was stopped. Nothing was changed." = "Le téléchargement est bien plus volumineux qu’une version de Zenith et a donc été arrêté. Rien n’a été modifié.";

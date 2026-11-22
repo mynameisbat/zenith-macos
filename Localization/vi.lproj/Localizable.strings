@@ -660,6 +660,8 @@
 "Download…" = "Tải xuống…";
 "Zenith %@ is available" = "Đã có Zenith %@";
 "Zenith %@ is available." = "Đã có Zenith %@.";
+"Zenith %@ needs macOS %@ or later." = "Zenith %1$@ cần macOS %2$@ trở lên.";
+"This Mac runs macOS %@." = "Máy Mac này đang chạy macOS %@.";
 "Open Settings › General to install it" = "Mở Cài đặt › Chung để cài đặt";
 "Not checked yet." = "Chưa kiểm tra lần nào.";
 "Last checked %@." = "Kiểm tra lần cuối %@.";
@@ -692,6 +694,7 @@
 "The download was announced as Zenith %@ but contains version %@. Nothing was changed." = "Tệp tải được công bố là Zenith %1$@ nhưng lại chứa phiên bản %2$@. Không có gì bị thay đổi.";
 "The downloaded Zenith %@ is not newer than this copy (%@). Nothing was changed." = "Zenith %1$@ đã tải không mới hơn bản này (%2$@). Không có gì bị thay đổi.";
 "The downloaded app is not signed by the same signer as this copy of Zenith (%@). Nothing was changed." = "Ứng dụng đã tải không được ký bởi cùng người ký với bản Zenith này (%@). Không có gì bị thay đổi.";
+"The downloaded Zenith needs macOS %@ or later, and this Mac runs macOS %@. Nothing was changed." = "Tệp Zenith đã tải cần macOS %1$@ trở lên, còn máy Mac này đang chạy macOS %2$@. Không có gì bị thay đổi.";
 "The release does not point at a Zenith download Zenith can trust. Nothing was changed." = "Bản phát hành không trỏ tới tệp tải Zenith nào mà Zenith có thể tin cậy. Không có gì bị thay đổi.";
 "The download failed (%@). Nothing was changed." = "Tải xuống thất bại (%@). Không có gì bị thay đổi.";
 "The download is far larger than a Zenith release, so it was stopped. Nothing was changed." = "Tệp tải lớn hơn nhiều so với một bản phát hành Zenith nên đã bị dừng. Không có gì bị thay đổi.";
