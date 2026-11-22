@@ -34,20 +34,27 @@ public enum MinimumSystemMarker {
 
     static func parse(line: String) -> AppVersion? {
         // Markdown emphasis and code ticks carry no meaning here: `**Minimum macOS:** 26.0` is the same line.
-        let plain = line.filter { $0 != "*" && $0 != "_" && $0 != "`" }
-        let leadingMarkers = CharacterSet.whitespaces.union(CharacterSet(charactersIn: ">-+•"))
-        var words = plain.unicodeScalars.drop(while: { leadingMarkers.contains($0) })
-            .map(Character.init).split(whereSeparator: { $0 == " " || $0 == "\t" || $0 == "\u{00A0}" })
-            .map { String($0) }
+        let dropped: Set<Character> = ["*", "_", "`"]
+        let plain: String = String(line.filter { !dropped.contains($0) })
+        var leadingMarkers: CharacterSet = CharacterSet.whitespaces
+        leadingMarkers.formUnion(CharacterSet(charactersIn: ">-+•"))
+        let scalars: String.UnicodeScalarView.SubSequence = plain.unicodeScalars.drop(while: { leadingMarkers.contains($0) })
+        let trimmed: [Character] = scalars.map { Character($0) }
+        let separators: Set<Character> = [" ", "\t", "\u{00A0}"]
+        let pieces: [ArraySlice<Character>] = trimmed.split(whereSeparator: { separators.contains($0) })
+        var words: [String] = pieces.map { String($0) }
         // `Minimum macOS : 26.0` and `Minimum macOS:26.0` both split the colon off its neighbours.
         guard words.count >= 2, words[0].lowercased() == "minimum" else { return nil }
         words.removeFirst()
         let rest = words.joined(separator: " ")
         guard rest.lowercased().hasPrefix("macos") else { return nil }
-        let afterName = rest.dropFirst("macos".count).drop(while: { $0 == " " })
+        let afterName: Substring = rest.dropFirst("macos".count).drop(while: { $0 == " " })
         guard afterName.first == ":" else { return nil }
-        let value = afterName.dropFirst().trimmingCharacters(in: .whitespaces)
-        guard let version = AppVersion(value), value.first != "v", value.first != "V",
+        let valueText: String = String(afterName.dropFirst())
+        let value: String = valueText.trimmingCharacters(in: CharacterSet.whitespaces)
+        guard let version = AppVersion(value) else { return nil }
+        let firstChar: Character? = value.first
+        guard firstChar != "v", firstChar != "V",
               version.components.count <= 3, version.components[0] > 0 else { return nil }
         return version
     }
