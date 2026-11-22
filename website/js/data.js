@@ -154,14 +154,14 @@ const DAY = 86400000;
 
 export function seedClipboard(imageURL) {
   return [
-    { kind: 'link', text: 'https://shop.example.com/lamp?id=42&utm_source=newsletter&utm_medium=email&fbclid=IwAR0demo', at: now - 4 * 60000 },
-    { kind: 'text', text: 'Meeting notes: ship the island fix on Friday, then review the cleaner copy with the team.', at: now - 26 * 60000 },
-    { kind: 'color', text: '#0F62FE', at: now - 50 * 60000, pinned: true },
-    { kind: 'image', text: 'Image 1280 × 720', img: imageURL, w: 1280, h: 720, size: 682800, at: now - 70 * 60000 },
-    { kind: 'link', text: 'https://youtu.be/demo1234567?si=Xy12AbCdEfGh&t=42', at: now - 3 * 3600000 },
-    { kind: 'text', text: 'swift build -c release', at: now - DAY - 3600000 },
-    { kind: 'text', text: 'Invoice 2026-114, due 30 November', at: now - DAY - 5 * 3600000 },
-    { kind: 'text', text: 'brew install --cask example-app', at: now - 4 * DAY },
+    { kind: 'link', text: 'https://shop.example.com/lamp?id=42&utm_source=newsletter&utm_medium=email&fbclid=IwAR0demo', source: 'Safari', at: now - 4 * 60000 },
+    { kind: 'text', text: 'Meeting notes: ship the island fix on Friday, then review the cleaner copy with the team.', source: 'Notes', at: now - 26 * 60000 },
+    { kind: 'color', text: '#0F62FE', source: 'Design Tool', at: now - 50 * 60000, pinned: true },
+    { kind: 'image', text: 'Image 1280 × 720', img: imageURL, w: 1280, h: 720, size: 682800, source: 'Zenith', at: now - 70 * 60000 },
+    { kind: 'link', text: 'https://youtu.be/demo1234567?si=Xy12AbCdEfGh&t=42', source: 'Safari', at: now - 3 * 3600000 },
+    { kind: 'text', text: 'swift build -c release', source: 'Terminal', at: now - DAY - 3600000 },
+    { kind: 'text', text: 'Invoice 2026-114, due 30 November', source: 'Mail', at: now - DAY - 5 * 3600000 },
+    { kind: 'text', text: 'brew install --cask example-app', source: 'Terminal', at: now - 4 * DAY },
   ];
 }
 

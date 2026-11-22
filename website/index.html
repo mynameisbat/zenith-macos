@@ -14,24 +14,24 @@
   <script type="importmap">
   {
     "imports": {
-      "./js/capture.js": "./js/capture.js?v=7",
-      "./js/clipboard.js": "./js/clipboard.js?v=7",
-      "./js/core.js": "./js/core.js?v=7",
-      "./js/data.js": "./js/data.js?v=7",
-      "./js/desktop.js": "./js/desktop.js?v=7",
-      "./js/hub.js": "./js/hub.js?v=7",
-      "./js/island.js": "./js/island.js?v=7",
-      "./js/main.js": "./js/main.js?v=7",
-      "./js/models.js": "./js/models.js?v=7",
-      "./js/pages.js": "./js/pages.js?v=7",
-      "./js/qr.js": "./js/qr.js?v=7",
-      "./js/settings.js": "./js/settings.js?v=7",
-      "./js/tools.js": "./js/tools.js?v=7"
+      "./js/capture.js": "./js/capture.js?v=8",
+      "./js/clipboard.js": "./js/clipboard.js?v=8",
+      "./js/core.js": "./js/core.js?v=8",
+      "./js/data.js": "./js/data.js?v=8",
+      "./js/desktop.js": "./js/desktop.js?v=8",
+      "./js/hub.js": "./js/hub.js?v=8",
+      "./js/island.js": "./js/island.js?v=8",
+      "./js/main.js": "./js/main.js?v=8",
+      "./js/models.js": "./js/models.js?v=8",
+      "./js/pages.js": "./js/pages.js?v=8",
+      "./js/qr.js": "./js/qr.js?v=8",
+      "./js/settings.js": "./js/settings.js?v=8",
+      "./js/tools.js": "./js/tools.js?v=8"
     }
   }
   </script>
-  <link rel="stylesheet" href="style.css?v=7">
-  <script type="module" src="js/main.js?v=7"></script>
+  <link rel="stylesheet" href="style.css?v=8">
+  <script type="module" src="js/main.js?v=8"></script>
 </head>
 <body>
   <a class="skip" href="#win-readme">Skip to the Read Me</a>
@@ -135,7 +135,7 @@ cd zenith-macos
 ./scripts/bundle_app.sh
 open Zenith.app</code></pre>
             </div>
-            <p class="fine">Needs Xcode 16 or later, or the Command Line Tools with a Swift 6 toolchain.</p>
+            <p class="fine">To build it: macOS 26 (Tahoe) or later, and Xcode 26 or later or the Command Line Tools with a Swift 6.2 toolchain.</p>
             <h3>Permissions, and why</h3>
             <dl class="perm-list">
               <dt>Screen Recording <em>needed for capture</em></dt>
@@ -181,15 +181,15 @@ open Zenith.app</code></pre>
           <div class="readme-pane" data-readme-pane="screens" role="tabpanel" hidden>
             <p>These are drawn by the app itself with made-up data (<code>Zenith --render-screenshots</code>).</p>
             <div class="shots">
-              <figure><img src="assets/shots/island-home.png" width="380" height="162" loading="lazy" alt="The open island: the player on top and the dock of tools under it"><figcaption>The island: what is going on, and the dock</figcaption></figure>
-              <figure><img src="assets/shots/island-page-tools.png" width="520" height="300" loading="lazy" alt="The Tools page: every tool in four groups, with the dock and its Edit button at the bottom"><figcaption>All Tools, inside the island</figcaption></figure>
-              <figure><img src="assets/shots/island-now-playing.png" width="380" height="96" loading="lazy" alt="The island playing a track, with progress and controls"><figcaption>Island, Now Playing</figcaption></figure>
-              <figure><img src="assets/shots/island-widgets.png" width="380" height="162" loading="lazy" alt="The island's widgets: focus timer, next event and network speed, with the dock"><figcaption>Island, Widgets</figcaption></figure>
-              <figure><img src="assets/shots/island-page-system.png" width="420" height="428" loading="lazy" alt="The System page: running apps, CPU, memory, storage and network speed"><figcaption>System page</figcaption></figure>
-              <figure><img class="shot-light" src="assets/shots/command-hub-light.png" width="340" height="517" loading="lazy" alt="The Command Hub"><img class="shot-dark" src="assets/shots/command-hub-dark.png" width="340" height="517" loading="lazy" alt="The Command Hub"><figcaption>Command Hub (menu bar icon, off by default)</figcaption></figure>
-              <figure><img class="shot-light" src="assets/shots/clipboard-light.png" width="700" height="460" loading="lazy" alt="Clipboard history with a preview pane"><img class="shot-dark" src="assets/shots/clipboard-dark.png" width="700" height="460" loading="lazy" alt="Clipboard history with a preview pane"><figcaption>Clipboard history</figcaption></figure>
-              <figure><img class="shot-light" src="assets/shots/annotation-light.png" width="820" height="504" loading="lazy" alt="The annotation editor"><img class="shot-dark" src="assets/shots/annotation-dark.png" width="820" height="504" loading="lazy" alt="The annotation editor"><figcaption>Annotation editor</figcaption></figure>
-              <figure><img class="shot-light" src="assets/shots/settings-island-light.png" width="720" height="540" loading="lazy" alt="Settings, Dynamic Island pane"><img class="shot-dark" src="assets/shots/settings-island-dark.png" width="720" height="540" loading="lazy" alt="Settings, Dynamic Island pane"><figcaption>Settings</figcaption></figure>
+              <figure><img src="assets/shots/island-home.png" width="380" height="196" loading="lazy" alt="The open island: a tab capsule on each side of the notch, the player with its artwork glow and the dock of tools under it"><figcaption>The island: what is going on, and the dock</figcaption></figure>
+              <figure><img src="assets/shots/island-page-tools.png" width="380" height="466" loading="lazy" alt="The Tools page: every tool with its full name in four groups, with the dock and its Edit Dock button at the bottom"><figcaption>All Tools, a page of the island</figcaption></figure>
+              <figure><img src="assets/shots/island-now-playing.png" width="380" height="130" loading="lazy" alt="The island playing a track, with progress and controls"><figcaption>Island, Now Playing</figcaption></figure>
+              <figure><img src="assets/shots/island-widgets.png" width="380" height="196" loading="lazy" alt="The island's widgets: focus timer, next event and network speed, with the dock"><figcaption>Island, Widgets</figcaption></figure>
+              <figure><img src="assets/shots/island-page-system.png" width="380" height="512" loading="lazy" alt="The System page: search, CPU, memory and free-space rings, network speed and running apps"><figcaption>System page</figcaption></figure>
+              <figure><img class="shot-light" src="assets/shots/command-hub-light.png" width="392" height="624" loading="lazy" alt="The Command Hub: search, Privacy Shield and Keep Awake tiles, ring gauges and running apps"><img class="shot-dark" src="assets/shots/command-hub-dark.png" width="392" height="624" loading="lazy" alt="The Command Hub: search, Privacy Shield and Keep Awake tiles, ring gauges and running apps"><figcaption>Command Hub (menu bar icon, off by default)</figcaption></figure>
+              <figure><img class="shot-light" src="assets/shots/clipboard-light.png" width="1280" height="520" loading="lazy" alt="Clipboard history as a strip of preview cards"><img class="shot-dark" src="assets/shots/clipboard-dark.png" width="1280" height="520" loading="lazy" alt="Clipboard history as a strip of preview cards"><figcaption>Clipboard history</figcaption></figure>
+              <figure><img class="shot-light" src="assets/shots/annotation-light.png" width="700" height="560" loading="lazy" alt="The annotation editor with its compact toolbar"><img class="shot-dark" src="assets/shots/annotation-dark.png" width="700" height="560" loading="lazy" alt="The annotation editor with its compact toolbar"><figcaption>Annotation editor</figcaption></figure>
+              <figure><img class="shot-light" src="assets/shots/settings-island-light.png" width="880" height="620" loading="lazy" alt="Settings, Dynamic Island pane, with the live island preview"><img class="shot-dark" src="assets/shots/settings-island-dark.png" width="880" height="620" loading="lazy" alt="Settings, Dynamic Island pane, with the live island preview"><figcaption>Settings</figcaption></figure>
             </div>
           </div>
         </div>

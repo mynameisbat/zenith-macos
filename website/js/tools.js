@@ -9,7 +9,9 @@ export const TOOL_GROUPS = [
   { id: 'system', title: 'System', tools: ['system', 'ports', 'homebrew'] },
 ];
 
-// `shortcut` is the id of the shortcut that does the same (Settings → Shortcuts); `page` is the island page it opens.
+// `shortcut` is the id of the shortcut that does the same (Settings → Shortcuts); `page` is the island page it opens (only
+// System and All Tools are pages). `settingsTab` (IslandTool.opensSettingsWindow) opens the Settings window on that tab instead:
+// Settings, Cleaner, Ports and Homebrew are not island pages, they would spread over the menu bar.
 // A switch (`toggle`) shows whether it is on: grey while off.
 export const TOOLS = {
   area: { title: 'Capture Area', detail: 'Drag over part of the screen and copy or annotate it', icon: 'crop', tint: '#3d8bff', action: 'captureArea', shortcut: 'captureArea' },
@@ -21,25 +23,22 @@ export const TOOLS = {
   privacyShield: { title: 'Privacy Shield', detail: 'Look sites up over encrypted DNS through a local proxy', icon: 'lockshield', tint: '#34c759', toggle: true },
   keepAwake: { title: 'Keep Awake', detail: 'Keep the Mac from going to sleep on its own', icon: 'mug', tint: '#f5c93a', toggle: true },
   clean: { title: 'Quick Clean', detail: 'Scan for system junk; you confirm what to delete before anything goes', icon: 'sparkles', tint: '#c040f0', run: 'quickClean' },
-  uninstall: { title: 'Uninstall App', detail: 'Pick an app and move it and its files to the Trash', icon: 'trash', tint: '#f0506e', page: 'cleaner' },
-  cleaner: { title: 'Cleaner', detail: 'System junk, project build folders, old installers and leftovers', icon: 'drive', tint: '#5cd6c0', page: 'cleaner' },
+  uninstall: { title: 'Uninstall App', detail: 'Pick an app and move it and its files to the Trash', icon: 'trash', tint: '#f0506e', settingsTab: 'cleaner', cleanTab: 'uninstall' },
+  cleaner: { title: 'Cleaner', detail: 'System junk, project build folders, old installers and leftovers', icon: 'drive', tint: '#5cd6c0', settingsTab: 'cleaner', cleanTab: 'system' },
   boost: { title: 'Boost', detail: 'Free inactive memory and flush the DNS cache', icon: 'bolt', tint: '#f8d84a', run: 'boost' },
   system: { title: 'System', detail: 'Running apps, CPU, memory, storage and network speed', icon: 'cpu', tint: '#8e8e93', page: 'system' },
-  ports: { title: 'Ports', detail: 'Processes listening on network ports', icon: 'globe', tint: '#64c4f8', page: 'ports' },
-  homebrew: { title: 'Homebrew', detail: 'Installed and outdated Homebrew packages', icon: 'box', tint: '#a98467', page: 'homebrew' },
-  settings: { title: 'Settings', detail: 'Open Zenith’s settings', icon: 'gear', tint: '#3d3d3f', page: 'settings' },
-  quit: { title: 'Quit Zenith', detail: 'Quit Zenith', icon: 'power', tint: '#3d3d3f', run: 'quit' },
-  allTools: { title: 'All Tools', detail: 'Every tool, in groups', icon: 'grid', tint: '#3d3d3f', page: 'tools' },
+  ports: { title: 'Ports', detail: 'Processes listening on network ports', icon: 'globe', tint: '#64c4f8', settingsTab: 'ports' },
+  homebrew: { title: 'Homebrew', detail: 'Installed and outdated Homebrew packages', icon: 'box', tint: '#a98467', settingsTab: 'homebrew' },
+  settings: { title: 'Settings', detail: 'Open Zenith’s settings', icon: 'gear', tint: '#d8d8de', settingsTab: 'general' },
+  quit: { title: 'Quit Zenith', detail: 'Quit Zenith', icon: 'power', tint: '#d8d8de', run: 'quit' },
+  allTools: { title: 'All Tools', detail: 'Every tool, in groups', icon: 'grid', tint: '#d8d8de', page: 'tools' },
 };
 
-/** `size` is the page's content, below the island's top strip, in points (IslandPage.contentSize). */
+/** `size` is the page's content, below the island's top strip, in points (IslandPage.contentSize). No page is wider than the
+ *  island: it is a black bar over the menu bar, and anything wider covers the status items beside the notch. */
 export const PAGES = {
-  system: { title: 'System', icon: 'cpu', size: [420, 392] },
-  cleaner: { title: 'Cleaner', icon: 'sparkles', size: [580, 480] },
-  ports: { title: 'Ports', icon: 'globe', size: [580, 440] },
-  homebrew: { title: 'Homebrew', icon: 'box', size: [620, 480] },
-  settings: { title: 'Settings', icon: 'gear', size: [720, 500] },
-  tools: { title: 'Tools', icon: 'grid', size: [520, 264] },
+  system: { title: 'System', icon: 'cpu', size: [380, 476] },
+  tools: { title: 'Tools', icon: 'grid', size: [380, 430] },
 };
 
 // ---------------------------------------------------------------- the dock layout (IslandDockLayout)
