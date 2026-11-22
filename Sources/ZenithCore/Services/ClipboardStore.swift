@@ -421,7 +421,8 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
                 payload: first.payload,
                 previewText: first.previewText,
                 byteSize: first.byteSize,
-                isPinned: first.isPinned
+                isPinned: first.isPinned,
+                sourceBundleID: item.sourceBundleID ?? first.sourceBundleID
             )
             lock.unlock()
             notifyChange()
@@ -441,7 +442,8 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
                 payload: existing.payload,
                 previewText: existing.previewText,
                 byteSize: existing.byteSize,
-                isPinned: existing.isPinned
+                isPinned: existing.isPinned,
+                sourceBundleID: item.sourceBundleID ?? existing.sourceBundleID
             )
             _items.insert(promoted, at: 0)
             enforceCapacityLocked(preserveFrontItem: true)
@@ -497,7 +499,8 @@ public final class ClipboardStore: ObservableObject, @unchecked Sendable {
                 payload: existing.payload,
                 previewText: existing.previewText,
                 byteSize: existing.byteSize,
-                isPinned: existing.isPinned
+                isPinned: existing.isPinned,
+                sourceBundleID: existing.sourceBundleID
             )
             _items.insert(bumped, at: 0)
         }

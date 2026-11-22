@@ -88,6 +88,9 @@ public final class LocalProxyServer: @unchecked Sendable {
     /// TCP for both sides of the relay, with Nagle's algorithm off. The proxy forwards small writes as they come (the
     /// CONNECT reply, the ClientHello in two pieces for the anti-DPI split); with Nagle on, the second piece waited
     /// for the server's delayed ACK, which added 80–200 ms to every new HTTPS connection through the shield.
+    /// The only address the proxy listens on.
+    static let loopbackHost: NWEndpoint.Host = "127.0.0.1"
+
     static func relayTCPParameters() -> NWParameters {
         let tcp = NWProtocolTCP.Options()
         tcp.noDelay = true
@@ -237,8 +240,11 @@ public final class LocalProxyServer: @unchecked Sendable {
         guard let nwPort = NWEndpoint.Port(rawValue: port) else {
             throw NSError(domain: "LocalProxyServer", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid port \(port)"])
         }
+        // Bound to the loopback address itself: an interface type alone left the socket on `*:port` (lsof showed it),
+        // reachable on the LAN address and refused only afterwards by the check below.
+        parameters.requiredLocalEndpoint = .hostPort(host: Self.loopbackHost, port: nwPort)
 
-        let newListener = try NWListener(using: parameters, on: nwPort)
+        let newListener = try NWListener(using: parameters)
         newListener.newConnectionHandler = { [weak self] connection in
             guard let self = self else { return }
             if case let .hostPort(remoteHost, _) = connection.endpoint {

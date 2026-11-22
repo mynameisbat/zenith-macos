@@ -87,4 +87,38 @@ public struct PanelPositioner: Sendable {
 
         return NSRect(x: x, y: y, width: panelSize.width, height: panelSize.height)
     }
+    // MARK: - Docked panel
+
+    /// A wide panel resting near the bottom of a screen, centred (the clipboard strip). The screen is the one the
+    /// pointer is on, else the main one.
+    public static func dockedFrame(
+        mouseLocation: CGPoint,
+        preferredSize: CGSize,
+        screens: [NSScreen] = NSScreen.screens
+    ) -> NSRect {
+        let activeScreen = screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
+            ?? NSScreen.main
+            ?? screens.first
+        let vf = activeScreen?.visibleFrame ?? .zero
+        return dockedFrame(preferredSize: preferredSize, visibleFrame: vf)
+    }
+
+    /// Pure version: `visibleFrame` is the screen without the menu bar and the Dock, so the panel sits `bottomMargin`
+    /// above the Dock. A narrow screen narrows the panel (never below `minimumWidth`, never off the screen) and a
+    /// short one shortens it.
+    public static func dockedFrame(
+        preferredSize: CGSize,
+        visibleFrame: NSRect,
+        sideMargin: CGFloat = 40,
+        bottomMargin: CGFloat = 32,
+        minimumWidth: CGFloat = 640
+    ) -> NSRect {
+        let frame = (visibleFrame.width > 0 && visibleFrame.height > 0)
+            ? visibleFrame
+            : NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        let available = frame.width - 2 * sideMargin
+        let width = min(preferredSize.width, max(min(minimumWidth, frame.width), available))
+        let height = min(preferredSize.height, max(0, frame.height - bottomMargin - 12))
+        return NSRect(x: frame.midX - width / 2, y: frame.minY + bottomMargin, width: width, height: height)
+    }
 }

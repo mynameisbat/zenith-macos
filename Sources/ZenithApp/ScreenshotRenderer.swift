@@ -34,7 +34,7 @@ enum ScreenshotRenderer {
 
         island.nowPlayingTrack = NowPlayingTrack(
             app: .appleMusic, title: "Dawn Chorus", artist: "Example Band", album: "Field Notes",
-            duration: 215, position: 84, isPlaying: true
+            duration: 215, position: 84, isPlaying: true, artworkData: Self.sampleCover(), canSeek: true
         )
         save("island-now-playing", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: geometry.expandedSize(page: nil, showsDock: island.showsToolsTab).height))
 
@@ -50,7 +50,7 @@ enum ScreenshotRenderer {
         NetworkSpeedMonitor.shared.pin(NetworkSpeed(downloadBytesPerSecond: 2_400_000, uploadBytesPerSecond: 180_000))
         island.nowPlayingTrack = NowPlayingTrack(
             app: .appleMusic, title: "Dawn Chorus", artist: "Example Band", album: "Field Notes",
-            duration: 215, position: 84, isPlaying: true
+            duration: 215, position: 84, isPlaying: true, artworkData: Self.sampleCover(), canSeek: true
         )
         island.showsTimerWidget = true
         island.showsCalendarWidget = true
@@ -115,13 +115,38 @@ enum ScreenshotRenderer {
         island.showsTimerWidget = true
         island.nowPlayingTrack = NowPlayingTrack(
             app: .appleMusic, title: "Dawn Chorus", artist: "Example Band", album: "Field Notes",
-            duration: 215, position: 84, isPlaying: true
+            duration: 215, position: 84, isPlaying: true, artworkData: Self.sampleCover(), canSeek: true
         )
         island.droppedItems = [IslandDropItem(name: "Notes.txt", textContent: "Agenda for Friday")]
         island.activeTab = .nowPlaying
         island.isExpanded = true
         let homeSize = geometry.expandedSize(page: nil, showsDock: true)
         save("island-home", ZenithDynamicIslandView(geometry: geometry).frame(width: homeSize.width, height: homeSize.height))
+        // The closed island while that track plays: the cover in a small tile on one side, the equalizer on the other.
+        island.isExpanded = false
+        save("island-now-playing-closed", ZenithDynamicIslandView(geometry: geometry).frame(width: geometry.expandedWidth, height: 40))
+        island.isExpanded = true
+        // On a display with a notch (`ZENITH_RENDER_NOTCH=1`, for checking a layout): the notch, in red, must have
+        // nothing under it. This Mac's own display decides the default geometry; this one is a 14-inch MacBook Pro's.
+        let notchedGeometry = ZenithIslandGeometry(
+            screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982), notch: CGRect(x: 663, y: 950, width: 186, height: 32)
+        )
+        let showsNotchVariants = ProcessInfo.processInfo.environment["ZENITH_RENDER_NOTCH"] == "1"
+        if showsNotchVariants {
+            let size = notchedGeometry.expandedSize(page: nil, showsDock: true)
+            let plain = ZenithIslandGeometry(screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982), notch: nil)
+            save("island-home-plain", ZenithDynamicIslandView(geometry: plain).frame(width: size.width, height: size.height))
+            save("island-home-notch", ZStack(alignment: .top) {
+                ZenithDynamicIslandView(geometry: notchedGeometry)
+                Rectangle().fill(Color.red.opacity(0.4)).frame(width: 186, height: 32)
+            }.frame(width: size.width, height: size.height))
+        }
+        // The same island with the solid-colour dock icons.
+        let savedStyle = IslandWidgetSettings.shared.dockIconStyle
+        defer { IslandWidgetSettings.shared.dockIconStyle = savedStyle }
+        IslandWidgetSettings.shared.dockIconStyle = .color
+        save("island-home-color", ZenithDynamicIslandView(geometry: geometry).frame(width: homeSize.width, height: homeSize.height))
+        IslandWidgetSettings.shared.dockIconStyle = .tinted
         island.droppedItems = []
         island.nowPlayingTrack = nil
         island.showsTimerWidget = false
@@ -136,8 +161,22 @@ enum ScreenshotRenderer {
         defer { IslandWidgetSettings.shared.dockLayout = savedDock }
         IslandWidgetSettings.shared.dockLayout = IslandDockLayout()
         island.openPage(.tools)
+        IslandWidgetSettings.shared.dockIconStyle = .tinted
         let toolsPageSize = geometry.expandedSize(page: .tools, showsDock: true)
         save("island-page-tools", ZenithDynamicIslandView(geometry: geometry).frame(width: toolsPageSize.width, height: toolsPageSize.height))
+        if showsNotchVariants {
+            let size = notchedGeometry.expandedSize(page: .tools, showsDock: true)
+            save("island-page-tools-notch", ZStack(alignment: .top) {
+                ZenithDynamicIslandView(geometry: notchedGeometry)
+                Rectangle().fill(Color.red.opacity(0.4)).frame(width: 186, height: 32)
+            }.frame(width: size.width, height: size.height))
+        }
+        if showsNotchVariants {
+            // No notch: the header has room for the page's name.
+            let plain = ZenithIslandGeometry(screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982), notch: nil)
+            let size = plain.expandedSize(page: .tools, showsDock: true)
+            save("island-page-tools-plain", ZenithDynamicIslandView(geometry: plain).frame(width: size.width, height: size.height))
+        }
         IslandDockEditor.shared.isEditing = true
         save("island-page-tools-editing", ZenithDynamicIslandView(geometry: geometry).frame(width: toolsPageSize.width, height: toolsPageSize.height))
         IslandDockEditor.shared.isEditing = false
@@ -145,14 +184,14 @@ enum ScreenshotRenderer {
 
         // The Command Hub, with an invented process list.
         let hogs = [
-            ProcessTelemetry(pid: 4101, name: "Video Editor", cpuPercent: 38.5, memoryBytes: 2_400_000_000),
+            ProcessTelemetry(pid: 4101, name: "Video Editor", cpuPercent: 155.5, memoryBytes: 2_400_000_000),
             ProcessTelemetry(pid: 4102, name: "Design Tool", cpuPercent: 21.0, memoryBytes: 1_300_000_000),
             ProcessTelemetry(pid: 4103, name: "Chat App", cpuPercent: 9.5, memoryBytes: 820_000_000),
             ProcessTelemetry(pid: 4104, name: "Notes", cpuPercent: 3.2, memoryBytes: 310_000_000),
             ProcessTelemetry(pid: 4105, name: "Code Editor", cpuPercent: 2.1, memoryBytes: 1_100_000_000)
         ]
         let sampleSnapshot = HardwareSnapshot(
-            disk: DiskTelemetry(totalBytes: 500_000_000_000, freeBytes: 212_000_000_000, usedBytes: 288_000_000_000, usedPercent: 57.6),
+            disk: DiskTelemetry(totalBytes: 1_000_000_000_000, freeBytes: 389_080_000_000, usedBytes: 610_920_000_000, usedPercent: 61.1),
             cpu: CPUTelemetry(totalUsagePercent: 31, topHogs: hogs),
             memory: MemoryTelemetry(
                 totalBytes: 16_000_000_000, usedBytes: 10_400_000_000, freeBytes: 5_600_000_000,
@@ -172,49 +211,76 @@ enum ScreenshotRenderer {
             ListeningPort(pid: 612, processName: "ControlCenter", uid: nil, user: nil, proto: .tcp, address: "*", port: 7000, identity: ownProcess("/System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter")),
         ])
         ZenithCommandHubState.shared.hardwareSnapshot = sampleSnapshot
-        // The clipboard panel, with invented items of every kind, spread over three days.
-        let samples: [(text: String, age: TimeInterval, pinned: Bool)] = [
-            ("https://example.com/docs/getting-started", 60, false),
-            ("Meeting notes: ship the island fix on Friday.\nAgenda: review the clipboard panel, then the island timer.", 420, false),
-            ("#0F62FE", 840, true),
-            ("", 1_500, false), // the image
-            ("swift build -c release", 26 * 3_600, false),
-            ("Invoice 2026-114, due 30 November", 27 * 3_600, false),
-            ("brew install --cask example-app", 3 * 86_400, false)
+        // The clipboard strip, with invented items of every kind, spread over three days. The apps are system apps
+        // every Mac has, only so the cards show real icons; nothing is read from this Mac's clipboard.
+        let samples: [(text: String, age: TimeInterval, pinned: Bool, app: String)] = [
+            ("https://example.com/docs/getting-started", 120, false, "com.apple.Safari"),
+            ("Meeting notes: ship the island fix on Friday, then review the dock layout together.", 360, false, "com.apple.Notes"),
+            ("#0F62FE", 720, true, "com.apple.Preview"),
+            ("", 1_260, false, "com.apple.Preview"), // the image
+            ("swift build -c release\n./scripts/bundle_app.sh", 26 * 3_600, false, "com.apple.Terminal"),
+            ("Invoice 2026-114, due 30 November", 27 * 3_600, false, "com.apple.mail"),
+            ("brew install --cask example-app", 3 * 86_400, false, "com.apple.Terminal"),
+            ("https://example.org/blog/a-long-address/with/several/parts?ref=newsletter", 4 * 86_400, false, "com.apple.Safari")
         ]
         // A plain loop: one long closure with many arguments is more than Swift 6.1's type checker likes.
         var items: [ClipboardItem] = []
         for sample in samples {
             let timestamp = Date().addingTimeInterval(-sample.age)
             if sample.text.isEmpty, let png = sampleImagePNG() {
-                items.append(ClipboardItem.image(data: png, width: 1280, height: 720, timestamp: timestamp))
+                items.append(ClipboardItem.image(data: png, width: 1280, height: 720, timestamp: timestamp, sourceBundleID: sample.app))
             } else {
-                items.append(ClipboardItem.text(sample.text, timestamp: timestamp, isPinned: sample.pinned))
+                items.append(ClipboardItem.text(sample.text, timestamp: timestamp, isPinned: sample.pinned, sourceBundleID: sample.app))
             }
         }
         let viewModel = ClipboardHistoryViewModel(items: items)
 
         for (suffix, scheme) in [("light", ColorScheme.light), ("dark", ColorScheme.dark)] {
-            let background = scheme == .dark ? Color(white: 0.12) : Color(white: 0.96)
+            // The popover's own glass is not there off screen: a flat stand-in in its colour, with its large radius.
+            let popoverBackground = scheme == .dark ? Color(white: 0.17) : Color(white: 0.9)
             save("command-hub-\(suffix)",
                  ZenithCommandHubView()
-                    .background(background)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous)),
+                    .background(popoverBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous)),
                  dark: scheme == .dark)
-            // Light shows a text item's preview, dark the image's.
+            // Light selects a text card, dark the image's.
             viewModel.selectedIndex = scheme == .dark ? 3 : 1
-            save("clipboard-\(suffix)",
-                 ClipboardHistoryView(viewModel: viewModel)
-                    .background(background)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous)),
-                 dark: scheme == .dark)
+            // Glass has nothing to refract off screen: a desktop of soft colour blobs behind a flat stand-in.
+            let desktop = ZStack(alignment: .bottom) {
+                ClipboardPictureBackdrop(isDark: scheme == .dark)
+                ClipboardHistoryView(viewModel: viewModel, drawsGlass: false)
+                    .frame(width: ClipboardHistoryView.panelSize.width, height: ClipboardHistoryView.panelSize.height)
+                    .padding(.bottom, 32)
+            }
+            .frame(width: 1280, height: 520)
+            save("clipboard-\(suffix)", desktop, dark: scheme == .dark)
+
+            // The snippet menu (⌃⌥S), on the same kind of stand-in, with made-up snippets in a private library.
+            let snippetLibrary = SnippetLibrary(directory: FileManager.default.temporaryDirectory.appendingPathComponent("zenith-render-snippets-\(UUID().uuidString)"))
+            // (A new library starts with the two example snippets: today's date and an email signature.)
+            snippetLibrary.add(Snippet(name: "Meeting link", trigger: ";meet", body: "https://example.com/meet/design-review"))
+            snippetLibrary.add(Snippet(name: "Out of office", trigger: "", body: "Thanks for your message. I am away until Monday and will reply then."))
+            let snippetModel = SnippetPickerModel(library: snippetLibrary)
+            snippetModel.moveSelection(by: 1)
+            let snippetDesktop = ZStack {
+                ClipboardPictureBackdrop(isDark: scheme == .dark)
+                SnippetPickerView(model: snippetModel, drawsGlass: false, onInsert: { _ in }, onDismiss: {})
+            }
+            .frame(width: 560, height: 440)
+            save("snippet-picker-\(suffix)", snippetDesktop, dark: scheme == .dark)
         }
 
-        // The island grown into a page: the hub's content (same invented numbers) and the ports list (pinned above).
-        for page in [IslandPage.system, .ports] {
-            island.openPage(page)
-            let pageSize = geometry.expandedSize(page: page, showsDock: true)
-            save("island-page-\(page.rawValue)", ZenithDynamicIslandView(geometry: geometry).frame(width: pageSize.width, height: pageSize.height))
+        // The island grown into its System page: the hub's content (same invented numbers). (Settings, Cleaner, Ports
+        // and Homebrew are too wide for the island and open in the Settings window.)
+        island.openPage(.system)
+        let systemPageSize = geometry.expandedSize(page: .system, showsDock: true)
+        save("island-page-system", ZenithDynamicIslandView(geometry: geometry).frame(width: systemPageSize.width, height: systemPageSize.height))
+        if showsNotchVariants {
+            let size = notchedGeometry.expandedSize(page: .system, showsDock: true)
+            save("island-page-system-notch", ZStack(alignment: .top) {
+                ZenithDynamicIslandView(geometry: notchedGeometry)
+                Rectangle().fill(Color.red.opacity(0.4)).frame(width: 186, height: 32)
+            }.frame(width: size.width, height: size.height))
         }
         island.close()
 
@@ -227,9 +293,15 @@ enum ScreenshotRenderer {
             for (suffix, scheme) in [("light", ColorScheme.light), ("dark", ColorScheme.dark)] {
                 save("annotation-\(suffix)",
                      AnnotationEditorView(viewModel: editor)
-                        .frame(width: EditorWindowGeometryCalculator.toolbarWidth, height: 360 + 60 + EditorWindowGeometryCalculator.toolbarReserve),
+                        .frame(width: 700, height: 360 + 60 + EditorWindowGeometryCalculator.compactToolbarReserve),
                      dark: scheme == .dark)
             }
+            // A wide capture: the toolbar in one row.
+            let wideEditor = AnnotationEditorViewModel(baseImage: image, canvasSize: CGSize(width: 900, height: 400), imageScaleFactor: 2, soundService: nil)
+            save("annotation-wide",
+                 AnnotationEditorView(viewModel: wideEditor)
+                    .frame(width: 900, height: 400 + EditorWindowGeometryCalculator.toolbarReserve),
+                 dark: false)
         }
 
         // Outside the app bundle the process has no icon; Settings shows it, so use the one the bundle gets.
@@ -288,21 +360,27 @@ enum ScreenshotRenderer {
                      dark: scheme == .dark)
             }
         }
-        // Settings as a page of the island (the stand-in services above are still in place).
-        island.openPage(.settings)
-        let settingsPageSize = geometry.expandedSize(page: .settings, showsDock: true)
-        save("island-page-settings", ZenithDynamicIslandView(geometry: geometry).frame(width: settingsPageSize.width, height: settingsPageSize.height))
-        // For checking a layout by hand only: these two pages read this Mac (its junk files, its Homebrew packages),
-        // so their pictures must never be published.
-        if ProcessInfo.processInfo.environment["ZENITH_RENDER_LOCAL_PAGES"] == "1" {
-            for page in [IslandPage.cleaner, .homebrew] {
-                island.openPage(page)
-                let pageSize = geometry.expandedSize(page: page, showsDock: true)
-                save("local-only-island-page-\(page.rawValue)", ZenithDynamicIslandView(geometry: geometry).frame(width: pageSize.width, height: pageSize.height))
-            }
-        }
         island.close()
         return failures == 0 ? 0 : 1
+    }
+
+    /// A made-up 300×300 album cover (an orange-to-pink-to-violet gradient) for the Now Playing card.
+    private static func sampleCover() -> Data? {
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 300, pixelsHigh: 300, bitsPerSample: 8, samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        ), let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        let bounds = NSRect(x: 0, y: 0, width: 300, height: 300)
+        NSGradient(colors: [
+            NSColor(red: 1.0, green: 0.70, blue: 0.42, alpha: 1),
+            NSColor(red: 1.0, green: 0.24, blue: 0.43, alpha: 1),
+            NSColor(red: 0.42, green: 0.17, blue: 1.0, alpha: 1)
+        ], atLocations: [0, 0.55, 1], colorSpace: .deviceRGB)?
+            .draw(in: bounds, relativeCenterPosition: NSPoint(x: -0.4, y: 0.4))
+        NSGraphicsContext.restoreGraphicsState()
+        return rep.representation(using: .png, properties: [:])
     }
 
     /// A made-up 1280×720 picture (a gradient with a few shapes) for the clipboard's image item.
@@ -398,4 +476,23 @@ private struct ScreenshotUpdateInstaller: UpdateInstalling {
     }
 
     func automaticInstallRefusal() -> UpdateInstallRefusal? { nil }
+}
+
+
+/// The desktop behind the clipboard strip in `--render-screenshots`: three soft colour blobs, so the translucent
+/// stand-in has something to show through.
+private struct ClipboardPictureBackdrop: View {
+    let isDark: Bool
+
+    var body: some View {
+        ZStack {
+            (isDark ? Color(red: 0.04, green: 0.05, blue: 0.09) : Color(red: 0.93, green: 0.94, blue: 0.97))
+            Circle().fill(isDark ? Color(red: 0.17, green: 0.23, blue: 0.56) : Color(red: 0.55, green: 0.65, blue: 1.0))
+                .frame(width: 560, height: 480).blur(radius: 110).offset(x: -300, y: -120)
+            Circle().fill(isDark ? Color(red: 0.42, green: 0.17, blue: 0.48) : Color(red: 1.0, green: 0.62, blue: 0.80))
+                .frame(width: 500, height: 440).blur(radius: 110).offset(x: 330, y: -60).opacity(0.8)
+            Circle().fill(isDark ? Color(red: 0.05, green: 0.37, blue: 0.43) : Color(red: 0.50, green: 0.88, blue: 0.85))
+                .frame(width: 560, height: 380).blur(radius: 110).offset(x: 0, y: 190).opacity(0.8)
+        }
+    }
 }

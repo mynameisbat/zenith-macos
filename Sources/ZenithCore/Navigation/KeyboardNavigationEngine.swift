@@ -164,7 +164,8 @@ public final class ClipboardHistoryViewModel: ObservableObject {
                     payload: existing.payload,
                     previewText: existing.previewText,
                     byteSize: existing.byteSize,
-                    isPinned: existing.isPinned
+                    isPinned: existing.isPinned,
+                    sourceBundleID: existing.sourceBundleID
                 )
                 items.insert(bumped, at: 0)
                 filterItems()
@@ -281,6 +282,8 @@ public final class KeyboardNavigationEngine {
         public static let escapeKey: UInt16 = 53
         public static let deleteKey: UInt16 = 51 // Backspace / Delete (⌫)
         public static let forwardDelete: UInt16 = 117 // Forward Delete (⌦)
+        public static let leftArrow: UInt16 = 123
+        public static let rightArrow: UInt16 = 124
         public static let downArrow: UInt16 = 125
         public static let upArrow: UInt16 = 126
         public static let pageDown: UInt16 = 121
@@ -439,11 +442,13 @@ public final class KeyboardNavigationEngine {
         // 6. Check Navigation & Selection (Zero modifiers)
         if relevantModifiers.isEmpty {
             switch keyCode {
-            case KeyCodes.downArrow:
+            // The cards sit in a row, so ← and → step through them like ↑ and ↓. They no longer move the search
+            // field's caret; ⌥← / ⌥→ and ⌘← / ⌘→ still reach the field.
+            case KeyCodes.rightArrow, KeyCodes.downArrow:
                 viewModel.navigateDown()
                 return true
 
-            case KeyCodes.upArrow:
+            case KeyCodes.leftArrow, KeyCodes.upArrow:
                 viewModel.navigateUp()
                 return true
 

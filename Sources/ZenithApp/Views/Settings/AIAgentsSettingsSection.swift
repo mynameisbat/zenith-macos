@@ -70,7 +70,7 @@ struct AIAgentsSettingsSection: View {
                                 .labelsHidden()
                         }
                     }
-                    .padding(.leading, 32)
+                    .padding(.leading, 42)
                 }
             }
         }
@@ -98,7 +98,7 @@ struct AIAgentsSettingsSection: View {
                 .labelsHidden()
             }
         }
-        .padding(.leading, 32)
+        .padding(.leading, 42)
     }
 
     private func subtitle(for kind: AIAgentKind) -> LocalizedStringKey {

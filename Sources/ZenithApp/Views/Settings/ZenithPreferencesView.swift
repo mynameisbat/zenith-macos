@@ -2,25 +2,6 @@ import SwiftUI
 import AppKit
 import ZenithCore
 
-/// An AppKit visual-effect view, for the translucent sidebar material SwiftUI's `Material` cannot pick.
-struct ZenithVisualEffect: NSViewRepresentable {
-    var material: NSVisualEffectView.Material
-    var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
-
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = material
-        view.blendingMode = blendingMode
-        view.state = .followsWindowActiveState
-        return view
-    }
-
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {
-        view.material = material
-        view.blendingMode = blendingMode
-    }
-}
-
 extension SettingsTab {
     var tint: Color {
         switch self {
@@ -43,41 +24,38 @@ extension SettingsTab {
 public struct ZenithPreferencesView: View {
     @ObservedObject public var viewModel: SettingsViewModel
 
-    /// Drawn as a page of the island: on the island's black instead of a window's background, with no room left
-    /// for a window's buttons and no minimum size of its own.
-    private let inIsland: Bool
-
-    public init(viewModel: SettingsViewModel = SettingsViewModel(), inIsland: Bool = false) {
+    public init(viewModel: SettingsViewModel = SettingsViewModel()) {
         self.viewModel = viewModel
-        self.inIsland = inIsland
     }
 
-    @ViewBuilder
-    private var sidebarBackground: some View {
-        if inIsland {
-            Color.white.opacity(0.06)
-        } else {
-            ZenithVisualEffect(material: .sidebar)
-        }
+    /// The sidebar is a floating pane inset from the window's edges, as macOS 26's own sidebar is: Liquid Glass in a
+    /// window (a material with a hairline edge: `glassEffect` flattened the labels to the wrong colour in an off-screen
+    /// window and gains nothing over an opaque window background).
+    private static let paneShape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+
+    private var sidebarPane: some View {
+        sidebarView
+            .background(.regularMaterial, in: Self.paneShape)
+            .background(Color.primary.opacity(0.03), in: Self.paneShape)
+            .overlay(Self.paneShape.strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+            .shadow(color: .black.opacity(0.06), radius: 6, y: 1)
     }
 
-    private static let sidebarWidth: CGFloat = 210
+    private static let sidebarWidth: CGFloat = 200
 
     public var body: some View {
         HStack(spacing: 0) {
-            sidebarView
+            sidebarPane
                 .frame(width: Self.sidebarWidth)
-                .background(sidebarBackground)
-
-            Divider()
+                .padding(10)
 
             detailPaneView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(inIsland ? Color.clear : Color(nsColor: .windowBackgroundColor))
         }
+        .background(Color(nsColor: .windowBackgroundColor))
         .frame(
-            minWidth: inIsland ? 0 : SettingsWindowController.defaultWidth, maxWidth: .infinity,
-            minHeight: inIsland ? 0 : SettingsWindowController.defaultHeight, maxHeight: .infinity
+            minWidth: SettingsWindowController.defaultWidth, maxWidth: .infinity,
+            minHeight: SettingsWindowController.defaultHeight, maxHeight: .infinity
         )
         .ignoresSafeArea()
         .onAppear {
@@ -103,15 +81,15 @@ public struct ZenithPreferencesView: View {
 
     private var sidebarView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Room for the window's traffic lights.
-            Color.clear.frame(height: inIsland ? 10 : 44)
+            // Room for the window's traffic lights, which sit on the pane.
+            Color.clear.frame(height: 34)
 
             searchField
                 .padding(.horizontal, 10)
                 .padding(.bottom, 10)
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
                     if viewModel.searchText.trimmingCharacters(in: .whitespaces).isEmpty {
                         identityRow
                     }
@@ -128,19 +106,19 @@ public struct ZenithPreferencesView: View {
                     }
                 }
                 .padding(.horizontal, 10)
-                .padding(.bottom, 12)
+                .padding(.bottom, 10)
             }
         }
     }
 
     private var searchField: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 11.5))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             TextField("Search", text: $viewModel.searchText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12.5))
+                .font(.system(size: 13))
                 // As System Settings does: the pane follows the search, so the content never shows a section the
                 // sidebar has filtered away ("proxy" listed Privacy Shield while General stayed open).
                 .onChange(of: viewModel.searchText) { _, _ in
@@ -164,12 +142,9 @@ public struct ZenithPreferencesView: View {
                 .accessibilityLabel("Clear search")
             }
         }
-        .padding(.horizontal, 7)
-        .frame(height: 26)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.07))
-        )
+        .padding(.horizontal, 10)
+        .frame(height: 30)
+        .background(Capsule().fill(Color.primary.opacity(0.07)))
     }
 
     /// The app's own row at the top, where System Settings shows the Apple Account.
@@ -209,7 +184,7 @@ public struct ZenithPreferencesView: View {
     @ViewBuilder
     private func sidebarGroup(_ tabs: [SettingsTab]) -> some View {
         if !tabs.isEmpty {
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 ForEach(tabs) { tab in
                     sidebarRow(tab)
                 }
@@ -224,21 +199,21 @@ public struct ZenithPreferencesView: View {
         return Button {
             viewModel.selectedTab = tab
         } label: {
-            HStack(spacing: 8) {
-                ZenithIconTile(systemName: tab.iconName, tint: tab.tint, size: 20)
+            HStack(spacing: 10) {
+                ZenithIconTile(systemName: tab.iconName, tint: tab.tint, size: 22, cornerRatio: 0.3)
                 Text(tab.title)
-                    .font(.system(size: 13))
+                    .font(.system(size: 13.5, weight: .medium))
                     .foregroundStyle(isSelected ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .frame(height: 34)
             .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isSelected ? ZenithTheme.selection : (isHovered ? Color.primary.opacity(0.06) : Color.clear))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected ? ZenithTheme.accent : (isHovered ? Color.primary.opacity(0.06) : Color.clear))
             )
-            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tab.title)
@@ -257,13 +232,14 @@ public struct ZenithPreferencesView: View {
     private var detailPaneView: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(viewModel.selectedTab.title)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 26, weight: .bold))
+                .tracking(-0.5)
+                .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 52)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
+                .padding(.top, 28)
+                .padding(.bottom, 14)
                 .accessibilityAddTraits(.isHeader)
-
-            Divider()
 
             Group {
                 switch viewModel.selectedTab {

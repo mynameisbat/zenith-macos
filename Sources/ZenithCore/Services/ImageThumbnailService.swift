@@ -10,11 +10,11 @@ public final class ImageThumbnailService: @unchecked Sendable {
     private let cache = NSCache<NSUUID, CGImage>()
     public let defaultMaxPixelDimension: Int
 
-    public init(maxCacheCount: Int = 80, defaultMaxPixelDimension: Int = 128) {
+    public init(maxCacheCount: Int = 80, defaultMaxPixelDimension: Int = 128, maxCacheBytes: Int = 10 * 1024 * 1024) {
         self.defaultMaxPixelDimension = defaultMaxPixelDimension
         self.cache.countLimit = maxCacheCount
         // 128x128 RGBA thumbnail ≈ 64KB. 80 items ≈ 5.1MB. Safety limit at 10MB.
-        self.cache.totalCostLimit = 10 * 1024 * 1024
+        self.cache.totalCostLimit = maxCacheBytes
     }
 
     /// Fast synchronous memory cache lookup (< 0.01ms). Completely safe to call on MainActor.

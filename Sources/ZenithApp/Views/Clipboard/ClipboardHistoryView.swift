@@ -1,180 +1,202 @@
 import SwiftUI
+import AppKit
 import ZenithCore
 
-/// The clipboard history panel: search and kind filters on top, the list on the left (grouped by day), the selected
-/// item's preview on the right, and the keyboard shortcuts at the bottom.
+/// The clipboard history panel: a wide Liquid Glass strip docked near the bottom of the screen. Search, the kind
+/// filter and the item count on top, a row of cards (newest first) in the middle, the keyboard shortcuts and the
+/// Paste button below.
 public struct ClipboardHistoryView: View {
     @ObservedObject public var viewModel: ClipboardHistoryViewModel
     public var onDismiss: () -> Void
+    /// False only for `--render-screenshots`: a window that is not on screen has nothing behind it for glass to
+    /// refract, so the pictures get a flat stand-in in the glass's colour.
+    private let drawsGlass: Bool
 
-    public static let panelSize = CGSize(width: 700, height: 460)
-    private static let listWidth: CGFloat = 330
+    /// The size the panel asks for; `PanelPositioner.dockedFrame` narrows it on a small screen.
+    public static let panelSize = CGSize(width: 1200, height: 372)
+    public static let cornerRadius: CGFloat = 34
+    private static let cardSpacing: CGFloat = 14
+
+    @FocusState private var isSearchFocused: Bool
+    @Environment(\.colorScheme) private var colorScheme
 
     public init(viewModel: ClipboardHistoryViewModel, onDismiss: @escaping () -> Void = {}) {
+        self.init(viewModel: viewModel, drawsGlass: true, onDismiss: onDismiss)
+    }
+
+    init(viewModel: ClipboardHistoryViewModel, drawsGlass: Bool, onDismiss: @escaping () -> Void = {}) {
         self.viewModel = viewModel
         self.onDismiss = onDismiss
+        self.drawsGlass = drawsGlass
+    }
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 8) {
-                SearchBarView(text: $viewModel.searchText, placeholder: "Search clipboard history") {
-                    viewModel.selectedIndex = 0
-                }
-                filterChips
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
-
-            Divider()
-
-            HStack(spacing: 0) {
-                listPane
-                    .frame(width: Self.listWidth)
-
-                Divider()
-
-                ClipboardPreviewPane(
-                    item: viewModel.selectedItem,
-                    onPaste: { item in viewModel.selectItem(item) },
-                    onPasteVariant: { item, variant in viewModel.selectItem(item, variant: variant) },
-                    onTogglePin: { item in viewModel.togglePin(item: item) },
-                    onDelete: { item in
-                        withAnimation(.zenithSpring) {
-                            viewModel.deleteItem(item: item)
-                        }
-                    }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.primary.opacity(0.025))
-            }
-
-            Divider()
-
-            footerView
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
+        VStack(spacing: 12) {
+            topRow
+            cardsRow
+            bottomRow
         }
-        .frame(width: Self.panelSize.width, height: Self.panelSize.height)
-        .zenithMaterial(cornerRadius: 12)
+        .padding(.top, 16)
+        .padding(.horizontal, 18)
+        .padding(.bottom, 14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            if !drawsGlass { standInGlass }
+        }
+        .glassEffectIfNeeded(drawsGlass, in: shape)
     }
 
-    // MARK: Filters
+    /// What the glass looks like over a desktop, for the pictures: a tinted translucent plate with a lit edge.
+    private var standInGlass: some View {
+        shape
+            .fill(colorScheme == .dark ? Color(white: 0.11, opacity: 0.62) : Color(white: 1, opacity: 0.55))
+            .overlay(shape.strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.7), lineWidth: 1))
+    }
 
-    private var filterChips: some View {
-        HStack(spacing: 6) {
+    // MARK: Top row
+
+    private var topRow: some View {
+        HStack(spacing: 12) {
+            searchField
+                .frame(maxWidth: 360)
+            filterBar
+            Spacer(minLength: 8)
+            countLabel
+        }
+        .frame(height: 36)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+
+            TextField("Search clipboard history", text: $viewModel.searchText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13.5))
+                .focused($isSearchFocused)
+                .onChange(of: viewModel.searchText) { _, _ in
+                    viewModel.selectedIndex = 0
+                }
+
+            if !viewModel.searchText.isEmpty {
+                Button {
+                    viewModel.searchText = ""
+                    viewModel.selectedIndex = 0
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 36)
+        .hubCapsule()
+        .overlay(RoundedRectangle(cornerRadius: 1000, style: .circular).strokeBorder(ZenithTheme.accent.opacity(isSearchFocused ? 0.55 : 0), lineWidth: 1.5))
+        .onAppear { isSearchFocused = true }
+    }
+
+    private var filterBar: some View {
+        HStack(spacing: 2) {
             ForEach(ClipboardKindFilter.allCases, id: \.self) { filter in
                 let isOn = viewModel.kindFilter == filter
                 Button {
-                    viewModel.kindFilter = filter
+                    withAnimation(.easeOut(duration: 0.15)) { viewModel.kindFilter = filter }
                 } label: {
-                    Label(filter.title, systemImage: filter.symbolName)
-                        .labelStyle(.titleAndIcon)
-                        .font(.system(size: 11.5, weight: isOn ? .semibold : .regular))
-                        .foregroundStyle(isOn ? AnyShapeStyle(Color.white) : AnyShapeStyle(.secondary))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule().fill(isOn ? ZenithTheme.accent : Color.primary.opacity(0.06))
-                        )
+                    Text(filter.title)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(isOn ? Color.black.opacity(0.85) : Color.secondary)
+                        .padding(.horizontal, 14)
+                        .frame(height: 30)
+                        .background {
+                            if isOn {
+                                Capsule()
+                                    .fill(Color.white.opacity(colorScheme == .dark ? 0.9 : 0.95))
+                                    .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.12), radius: 2, y: 1)
+                            }
+                        }
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
                 .help(filter == .all ? Text("Show everything") : Text("Show \(filter.title.lowercased())"))
             }
-            Spacer(minLength: 0)
         }
+        .padding(3)
+        .hubCapsule()
     }
 
-    // MARK: List
-
-    /// One list line: either a day heading or an item with its index in `filteredItems`.
-    private enum ListEntry: Identifiable {
-        case header(ClipboardDateBucket)
-        case item(Int, ClipboardItem)
-
-        var id: String {
-            switch self {
-            case .header(let bucket): return "header-\(bucket.rawValue)"
-            case .item(_, let item): return item.id.uuidString
+    private var countLabel: some View {
+        Group {
+            if viewModel.filteredItems.count != viewModel.totalCount {
+                Text("\(viewModel.filteredItems.count) of \(viewModel.totalCount)")
+            } else if viewModel.totalCount == 1 {
+                Text("1 item")
+            } else {
+                Text("\(viewModel.totalCount) items")
             }
         }
+        .font(.system(size: 12))
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .fixedSize()
     }
 
-    /// Day headings only while not searching: search results are ordered by relevance, not by time.
-    private var entries: [ListEntry] {
-        let items = viewModel.filteredItems
-        let isSearching = !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        var result: [ListEntry] = []
-        result.reserveCapacity(items.count + 3)
-        var lastBucket: ClipboardDateBucket?
-        let now = Date()
-        for (index, item) in items.enumerated() {
-            if !isSearching {
-                let bucket = ClipboardDateBucket.bucket(for: item.timestamp, now: now)
-                if bucket != lastBucket {
-                    result.append(.header(bucket))
-                    lastBucket = bucket
-                }
-            }
-            result.append(.item(index, item))
-        }
-        return result
-    }
+    // MARK: Cards
 
     @ViewBuilder
-    private var listPane: some View {
+    private var cardsRow: some View {
         if viewModel.filteredItems.isEmpty {
             emptyStateView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollViewReader { proxy in
-                ScrollView(.vertical, showsIndicators: true) {
-                    LazyVStack(alignment: .leading, spacing: 1) {
-                        ForEach(entries) { entry in
-                            switch entry {
-                            case .header(let bucket):
-                                ZenithSectionHeader(verbatim: bucket.title)
-                                    .padding(.top, bucket == .today ? 2 : 10)
-                                    .padding(.bottom, 3)
-                            case .item(let index, let item):
-                                ClipboardRowView(
-                                    item: item,
-                                    isSelected: index == viewModel.selectedIndex,
-                                    quickIndex: index < 9 ? (index + 1) : nil,
-                                    onSelect: {
-                                        viewModel.selectedIndex = index
-                                    },
-                                    onActivate: {
-                                        viewModel.selectItem(at: index)
-                                    },
-                                    onTogglePin: {
-                                        viewModel.togglePin(for: item)
-                                    },
-                                    onDelete: {
-                                        withAnimation(.zenithSpring) {
-                                            viewModel.deleteItem(item: item)
-                                        }
-                                    },
-                                    onPasteVariant: { variant in
-                                        viewModel.selectItem(item, variant: variant)
-                                    }
-                                )
-                                .id(item.id)
-                            }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: Self.cardSpacing) {
+                        ForEach(Array(viewModel.filteredItems.enumerated()), id: \.element.id) { index, item in
+                            ClipboardCardView(
+                                item: item,
+                                isSelected: index == viewModel.selectedIndex,
+                                quickIndex: index < 9 ? index + 1 : nil,
+                                onSelect: { viewModel.selectedIndex = index },
+                                onActivate: { viewModel.selectItem(at: index) },
+                                onTogglePin: { viewModel.togglePin(for: item) },
+                                onDelete: {
+                                    withAnimation(.zenithSpring) { viewModel.deleteItem(item: item) }
+                                },
+                                onPasteVariant: { variant in viewModel.selectItem(item, variant: variant) },
+                                onOpenLink: { url in
+                                    onDismiss()
+                                    NSWorkspace.shared.open(url)
+                                }
+                            )
+                            .id(item.id)
                         }
                     }
-                    .padding(.horizontal, 8)
+                    // Room for the selected card's ring and shadow, and for a hovered card's lift.
+                    .padding(.horizontal, 4)
                     .padding(.vertical, 6)
                 }
                 .onChange(of: viewModel.selectedIndex) { _, newIndex in
-                    if newIndex >= 0 && newIndex < viewModel.filteredItems.count {
-                        let selectedID = viewModel.filteredItems[newIndex].id
-                        withAnimation(.easeOut(duration: 0.12)) {
-                            proxy.scrollTo(selectedID, anchor: nil)
-                        }
+                    guard viewModel.filteredItems.indices.contains(newIndex) else { return }
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        proxy.scrollTo(viewModel.filteredItems[newIndex].id, anchor: nil)
+                    }
+                }
+                .onAppear {
+                    // The panel is reused: start with the selected card in view.
+                    if let selected = viewModel.selectedItem {
+                        proxy.scrollTo(selected.id, anchor: .leading)
                     }
                 }
             }
@@ -217,33 +239,63 @@ public struct ClipboardHistoryView: View {
         .padding(20)
     }
 
-    // MARK: Footer
+    // MARK: Bottom row
 
-    private var footerView: some View {
-        HStack(spacing: 12) {
-            Group {
-                if viewModel.filteredItems.count != viewModel.totalCount {
-                    Text("\(viewModel.filteredItems.count) of \(viewModel.totalCount)")
-                } else if viewModel.totalCount == 1 {
-                    Text("1 item")
-                } else {
-                    Text("\(viewModel.totalCount) items")
-                }
-            }
-                .font(.system(size: 11))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .fixedSize()
-
-            Spacer(minLength: 8)
-
+    private var bottomRow: some View {
+        HStack(spacing: 14) {
             ZenithKeyHint("↩", "Paste")
             ZenithKeyHint("⇧↩", "Plain Text")
             ZenithKeyHint("⌘1–9", "Quick Paste")
+            ZenithKeyHint("←→", "Browse")
             ZenithKeyHint("⌘P", "Pin")
             ZenithKeyHint("⌘⌫", "Delete")
             ZenithKeyHint("esc", "Close")
+
+            Spacer(minLength: 12)
+
+            if let selected = viewModel.selectedItem {
+                pasteButton(for: selected)
+            }
+        }
+        .frame(height: 34)
+    }
+
+    @ViewBuilder
+    private func pasteButton(for item: ClipboardItem) -> some View {
+        let title = ClipboardCardContentCache.shared.content(for: item).shortTitle
+        let button = Button {
+            viewModel.selectItem(at: viewModel.selectedIndex)
+        } label: {
+            Text("Paste \u{201C}\(title)\u{201D}")
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: 260)
+                .padding(.horizontal, 6)
+        }
+        .tint(ZenithTheme.accent)
+        .help("Paste into the app you were using (Return)")
+
+        if drawsGlass {
+            button.buttonStyle(.glassProminent)
+        } else {
+            // Off screen a prominent button is drawn grey (its window is not key): paint the glass one's look.
+            button.buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(ZenithTheme.accent))
+        }
+    }
+}
+
+private extension View {
+    /// Liquid Glass behind the panel, unless this is a picture (see `ClipboardHistoryView.drawsGlass`).
+    @ViewBuilder
+    func glassEffectIfNeeded(_ isOn: Bool, in shape: RoundedRectangle) -> some View {
+        if isOn {
+            glassEffect(.regular, in: shape)
+        } else {
+            clipShape(shape)
         }
     }
 }

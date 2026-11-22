@@ -151,6 +151,38 @@ struct KeyboardNavigationEngineTests {
         _ = viewModel
     }
 
+    @Test("CARD-K1: Left and right arrows step through the cards, with the hardware flags too")
+    func testLeftRightArrowsStepThroughCards() {
+        let (engine, viewModel, _, _) = makeEngineWithItems(count: 4)
+
+        #expect(engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.rightArrow, modifiers: []) == true)
+        #expect(viewModel.selectedIndex == 1)
+        #expect(engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.rightArrow, modifiers: [.numericPad, .function]) == true)
+        #expect(viewModel.selectedIndex == 2)
+        #expect(engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.leftArrow, modifiers: [.numericPad, .function]) == true)
+        #expect(viewModel.selectedIndex == 1)
+
+        // The ends stop, they do not wrap.
+        _ = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.leftArrow, modifiers: [])
+        _ = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.leftArrow, modifiers: [])
+        #expect(viewModel.selectedIndex == 0)
+        viewModel.selectedIndex = 3
+        _ = engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.rightArrow, modifiers: [])
+        #expect(viewModel.selectedIndex == 3)
+    }
+
+    @Test("CARD-K2: Arrows with Option, Command or Shift reach the search field (word, line and selection moves)")
+    func testModifiedLeftRightArrowsPassThrough() {
+        let (engine, viewModel, _, _) = makeEngineWithItems(count: 4)
+        viewModel.selectedIndex = 2
+
+        for modifiers: NSEvent.ModifierFlags in [.option, .shift, .command, [.shift, .option]] {
+            #expect(engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.leftArrow, modifiers: modifiers) == false)
+            #expect(engine.handleKey(keyCode: KeyboardNavigationEngine.KeyCodes.rightArrow, modifiers: modifiers) == false)
+        }
+        #expect(viewModel.selectedIndex == 2)
+    }
+
     @Test("Native macOS hardware arrow keys with .numericPad and .function flags navigate correctly")
     func testNativeHardwareArrowKeyNavigation() {
         let (engine, viewModel, _, _) = makeEngineWithItems(count: 5)

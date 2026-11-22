@@ -125,29 +125,30 @@ struct IslandAIAgentsPanel: View {
                 emptyCard
             } else {
                 ForEach(agents) { agent in
-                    AIAgentCard(agent: agent, compact: agents.count > 1)
+                    AIAgentCard(agent: agent, compact: agents.count > 1, tight: agents.count > 2)
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { AIAgentMonitor.shared.recomputeNow() }
     }
 
     private var emptyCard: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 8) {
             Image(systemName: "sparkles")
-                .font(.system(size: 16))
+                .font(.system(size: 18))
                 .foregroundStyle(ZenithTheme.Island.textSecondary)
-                .frame(width: 22)
+                .frame(width: 24)
             VStack(alignment: .leading, spacing: 1) {
                 Text("No agent activity today")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(ZenithTheme.Island.textPrimary)
                 Text("Claude Code, Codex and Antigravity show here while they work.")
-                    .font(.system(size: 10))
+                    .font(.system(size: 11))
                     .foregroundStyle(ZenithTheme.Island.textSecondary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.9)
             }
             .lineLimit(1)
             Spacer(minLength: 0)
@@ -162,28 +163,33 @@ struct AIAgentCard: View {
     let agent: AIAgentSnapshot
     /// Two or three cards share the width: fewer details per line.
     let compact: Bool
+    /// Three cards in 380 pt: smaller type and side padding, and no spare line of numbers.
+    var tight = false
 
     private var infoLine: String? {
+        if tight { return nil }
         if compact {
-            return agent.usageText ?? agent.limitsText ?? agent.model
+            // "Today 10M" and no more: with "Session 3.2M" after it the line is cut in a card 147 pt wide. All of it is
+            // in the tooltip.
+            return agent.usageText?.components(separatedBy: " · ").first ?? agent.limitsText ?? agent.model
         }
         let parts = [agent.usageText, agent.limitsText].compactMap { $0 }
         return parts.isEmpty ? agent.model : parts.joined(separator: " · ")
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 5) {
                 Image(systemName: agent.kind.symbolName)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(agent.kind.tint)
                 Text(verbatim: agent.kind.displayName)
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .font(.system(size: tight ? 12 : 13, weight: .semibold))
                     .foregroundStyle(ZenithTheme.Island.textPrimary)
                     .layoutPriority(1)
                 if !compact, let model = agent.model, infoLine != model {
                     Text(verbatim: model)
-                        .font(.system(size: 9.5))
+                        .font(.system(size: 10.5))
                         .foregroundStyle(ZenithTheme.Island.textTertiary)
                 }
                 Spacer(minLength: 2)
@@ -193,11 +199,11 @@ struct AIAgentCard: View {
                 }
             }
             Text(verbatim: agent.statusText)
-                .font(.system(size: 10, weight: agent.isWorking ? .medium : .regular))
+                .font(.system(size: 11.5, weight: agent.isWorking ? .medium : .regular))
                 .foregroundStyle(agent.isWorking ? AnyShapeStyle(agent.kind.tint) : AnyShapeStyle(ZenithTheme.Island.textSecondary))
             if let infoLine {
                 Text(verbatim: infoLine)
-                    .font(.system(size: 10))
+                    .font(.system(size: 11))
                     .monospacedDigit()
                     .foregroundStyle(ZenithTheme.Island.textSecondary)
             }
@@ -205,7 +211,7 @@ struct AIAgentCard: View {
         .lineLimit(1)
         .truncationMode(.tail)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .modifier(IslandCardBackground())
+        .modifier(IslandCardBackground(horizontalPadding: tight ? 9 : (compact ? 12 : 14)))
         .help(Text(verbatim: agent.detailText(now: Date())))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: agent.kind.displayName))

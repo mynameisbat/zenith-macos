@@ -72,14 +72,17 @@ public struct ZenithDynamicIslandView: View {
         if isDisplayingAlert {
             return geometry.hasNotch ? 0 : 18
         }
-        return geometry.hasNotch ? 0 : (islandState.isExpanded ? 16 : (geometry.idleHeight / 2))
+        // The open island hangs from the top edge of the screen (or of the notch), so its top is square.
+        return geometry.hasNotch || islandState.isExpanded ? 0 : (geometry.idleHeight / 2)
     }
 
     private var bottomRadius: CGFloat {
         if isDisplayingAlert {
             return 18
         }
-        return islandState.isExpanded ? 18 : (geometry.hasNotch ? 10 : (geometry.idleHeight / 2))
+        // 28 pt around the open island and its dock tray (22 pt, 6 pt in from the bottom edge); a page is a window, the same corners.
+        if islandState.isExpanded { return 28 }
+        return geometry.hasNotch ? 10 : (geometry.idleHeight / 2)
     }
 
     private var currentShape: UnevenRoundedRectangle {
@@ -151,10 +154,10 @@ public struct ZenithDynamicIslandView: View {
                     }
                     .accessibilityAddTraits(.isButton)
                     .accessibilityHint("Opens the timer")
-                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+                    .transition(compactWingsTransition)
             } else if islandState.compactActivity == .nowPlaying, let track = islandState.nowPlayingTrack {
                 nowPlayingIdleCapsule(track)
-                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+                    .transition(compactWingsTransition)
             } else if islandState.compactActivity == .aiAgent, let agent = islandState.workingAIAgent {
                 AIAgentCompactWings(agent: agent, geometry: geometry)
                     .contentShape(Rectangle())
@@ -164,10 +167,10 @@ public struct ZenithDynamicIslandView: View {
                     }
                     .accessibilityAddTraits(.isButton)
                     .accessibilityHint("Shows the AI agents")
-                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+                    .transition(compactWingsTransition)
             } else if islandState.compactActivity == .keepAwake, let awake = islandState.keepAwake {
                 IslandKeepAwakeCompactWings(snapshot: awake, geometry: geometry)
-                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+                    .transition(compactWingsTransition)
             }
         }
         .frame(width: currentWidth, height: currentHeight, alignment: .top)
@@ -219,6 +222,16 @@ public struct ZenithDynamicIslandView: View {
 
     // MARK: - Alert Capsule HUD
 
+    /// What sits beside the notch while the island is closed grows in as before, but leaves at once when something else
+    /// takes the island (it opening onto a card, a notice): a slow fade-out under the arriving card read as two cards
+    /// overlapping.
+    private var compactWingsTransition: AnyTransition {
+        .asymmetric(
+            insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)),
+            removal: AnyTransition.opacity.animation(.easeIn(duration: 0.08))
+        )
+    }
+
     /// The shape leads and the page follows: it waits for the island to be most of the way open, then comes into
     /// focus from the top edge. Leaving, it is gone before the shape has closed around it.
     private var contentArrival: AnyTransition {
@@ -266,9 +279,10 @@ public struct ZenithDynamicIslandView: View {
 
     // MARK: - Expanded Dynamic Island (Tabbed Shelf or Now Playing)
 
-    /// The panel is a fixed 96 pt. On a notched display the hardware notch hides the first `notchRect.height` pt of it,
-    /// so the content starts below that, once, here. (Each piece used to add its own notch inset, which pushed the
-    /// tab switcher up behind the notch and the rest off the bottom whenever both Now Playing and the shelf existed.)
+    /// What the open island can show, as tabs. On a notched display the hardware notch hides the first
+    /// `notchRect.height` pt of the panel, so the card starts below that (`ZenithIslandGeometry.tabStripHeight`), once,
+    /// in `contextCard`. (Each piece used to add its own notch inset, which pushed the tab switcher up behind the notch
+    /// and the rest off the bottom whenever both Now Playing and the shelf existed.)
     private var availableTabs: [IslandExpandedTab] {
         ZenithIslandState.availableTabs(
             hasTrack: islandState.nowPlayingTrack != nil,
@@ -299,7 +313,7 @@ public struct ZenithDynamicIslandView: View {
         }
     }
 
-    /// What is going on (music, a timer, an agent, staged files) in the island's usual 96 pt, and under it the dock
+    /// What is going on (music, a timer, an agent, staged files) in the island's usual 380 × 130 pt, and under it the dock
     /// of tools. A file being dragged in gets the whole island: the dock steps aside for the drop.
     private var tabbedIslandContent: some View {
         VStack(spacing: 0) {
@@ -318,67 +332,86 @@ public struct ZenithDynamicIslandView: View {
         let hasTabs = tabs.count > 1 && !islandState.isDropTargeted
 
         return ZStack(alignment: .top) {
+            // The card sits at the bottom of the area and the strip of tabs at the top, so the strip is clear of the
+            // hardware notch whatever its height.
             VStack(spacing: 0) {
-                // Without a notch the tab switcher takes its own row; with one it sits in the free strips either
-                // side of the notch (below).
-                if hasTabs && !geometry.hasNotch {
-                    tabSwitcherHeader(tabs: tabs, current: current)
-                        .padding(.top, 4)
-                }
-
-                switch current {
-                case .nowPlaying:
-                    if let track = islandState.nowPlayingTrack {
-                        NowPlayingExpandedView(
-                            track: track,
-                            onPrevious: { NowPlayingService.shared.previousTrack() },
-                            onTogglePlayPause: { NowPlayingService.shared.togglePlayPause() },
-                            onNext: { NowPlayingService.shared.nextTrack() },
-                            onSeek: { NowPlayingService.shared.seek(to: $0) }
-                        )
-                    } else {
-                        shelfContent
-                    }
-                case .widgets:
-                    IslandWidgetsPanel(islandState: islandState)
-                case .aiAgents:
-                    IslandAIAgentsPanel(islandState: islandState)
-                case .shelf:
-                    shelfContent
-                }
+                Spacer(minLength: geometry.tabStripHeight)
+                cardContent(current)
+                    .frame(width: geometry.expandedWidth, height: ZenithIslandGeometry.cardHeight)
+                Color.clear.frame(height: ZenithIslandGeometry.cardBottomGap)
             }
-            .padding(.top, geometry.hasNotch ? geometry.notchRect.height + 2 : (hasTabs ? 0 : 6))
 
-            if hasTabs && geometry.hasNotch {
+            if hasTabs {
                 tabSwitcherHeader(tabs: tabs, current: current)
-                    .frame(height: geometry.notchRect.height)
+                    .frame(height: geometry.tabStripHeight, alignment: .center)
             }
         }
         .frame(width: geometry.expandedWidth, height: geometry.expandedHeight, alignment: .top)
     }
 
-    /// With a notch the tabs sit either side of it (icons only when three must share the space); without one they
-    /// sit together at the left.
-    private func tabSwitcherHeader(tabs: [IslandExpandedTab], current: IslandExpandedTab) -> some View {
-        let compact = geometry.hasNotch && tabs.count > 2
-        let leftCount = geometry.hasNotch ? (tabs.count + 1) / 2 : tabs.count
-        return HStack(spacing: 4) {
-            ForEach(Array(tabs.prefix(leftCount)), id: \.self) { tab in
-                tabButton(for: tab, isSelected: tab == current, compact: compact)
-            }
-            if geometry.hasNotch {
-                Spacer(minLength: geometry.notchRect.width + 8)
-                ForEach(Array(tabs.dropFirst(leftCount)), id: \.self) { tab in
-                    tabButton(for: tab, isSelected: tab == current, compact: compact)
-                }
+    @ViewBuilder
+    private func cardContent(_ current: IslandExpandedTab) -> some View {
+        switch current {
+        case .nowPlaying:
+            if let track = islandState.nowPlayingTrack {
+                NowPlayingExpandedView(
+                    track: track,
+                    onPrevious: { NowPlayingService.shared.previousTrack() },
+                    onTogglePlayPause: { NowPlayingService.shared.togglePlayPause() },
+                    onNext: { NowPlayingService.shared.nextTrack() },
+                    onSeek: { NowPlayingService.shared.seek(to: $0) }
+                )
             } else {
-                Spacer()
+                shelfContent
             }
+        case .widgets:
+            IslandWidgetsPanel(islandState: islandState)
+        case .aiAgents:
+            IslandAIAgentsPanel(islandState: islandState)
+        case .shelf:
+            shelfContent
         }
-        .padding(.horizontal, 8)
     }
 
-    private func tabButton(for tab: IslandExpandedTab, isSelected: Bool, compact: Bool) -> some View {
+    /// The tabs as icon-only pills in segmented capsules. Beside a notch there are only about 97 pt either side of it,
+    /// so the tabs are shared between the two sides, two pills each, and the shelf is a pill with a small count
+    /// (`IslandTabStrip`). Without a notch the pills are one capsule at the left and the shelf, with the number of
+    /// items on it, a small capsule at the right. Nothing sits in the middle: beside a notch that is the hardware.
+    private func tabSwitcherHeader(tabs: [IslandExpandedTab], current: IslandExpandedTab) -> some View {
+        let strip = IslandTabStrip.layout(tabs: tabs, hasNotch: geometry.hasNotch)
+        return HStack(spacing: 0) {
+            tabCapsule(strip.left, current: current)
+            Spacer(minLength: geometry.hasNotch ? geometry.notchRect.width + 8 : 8)
+            if geometry.hasNotch {
+                tabCapsule(strip.right, current: current)
+            } else if tabs.contains(.shelf) {
+                shelfCapsule(isSelected: current == .shelf)
+            }
+        }
+        .padding(.horizontal, ZenithIslandGeometry.tabEdgeInset)
+    }
+
+    @ViewBuilder
+    private func tabCapsule(_ tabs: [IslandExpandedTab], current: IslandExpandedTab) -> some View {
+        if !tabs.isEmpty {
+            HStack(spacing: 0) {
+                ForEach(tabs, id: \.self) { tab in
+                    tabPill(for: tab, isSelected: tab == current)
+                }
+            }
+            .padding(2)
+            .background(Capsule().fill(Color.white.opacity(0.07)))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
+        }
+    }
+
+    private func select(_ tab: IslandExpandedTab) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            islandState.activeTab = tab
+        }
+    }
+
+    private func tabPill(for tab: IslandExpandedTab, isSelected: Bool) -> some View {
         let symbol: String
         let title: String
         switch tab {
@@ -396,31 +429,52 @@ public struct ZenithDynamicIslandView: View {
             title = String(localized: "Shelf (\(islandState.droppedItems.count))")
         }
         return Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                islandState.activeTab = tab
-            }
+            select(tab)
         } label: {
-            HStack(spacing: 3) {
-                Image(systemName: symbol)
-                    .font(.system(size: compact ? 10 : 8.5))
-                if !compact {
-                    Text(title)
-                        .font(.system(size: 10, weight: .semibold))
-                        .lineLimit(1)
-                } else if tab == .shelf {
-                    Text("\(islandState.droppedItems.count)")
-                        .font(.system(size: 10, weight: .semibold))
-                        .monospacedDigit()
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(isSelected ? .white : .white.opacity(0.6))
+                .frame(width: ZenithIslandGeometry.tabPillWidth, height: 24)
+                .background(Capsule().fill(isSelected ? Color.white.opacity(0.18) : Color.clear))
+                .overlay(alignment: .topTrailing) {
+                    // The shelf's pill has no room for its count: a small badge, only beside a notch.
+                    if tab == .shelf, !islandState.droppedItems.isEmpty {
+                        Text(verbatim: String(islandState.droppedItems.count))
+                            .font(.system(size: 8.5, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 3)
+                            .frame(minWidth: 11, minHeight: 11)
+                            .background(Capsule().fill(Color.white.opacity(0.92)))
+                            .offset(x: 4, y: -3)
+                    }
                 }
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(title)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func shelfCapsule(isSelected: Bool) -> some View {
+        let count = islandState.droppedItems.count
+        let title = String(localized: "Shelf (\(count))")
+        return Button {
+            select(.shelf)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "tray.and.arrow.down.fill")
+                    .font(.system(size: 11.5, weight: .semibold))
+                Text(verbatim: String(count))
+                    .font(.system(size: 12, weight: .semibold))
+                    .monospacedDigit()
             }
-            .fixedSize()
-            .foregroundColor(isSelected ? .white : .white.opacity(0.72))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(
-                Capsule()
-                    .fill(isSelected ? Color.white.opacity(0.14) : Color.clear)
-            )
+            .foregroundColor(isSelected ? .white : .white.opacity(0.8))
+            .padding(.horizontal, 12)
+            .frame(height: 26)
+            .background(Capsule().fill(Color.white.opacity(isSelected ? 0.18 : 0.07)))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -439,8 +493,7 @@ public struct ZenithDynamicIslandView: View {
                 populatedShelfDock
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -458,8 +511,12 @@ public struct ZenithDynamicIslandView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(islandState.isDropTargeted ? 0.08 : 0.045))
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(islandState.isDropTargeted ? 0.09 : 0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.07), lineWidth: 1)
         )
     }
 
@@ -501,8 +558,12 @@ public struct ZenithDynamicIslandView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.045))
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.white.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.07), lineWidth: 1)
             )
 
             // Clear shelf button

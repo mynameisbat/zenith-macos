@@ -232,6 +232,9 @@ private struct HomebrewUpdateButton: View {
         Button("Update Homebrew") {
             model.update()
         }
+        .lineLimit(1)
+        .fixedSize()
+        .layoutPriority(1)
         .disabled(model.isQueued(.update))
         .help("Run brew update: fetch the newest package list, so new versions show up")
     }
@@ -352,6 +355,9 @@ private struct HomebrewUpdatesSection: View {
                             }
                         }
                         .buttonStyle(.borderedProminent)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .layoutPriority(1)
                         .disabled(model.upgradable.isEmpty)
                     }
                     .controlSize(.small)

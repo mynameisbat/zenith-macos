@@ -207,10 +207,11 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
             var currentTypes = copiedTypes
 
             // Passwords, generated or temporary copies, and copies made in an ignored app stay out of the history.
+            let sourceBundleID = frontmostApplication?.frontmostBundleIdentifier()
             let decision = ClipboardCapturePolicy.decide(
                 types: copiedTypes.map(\.rawValue),
                 itemTypes: (pasteboard.pasteboardItems ?? []).map { $0.types.map(\.rawValue) },
-                frontmostBundleIdentifier: frontmostApplication?.frontmostBundleIdentifier(),
+                frontmostBundleIdentifier: sourceBundleID,
                 options: options
             )
             guard decision == .record else {
@@ -252,7 +253,8 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
                         pngData: pngData,
                         tiffData: tiffData,
                         rtfData: rtfData,
-                        plainText: plainText
+                        plainText: plainText,
+                        sourceBundleID: sourceBundleID
                     ) {
                         handler?(item)
                     }
@@ -290,7 +292,8 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
         tiffData: Data?,
         fileImageData: (data: Data, width: Int, height: Int)? = nil,
         rtfData: Data?,
-        plainText: String?
+        plainText: String?,
+        sourceBundleID: String? = nil
     ) -> ClipboardItem? {
         // Oversized copies are not kept in history (they are still on the system pasteboard). This runs before any
         // TIFF-to-PNG conversion so a huge image is not decoded just to be thrown away.
@@ -304,7 +307,7 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
         // 1. PNG Image
         if let pngData = pngData, !pngData.isEmpty {
             let (w, h) = extractDimensions(from: pngData)
-            return ClipboardItem.image(data: pngData, width: w, height: h)
+            return ClipboardItem.image(data: pngData, width: w, height: h, sourceBundleID: sourceBundleID)
         }
 
         // 2. TIFF Image
@@ -313,26 +316,26 @@ public final class PasteboardMonitor: PasteboardServiceProtocol, @unchecked Send
                let converted = rep.representation(using: .png, properties: [:]) {
                 let w = rep.pixelsWide > 0 ? rep.pixelsWide : Int(rep.size.width)
                 let h = rep.pixelsHigh > 0 ? rep.pixelsHigh : Int(rep.size.height)
-                return ClipboardItem.image(data: converted, width: w, height: h)
+                return ClipboardItem.image(data: converted, width: w, height: h, sourceBundleID: sourceBundleID)
             } else {
                 let (w, h) = extractDimensions(from: tiffData)
-                return ClipboardItem.image(data: tiffData, width: w, height: h)
+                return ClipboardItem.image(data: tiffData, width: w, height: h, sourceBundleID: sourceBundleID)
             }
         }
 
         // 3. Image file copied from Finder (fileURL)
         if let fileImg = fileImageData {
-            return ClipboardItem.image(data: fileImg.data, width: fileImg.width, height: fileImg.height)
+            return ClipboardItem.image(data: fileImg.data, width: fileImg.width, height: fileImg.height, sourceBundleID: sourceBundleID)
         }
 
         // 4. Rich Text (RTF)
         if let rtfData = rtfData, !rtfData.isEmpty {
-            return ClipboardItem.richText(rtfData: rtfData, plainText: plainText ?? "")
+            return ClipboardItem.richText(rtfData: rtfData, plainText: plainText ?? "", sourceBundleID: sourceBundleID)
         }
 
         // 5. Plain Text
         if let text = plainText, !text.isEmpty {
-            return ClipboardItem.text(text)
+            return ClipboardItem.text(text, sourceBundleID: sourceBundleID)
         }
 
         return nil

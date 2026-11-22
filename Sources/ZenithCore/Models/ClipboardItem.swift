@@ -37,6 +37,10 @@ public struct ClipboardItem: Identifiable, Sendable, Equatable, Hashable, Codabl
     /// Pinned items are exempt from FIFO capacity eviction.
     public var isPinned: Bool
 
+    /// Bundle identifier of the app that was frontmost when this was copied (for the card's icon). Only a hint: it
+    /// is read at the poll, so a very fast app switch can name the wrong app. Nil when unknown.
+    public let sourceBundleID: String?
+
     // MARK: - Pre-computed Search Metadata (Zero-Allocation Search)
     public let normalizedPreview: String
     public let isASCIIOnly: Bool
@@ -53,7 +57,8 @@ public struct ClipboardItem: Identifiable, Sendable, Equatable, Hashable, Codabl
         payload: ClipboardPayload,
         previewText: String,
         byteSize: Int,
-        isPinned: Bool = false
+        isPinned: Bool = false,
+        sourceBundleID: String? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -62,6 +67,7 @@ public struct ClipboardItem: Identifiable, Sendable, Equatable, Hashable, Codabl
         self.previewText = previewText
         self.byteSize = byteSize
         self.isPinned = isPinned
+        self.sourceBundleID = sourceBundleID
 
         // 1. Precompute normalized preview and count
         let lowerPreview = previewText.lowercased()
@@ -104,7 +110,7 @@ public struct ClipboardItem: Identifiable, Sendable, Equatable, Hashable, Codabl
 
     // MARK: - Codable Custom Synthesis
     enum CodingKeys: String, CodingKey {
-        case id, timestamp, itemType, payload, previewText, byteSize, isPinned
+        case id, timestamp, itemType, payload, previewText, byteSize, isPinned, sourceBundleID
     }
 
     public init(from decoder: Decoder) throws {
@@ -116,6 +122,7 @@ public struct ClipboardItem: Identifiable, Sendable, Equatable, Hashable, Codabl
         let previewText = try container.decode(String.self, forKey: .previewText)
         let byteSize = try container.decode(Int.self, forKey: .byteSize)
         let isPinned = try container.decode(Bool.self, forKey: .isPinned)
+        let sourceBundleID = try container.decodeIfPresent(String.self, forKey: .sourceBundleID)
 
         self.init(
             id: id,
@@ -124,7 +131,8 @@ public struct ClipboardItem: Identifiable, Sendable, Equatable, Hashable, Codabl
             payload: payload,
             previewText: previewText,
             byteSize: byteSize,
-            isPinned: isPinned
+            isPinned: isPinned,
+            sourceBundleID: sourceBundleID
         )
     }
 
@@ -137,10 +145,11 @@ public struct ClipboardItem: Identifiable, Sendable, Equatable, Hashable, Codabl
         try container.encode(previewText, forKey: .previewText)
         try container.encode(byteSize, forKey: .byteSize)
         try container.encode(isPinned, forKey: .isPinned)
+        try container.encodeIfPresent(sourceBundleID, forKey: .sourceBundleID)
     }
 
     /// Convenience factory for plain text items.
-    public static func text(_ string: String, id: UUID = UUID(), timestamp: Date = Date(), isPinned: Bool = false) -> ClipboardItem {
+    public static func text(_ string: String, id: UUID = UUID(), timestamp: Date = Date(), isPinned: Bool = false, sourceBundleID: String? = nil) -> ClipboardItem {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
         let preview = trimmed.count > 100 ? String(trimmed.prefix(100)) + "..." : trimmed
         return ClipboardItem(
@@ -150,12 +159,13 @@ public struct ClipboardItem: Identifiable, Sendable, Equatable, Hashable, Codabl
             payload: .plainText(string),
             previewText: preview.isEmpty ? "(Empty Text)" : preview,
             byteSize: string.utf8.count,
-            isPinned: isPinned
+            isPinned: isPinned,
+            sourceBundleID: sourceBundleID
         )
     }
 
     /// Convenience factory for rich text items.
-    public static func richText(rtfData: Data, plainText: String, id: UUID = UUID(), timestamp: Date = Date(), isPinned: Bool = false) -> ClipboardItem {
+    public static func richText(rtfData: Data, plainText: String, id: UUID = UUID(), timestamp: Date = Date(), isPinned: Bool = false, sourceBundleID: String? = nil) -> ClipboardItem {
         let trimmed = plainText.trimmingCharacters(in: .whitespacesAndNewlines)
         let preview = trimmed.count > 100 ? String(trimmed.prefix(100)) + "..." : trimmed
         return ClipboardItem(
@@ -165,12 +175,13 @@ public struct ClipboardItem: Identifiable, Sendable, Equatable, Hashable, Codabl
             payload: .richText(rtfData: rtfData, plainText: plainText),
             previewText: preview.isEmpty ? "(Rich Text)" : preview,
             byteSize: rtfData.count,
-            isPinned: isPinned
+            isPinned: isPinned,
+            sourceBundleID: sourceBundleID
         )
     }
 
     /// Convenience factory for image items.
-    public static func image(data: Data, width: Int, height: Int, id: UUID = UUID(), timestamp: Date = Date(), isPinned: Bool = false) -> ClipboardItem {
+    public static func image(data: Data, width: Int, height: Int, id: UUID = UUID(), timestamp: Date = Date(), isPinned: Bool = false, sourceBundleID: String? = nil) -> ClipboardItem {
         ClipboardItem(
             id: id,
             timestamp: timestamp,
@@ -178,7 +189,8 @@ public struct ClipboardItem: Identifiable, Sendable, Equatable, Hashable, Codabl
             payload: .image(data: data, width: width, height: height),
             previewText: "Image (\(width) × \(height))",
             byteSize: data.count,
-            isPinned: isPinned
+            isPinned: isPinned,
+            sourceBundleID: sourceBundleID
         )
     }
 

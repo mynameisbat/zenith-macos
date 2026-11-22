@@ -158,6 +158,26 @@ public protocol UpcomingEventProviding: AnyObject, Sendable {
 
 // MARK: - Island Tabs
 
+/// Where the tabs go in the strip at the top of the open island. Beside a notch each side has room for two icon pills
+/// only (the island is 380 pt wide, the notch about 186), so up to four items (Now Playing, Widgets, AI, Shelf) are
+/// shared between the two sides: the first two tabs on the left, the rest and the shelf on the right. Without a
+/// notch the pills are on the left and the shelf, with its item count, on the right, as it always was.
+public struct IslandTabStrip: Equatable, Sendable {
+    public let left: [IslandExpandedTab]
+    public let right: [IslandExpandedTab]
+
+    public static func layout(tabs: [IslandExpandedTab], hasNotch: Bool) -> IslandTabStrip {
+        guard hasNotch else {
+            return IslandTabStrip(left: tabs.filter { $0 != .shelf }, right: tabs.filter { $0 == .shelf })
+        }
+        let perSide = ZenithIslandGeometry.tabPillsPerSide
+        let pills = tabs.filter { $0 != .shelf }
+        let left = Array(pills.prefix(perSide))
+        let right = Array((Array(pills.dropFirst(perSide)) + tabs.filter { $0 == .shelf }).prefix(perSide))
+        return IslandTabStrip(left: left, right: right)
+    }
+}
+
 public extension ZenithIslandState {
     /// The tabs the expanded island offers, in order.
     static func availableTabs(hasTrack: Bool, hasShelfItems: Bool, showsWidgets: Bool, showsAIAgents: Bool = false) -> [IslandExpandedTab] {
@@ -212,6 +232,25 @@ public extension ZenithIslandState {
     }
 }
 
+// MARK: - Dock icon style
+
+/// How the dock's icons (and the Tools page's tiles) are drawn.
+public enum IslandDockIconStyle: String, CaseIterable, Sendable, Identifiable {
+    /// A faint glass tile with the glyph in the tool's colour; a switch that is off is dimmer, its glyph grey.
+    case tinted
+    /// A solid tile in the tool's colour with a white glyph; a switch that is off is grey.
+    case color
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .tinted: return String(localized: "Tinted")
+        case .color: return String(localized: "Color")
+        }
+    }
+}
+
 // MARK: - Widget Settings
 
 /// Which island widgets are on, and the timer lengths. Saved in `UserDefaults`.
@@ -231,6 +270,7 @@ public final class IslandWidgetSettings: ObservableObject {
         public static let showTools = "zenith_island_show_tools"
         public static let showMenuBarIcon = "zenith_show_menu_bar_icon"
         public static let dockTools = "zenith_island_dock_tools"
+        public static let dockIconStyle = "zenith_island_dock_icon_style"
     }
 
     public static let focusRange = 5...120
@@ -274,6 +314,11 @@ public final class IslandWidgetSettings: ObservableObject {
             guard dockLayout != oldValue else { return }
             save(dockLayout.storedIdentifiers, Keys.dockTools)
         }
+    }
+
+    /// How the dock's icons and the Tools page's tiles look. Saved on every change; an unknown saved value is the default.
+    @Published public var dockIconStyle: IslandDockIconStyle {
+        didSet { save(dockIconStyle.rawValue, Keys.dockIconStyle) }
     }
 
     /// Also keep Zenith's icon (and the Command Hub behind it) in the menu bar. Off: everything is on the island.
@@ -339,6 +384,7 @@ public final class IslandWidgetSettings: ObservableObject {
         self.showTools = userDefaults.object(forKey: Keys.showTools) as? Bool ?? true
         self.showMenuBarIcon = userDefaults.object(forKey: Keys.showMenuBarIcon) as? Bool ?? false
         self.dockLayout = IslandDockLayout(storedIdentifiers: userDefaults.stringArray(forKey: Keys.dockTools))
+        self.dockIconStyle = userDefaults.string(forKey: Keys.dockIconStyle).flatMap(IslandDockIconStyle.init(rawValue:)) ?? .tinted
         self.hideInFullscreen = userDefaults.object(forKey: Keys.hideInFullscreen) as? Bool ?? true
         self.scrollGestures = userDefaults.object(forKey: Keys.scrollGestures) as? Bool ?? true
         let delay = userDefaults.object(forKey: Keys.hoverOpenDelay) as? Double ?? Self.defaultHoverOpenDelay
@@ -362,6 +408,7 @@ public final class IslandWidgetSettings: ObservableObject {
         showTools = true
         showMenuBarIcon = false
         dockLayout = IslandDockLayout()
+        dockIconStyle = .tinted
         hideInFullscreen = true
         scrollGestures = true
         hoverOpenDelay = Self.defaultHoverOpenDelay

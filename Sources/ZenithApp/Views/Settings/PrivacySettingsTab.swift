@@ -491,19 +491,22 @@ public struct PrivacySettingsTab: View {
                 Spacer()
 
                 HStack(spacing: 8) {
-                    Button {
-                        stats.toggleRecording()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(stats.isRecordingEnabled ? Color.green : Color.orange)
-                                .frame(width: 6, height: 6)
-                            Text(stats.isRecordingEnabled ? "Recording" : "Paused")
-                                .font(.system(size: 10.5, weight: .medium))
+                    // Only while the shield is on: with it off nothing is recorded, and "Recording" claimed otherwise.
+                    if controller.isRunning {
+                        Button {
+                            stats.toggleRecording()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(stats.isRecordingEnabled ? Color.green : Color.orange)
+                                    .frame(width: 6, height: 6)
+                                Text(stats.isRecordingEnabled ? "Recording" : "Paused")
+                                    .font(.system(size: 10.5, weight: .medium))
+                            }
                         }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
 
                     if !stats.recentRequests.isEmpty {
                         Button {

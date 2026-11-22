@@ -106,15 +106,18 @@ public struct ZenithIconTile: View {
     public let systemName: String
     public let tint: Color
     public var size: CGFloat
+    /// Corner radius as a share of the side (0.24 is the classic tile; Settings uses 0.3).
+    public var cornerRatio: CGFloat
 
-    public init(systemName: String, tint: Color, size: CGFloat = 20) {
+    public init(systemName: String, tint: Color, size: CGFloat = 20, cornerRatio: CGFloat = 0.24) {
         self.systemName = systemName
         self.tint = tint
         self.size = size
+        self.cornerRatio = cornerRatio
     }
 
     public var body: some View {
-        RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
+        RoundedRectangle(cornerRadius: size * cornerRatio, style: .continuous)
             .fill(
                 LinearGradient(
                     colors: [tint.opacity(0.88), tint],
@@ -123,7 +126,7 @@ public struct ZenithIconTile: View {
                 )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
+                RoundedRectangle(cornerRadius: size * cornerRatio, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
             )
             .overlay(

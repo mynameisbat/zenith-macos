@@ -28,6 +28,9 @@ public struct ProcessTelemetry: Identifiable, Sendable, Equatable {
     public let memoryBytes: Int64
     public let state: String
     public let isZombie: Bool
+    /// How many processes this record stands for: 1, or more for an app together with its helpers
+    /// (`ProcessGrouping`). Its CPU and memory are the sums.
+    public let processCount: Int
 
     public init(
         pid: Int,
@@ -38,7 +41,8 @@ public struct ProcessTelemetry: Identifiable, Sendable, Equatable {
         memoryPercent: Double = 0.0,
         memoryBytes: Int64 = 0,
         state: String = "S",
-        isZombie: Bool = false
+        isZombie: Bool = false,
+        processCount: Int = 1
     ) {
         self.id = pid
         self.pid = pid
@@ -50,6 +54,7 @@ public struct ProcessTelemetry: Identifiable, Sendable, Equatable {
         self.memoryBytes = memoryBytes
         self.state = state
         self.isZombie = isZombie
+        self.processCount = processCount
     }
 }
 
@@ -376,7 +381,7 @@ public final class HardwareTelemetryService: @unchecked Sendable {
 
         // The runner reads the output while `ps` is still running: waiting for exit first would hang for good once
         // the listing outgrows the 64 KiB pipe buffer (about 1,200 processes).
-        guard let result = SystemCommand.processRunner("/bin/ps", ["-Aceo", "pid=,ppid=,state=,pcpu=,pmem=,rss=,comm=", "-r"]),
+        guard let result = SystemCommand.processRunner("/bin/ps", ["-Aeo", "pid=,ppid=,state=,pcpu=,pmem=,rss=,comm=", "-r"]),
               result.status == 0 else {
             return ([], [])
         }
@@ -532,6 +537,9 @@ public final class HardwareTelemetryService: @unchecked Sendable {
                 activeProcs.append(proc)
             }
         }
+
+        // An app and its helpers are one row: Chrome's twenty renderers are "Google Chrome", not twenty busy names.
+        activeProcs = ProcessGrouping.grouped(activeProcs)
 
         // Maintain top CPU hogs followed by heavy RAM consumers not already included
         var hogs: [ProcessTelemetry] = []

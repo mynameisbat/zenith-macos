@@ -6,9 +6,13 @@ import ZenithCore
 /// segmented groups, then undo/redo, then Copy and Save. Every control names its keyboard shortcut in its tooltip.
 public struct StylingToolbarView: View {
     @ObservedObject public var viewModel: AnnotationEditorViewModel
+    /// Two rows instead of one, for a window that follows a narrow picture (`EditorWindowGeometryCalculator`).
+    public let isCompact: Bool
+    @StateObject private var caption = ToolbarCaption()
 
-    public init(viewModel: AnnotationEditorViewModel) {
+    public init(viewModel: AnnotationEditorViewModel, isCompact: Bool = false) {
         self.viewModel = viewModel
+        self.isCompact = isCompact
     }
 
     private static var colorNames: [String] {
@@ -19,59 +23,29 @@ public struct StylingToolbarView: View {
     }
 
     public var body: some View {
-        HStack(spacing: 10) {
-            group {
-                toolButton(tool: .pen, icon: "pencil.tip", label: String(localized: "Pen"), shortcut: "P")
-                toolButton(tool: .arrow, icon: "arrow.up.right", label: String(localized: "Arrow"), shortcut: "A")
-                toolButton(tool: .rectangle, icon: "rectangle", label: String(localized: "Rectangle"), shortcut: "R")
-                toolButton(tool: .text, icon: "textformat", label: String(localized: "Text"), shortcut: "T")
-                toolButton(tool: .blur, icon: "checkerboard.rectangle", label: String(localized: "Pixelate"), shortcut: "B")
-                toolButton(tool: .redact, icon: "rectangle.fill", label: String(localized: "Redact"), shortcut: "X")
-                toolButton(tool: .crop, icon: "crop", label: String(localized: "Crop"), shortcut: "C")
-            }
-
-            group {
-                ForEach(0..<PresetColors.all.count, id: \.self) { idx in
-                    let name = idx < Self.colorNames.count ? Self.colorNames[idx] : String(localized: "Color \(idx + 1)")
-                    colorSwatch(color: PresetColors.all[idx], name: name, shortcut: "\(idx + 1)")
+        Group {
+            if isCompact {
+                VStack(spacing: 8) {
+                    HStack(spacing: 10) {
+                        toolsGroup
+                        strokesGroup
+                        historyGroup
+                    }
+                    HStack(spacing: 10) {
+                        colorsGroup
+                        actionButtons
+                    }
+                }
+            } else {
+                HStack(spacing: 10) {
+                    toolsGroup
+                    colorsGroup
+                    strokesGroup
+                    historyGroup
+                    Divider().frame(height: 20)
+                    actionButtons
                 }
             }
-
-            group {
-                strokeButton(width: 2.0, label: String(localized: "Thin"), shortcut: "[")
-                strokeButton(width: 4.0, label: String(localized: "Medium"), shortcut: nil)
-                strokeButton(width: 8.0, label: String(localized: "Thick"), shortcut: "]")
-            }
-
-            HStack(spacing: 2) {
-                iconButton("arrow.uturn.backward", label: String(localized: "Undo"), shortcut: "⌘Z", enabled: viewModel.commandStack.canUndo) {
-                    viewModel.undo()
-                }
-                iconButton("arrow.uturn.forward", label: String(localized: "Redo"), shortcut: "⇧⌘Z", enabled: viewModel.commandStack.canRedo) {
-                    viewModel.redo()
-                }
-            }
-
-            Divider().frame(height: 20)
-
-            HStack(spacing: 6) {
-                Button {
-                    viewModel.saveToDisk(parentWindow: nil)
-                } label: {
-                    Text("Save…")
-                }
-                .help("Save as PNG or JPEG (⌘S)")
-
-                Button {
-                    viewModel.copyToClipboard()
-                } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
-                        .labelStyle(.titleAndIcon)
-                }
-                .buttonStyle(.borderedProminent)
-                .help("Copy the annotated image and close (⌘C)")
-            }
-            .controlSize(.regular)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
@@ -84,6 +58,84 @@ public struct StylingToolbarView: View {
                 .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
         .shadow(color: Color.black.opacity(0.2), radius: 16, x: 0, y: 6)
+        // The name of the control under the pointer, in the free strip above the toolbar: a tooltip takes a second to
+        // show, and the icons say nothing without it.
+        .overlay(alignment: .top) {
+            if let text = caption.text {
+                Text(verbatim: text)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(.regularMaterial))
+                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+                    .offset(y: -28)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                    .accessibilityHidden(true)
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: caption.text)
+    }
+
+    private var toolsGroup: some View {
+        group {
+            toolButton(tool: .pen, icon: "pencil.tip", label: String(localized: "Pen"), shortcut: "P")
+            toolButton(tool: .arrow, icon: "arrow.up.right", label: String(localized: "Arrow"), shortcut: "A")
+            toolButton(tool: .rectangle, icon: "rectangle", label: String(localized: "Rectangle"), shortcut: "R")
+            toolButton(tool: .text, icon: "textformat", label: String(localized: "Text"), shortcut: "T")
+            toolButton(tool: .blur, icon: "checkerboard.rectangle", label: String(localized: "Pixelate"), shortcut: "B")
+            toolButton(tool: .redact, icon: "rectangle.fill", label: String(localized: "Redact"), shortcut: "X")
+            toolButton(tool: .crop, icon: "crop", label: String(localized: "Crop"), shortcut: "C")
+        }
+    }
+
+    private var colorsGroup: some View {
+        group {
+            ForEach(0..<PresetColors.all.count, id: \.self) { idx in
+                let name = idx < Self.colorNames.count ? Self.colorNames[idx] : String(localized: "Color \(idx + 1)")
+                colorSwatch(color: PresetColors.all[idx], name: name, shortcut: "\(idx + 1)")
+            }
+        }
+    }
+
+    private var strokesGroup: some View {
+        group {
+            strokeButton(width: 2.0, label: String(localized: "Thin"), shortcut: "[")
+            strokeButton(width: 4.0, label: String(localized: "Medium"), shortcut: nil)
+            strokeButton(width: 8.0, label: String(localized: "Thick"), shortcut: "]")
+        }
+    }
+
+    private var historyGroup: some View {
+        HStack(spacing: 2) {
+            iconButton("arrow.uturn.backward", label: String(localized: "Undo"), shortcut: "⌘Z", enabled: viewModel.commandStack.canUndo) {
+                viewModel.undo()
+            }
+            iconButton("arrow.uturn.forward", label: String(localized: "Redo"), shortcut: "⇧⌘Z", enabled: viewModel.commandStack.canRedo) {
+                viewModel.redo()
+            }
+        }
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 6) {
+            Button {
+                viewModel.saveToDisk(parentWindow: nil)
+            } label: {
+                Text("Save…")
+            }
+            .help("Save as PNG or JPEG (⌘S)")
+
+            Button {
+                viewModel.copyToClipboard()
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+                    .labelStyle(.titleAndIcon)
+            }
+            .buttonStyle(.borderedProminent)
+            .help("Copy the annotated image and close (⌘C)")
+        }
+        .controlSize(.regular)
     }
 
     /// A rounded well holding one group of choices.
@@ -115,6 +167,7 @@ public struct StylingToolbarView: View {
         .help("\(label) (\(shortcut))")
         .accessibilityLabel(label)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .onHover { caption.hover($0, "\(label) (\(shortcut))") }
     }
 
     private func colorSwatch(color: CGColor, name: String, shortcut: String) -> some View {
@@ -138,6 +191,7 @@ public struct StylingToolbarView: View {
         .help("\(name) (\(shortcut))")
         .accessibilityLabel(name)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .onHover { caption.hover($0, "\(name) (\(shortcut))") }
     }
 
     private func strokeButton(width: CGFloat, label: String, shortcut: String?) -> some View {
@@ -158,6 +212,7 @@ public struct StylingToolbarView: View {
         .help(helpText)
         .accessibilityLabel("\(label) line")
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .onHover { caption.hover($0, helpText) }
     }
 
     private func iconButton(_ symbol: String, label: String, shortcut: String, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -172,5 +227,23 @@ public struct StylingToolbarView: View {
         .disabled(!enabled)
         .help("\(label) (\(shortcut))")
         .accessibilityLabel(label)
+        .onHover { caption.hover($0, "\(label) (\(shortcut))") }
+    }
+}
+
+/// The caption above the toolbar: the name of the control the pointer is on, if any.
+@MainActor
+final class ToolbarCaption: ObservableObject {
+    @Published private(set) var text: String?
+    private var owner: String?
+
+    func hover(_ isInside: Bool, _ name: String) {
+        if isInside {
+            owner = name
+            text = name
+        } else if owner == name {
+            owner = nil
+            text = nil
+        }
     }
 }

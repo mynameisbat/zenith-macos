@@ -1,7 +1,7 @@
 import SwiftUI
 import ZenithCore
 
-/// A Command Hub line that appears only when Homebrew has packages to upgrade, and opens Settings → Homebrew.
+/// A Command Hub capsule that appears only when Homebrew has packages to upgrade, and opens Settings → Homebrew.
 /// It checks with `brew outdated` (read-only, fast) at most every few hours, and only if brew is installed.
 struct HomebrewHubRow: View {
     @ObservedObject private var model: HomebrewManagerModel = .shared
@@ -13,12 +13,11 @@ struct HomebrewHubRow: View {
     var body: some View {
         VStack(spacing: 0) {
             if model.brewPath != nil && !model.upgradable.isEmpty {
-                Divider().padding(.horizontal, 12)
                 Button(action: onOpen) {
                     HStack(spacing: 8) {
-                        ZenithIconTile(systemName: "shippingbox.fill", tint: HomebrewSettingsTab.tint, size: 20)
+                        ZenithIconTile(systemName: "shippingbox.fill", tint: HomebrewSettingsTab.tint, size: 22)
                         Text("Homebrew")
-                            .font(.system(size: 12.5))
+                            .font(.system(size: 13, weight: .semibold))
                         Spacer(minLength: 4)
                         Text(updatesText)
                             .font(.system(size: 11.5))
@@ -27,12 +26,14 @@ struct HomebrewHubRow: View {
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.tertiary)
                     }
-                    .contentShape(Rectangle())
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+                    .frame(height: 38)
+                    .hubCapsule()
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .help("Review and upgrade them in Settings → Homebrew")
+                .padding(.top, 10)
             }
         }
         .onAppear(perform: check)

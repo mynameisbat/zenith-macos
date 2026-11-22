@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import Foundation
 import PackageDescription
 
@@ -19,7 +19,7 @@ let testingMacroSettings: [SwiftSetting] =
 let package = Package(
     name: "Zenith",
     platforms: [
-        .macOS(.v15)
+        .macOS(.v26)
     ],
     products: [
         .library(

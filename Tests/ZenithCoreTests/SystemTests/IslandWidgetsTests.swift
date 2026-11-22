@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Combine
 @testable import ZenithCore
 
 /// A clock the tests move by hand.
@@ -207,6 +208,34 @@ struct IslandWidgetsTests {
         #expect(S.resolvedTab(active: .widgets, hasTrack: true, hasShelfItems: false, showsWidgets: true, isDropTargeted: true) == .shelf)
     }
 
+    @Test("IW-09b: The island opens on its final tab; a track or an agent arriving later does not change it")
+    func testOpeningPinsTheTab() {
+        let island = ZenithIslandState()
+        island.hoverOpenDelay = 0
+        island.showsAIAgentsTab = true
+
+        // Only the AI tab exists when it opens: it stays, though a track shows up while the island grows.
+        island.open()
+        #expect(island.activeTab == .aiAgents)
+        island.nowPlayingTrack = NowPlayingTrack(app: .spotify, title: "T", artist: "A", album: nil, duration: 100, position: 1, isPlaying: true)
+        #expect(island.currentTab == .aiAgents)
+        island.close()
+
+        // With both there when it opens, Now Playing is the tab from the first frame.
+        island.activeTab = .shelf
+        island.open()
+        #expect(island.activeTab == .nowPlaying)   // the track is there now: it is the first tab
+        island.close()
+
+        let both = ZenithIslandState()
+        both.showsAIAgentsTab = true
+        both.nowPlayingTrack = island.nowPlayingTrack
+        both.open()
+        #expect(both.activeTab == .nowPlaying)
+        both.nowPlayingTrack = nil
+        #expect(both.currentTab == .aiAgents)    // a tab that has gone still falls back
+    }
+
     @Test("IW-10: Widget settings are saved, clamped, and passed to the island")
     func testWidgetSettings() {
         let defaults = TestDefaults.make("IslandWidgetsTests_\(UUID().uuidString)")!
@@ -259,5 +288,35 @@ struct IslandWidgetsTests {
         #expect(reloaded.showNetwork)
         reloaded.resetToDefaults()
         #expect(!reloaded.showNetwork)
+    }
+
+    @Test("IW-12: The dock icon style is tinted by default, saved, restored, announced, and reset")
+    func testDockIconStyleSetting() {
+        let defaults = TestDefaults.make("IslandWidgetsTests_\(UUID().uuidString)")!
+        let settings = IslandWidgetSettings(userDefaults: defaults, island: ZenithIslandState())
+        #expect(settings.dockIconStyle == .tinted)
+        // Nothing is written until the user chooses.
+        #expect(defaults.object(forKey: IslandWidgetSettings.Keys.dockIconStyle) == nil)
+        #expect(IslandWidgetSettings.Keys.dockIconStyle == "zenith_island_dock_icon_style")
+
+        var announced = 0
+        let observation = settings.objectWillChange.sink { announced += 1 }
+        settings.dockIconStyle = .color
+        #expect(announced == 1)
+        #expect(defaults.string(forKey: IslandWidgetSettings.Keys.dockIconStyle) == "color")
+        observation.cancel()
+
+        let reloaded = IslandWidgetSettings(userDefaults: defaults, island: ZenithIslandState())
+        #expect(reloaded.dockIconStyle == .color)
+        reloaded.resetToDefaults()
+        #expect(reloaded.dockIconStyle == .tinted)
+        #expect(defaults.string(forKey: IslandWidgetSettings.Keys.dockIconStyle) == "tinted")
+
+        // A value this version does not know (a later one wrote it) falls back to the default.
+        defaults.set("holographic", forKey: IslandWidgetSettings.Keys.dockIconStyle)
+        #expect(IslandWidgetSettings(userDefaults: defaults, island: ZenithIslandState()).dockIconStyle == .tinted)
+
+        #expect(IslandDockIconStyle.allCases == [.tinted, .color])
+        #expect(IslandDockIconStyle.allCases.allSatisfy { !$0.title.isEmpty })
     }
 }

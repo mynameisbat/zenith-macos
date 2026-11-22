@@ -104,15 +104,10 @@ public final class SettingsWindow: NSWindow {
 public final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     public static let shared = SettingsWindowController()
 
-    public static let defaultWidth: CGFloat = 720
-    public static let defaultHeight: CGFloat = 540
+    public static let defaultWidth: CGFloat = 880
+    public static let defaultHeight: CGFloat = 620
 
     public var viewControllerProvider: (@MainActor () -> NSViewController)?
-
-    /// Asked first by `show()`. Returning true means the settings were shown somewhere else (the island's Settings
-    /// page), and the window stays closed. Every "open Settings" in the app goes through `show()`, so this one hook
-    /// moves them all.
-    public var presentationOverride: (@MainActor () -> Bool)?
 
     /// How long a closed Settings window keeps its content. Reopened within that time it comes back as it was; after
     /// it the SwiftUI view tree is let go and `show()` builds a new one. Measured: about 12 MB of allocations are freed,
@@ -134,7 +129,6 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
 
     /// Idempotently presents the Settings window, centering it and activating Zenith.
     public func show() {
-        if let presentationOverride, presentationOverride() { return }
         contentReleaseWork?.cancel()
         contentReleaseWork = nil
         let win = window ?? createWindow()
@@ -167,7 +161,7 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
         }
     }
 
-    /// Creates and configures the fixed 720x540 non-resizable settings window.
+    /// Creates and configures the fixed 880x620 non-resizable settings window.
     @discardableResult
     public func createWindow() -> NSWindow {
         if let existing = window {

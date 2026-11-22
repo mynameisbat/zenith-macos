@@ -40,13 +40,16 @@ public struct AnnotationEditorView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                Color.clear.frame(height: EditorWindowGeometryCalculator.toolbarReserve)
+                Color.clear.frame(height: EditorWindowGeometryCalculator.toolbarReserve(forCanvasWidth: viewModel.canvasSize.width))
             }
 
             // 4. Floating Styling Toolbar
             VStack {
                 Spacer()
-                StylingToolbarView(viewModel: viewModel)
+                StylingToolbarView(
+                    viewModel: viewModel,
+                    isCompact: EditorWindowGeometryCalculator.usesCompactToolbar(canvasWidth: viewModel.canvasSize.width)
+                )
                     .padding(.bottom, 20)
             }
         }
