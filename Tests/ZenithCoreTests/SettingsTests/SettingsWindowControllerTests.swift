@@ -100,12 +100,12 @@ struct SettingsWindowControllerTests {
         let controller = SettingsWindowController()
         let window = controller.createWindow()
 
-        #expect(window.frame.width == 720)
-        #expect(window.frame.height == 540)         // tall enough for the General tab without scrolling
-        #expect(window.minSize.width == 720)
-        #expect(window.minSize.height == 540)
-        #expect(window.maxSize.width == 720)
-        #expect(window.maxSize.height == 540)
+        #expect(window.frame.width == 880)
+        #expect(window.frame.height == 620)         // tall enough for the General tab without scrolling
+        #expect(window.minSize.width == 880)
+        #expect(window.minSize.height == 620)
+        #expect(window.maxSize.width == 880)
+        #expect(window.maxSize.height == 620)
 
         controller.dismiss()
     }

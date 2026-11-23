@@ -102,6 +102,12 @@ public final class AnnotationWindowController: NSObject, NSWindowDelegate, Annot
         editorWindow.level = .floating
         editorWindow.collectionBehavior = [.fullScreenAuxiliary, .participatesInCycle]
         editorWindow.contentView = hostingView
+        // Smaller than the toolbar needs would clip it.
+        editorWindow.contentMinSize = NSSize(
+            width: EditorWindowGeometryCalculator.usesCompactToolbar(canvasWidth: geometry.canvasSize.width)
+                ? EditorWindowGeometryCalculator.compactToolbarWidth : EditorWindowGeometryCalculator.toolbarWidth,
+            height: EditorWindowGeometryCalculator.compactMinimumHeight
+        )
         editorWindow.delegate = self
         editorWindow.eventDelegate = self
 
@@ -264,13 +270,11 @@ public final class AnnotationWindowController: NSObject, NSWindowDelegate, Annot
     public static func calculateWindowGeometry(for image: CGImage, on screen: NSScreen? = nil) -> WindowGeometry {
         let visibleFrame = screen?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1920, height: 1080)
         let scale = screen?.backingScaleFactor ?? 2.0
-        let geom = EditorWindowGeometryCalculator.calculate(
+        let geom = EditorWindowGeometryCalculator.calculateForEditor(
             imageWidth: image.width,
             imageHeight: image.height,
             displayVisibleFrame: visibleFrame,
-            backingScaleFactor: scale,
-            toolbarReserve: EditorWindowGeometryCalculator.toolbarReserve,
-            minimumWidth: EditorWindowGeometryCalculator.toolbarWidth
+            backingScaleFactor: scale
         )
         return WindowGeometry(
             windowFrame: geom.windowFrame,

@@ -11,7 +11,7 @@ struct IslandToolsTests {
 
     // MARK: Tools
 
-    @Test("IT-01: Every tool is in exactly one place, named in full, and every hub action and page can be reached")
+    @Test("IT-01: Every tool is in exactly one place, named in full, and every hub action and island page can be reached")
     func testToolCatalogue() {
         let grouped = IslandTool.groups.flatMap(\.tools)
         #expect(Set(grouped).count == grouped.count, "a tool is in two groups")
@@ -23,17 +23,26 @@ struct IslandToolsTests {
         #expect(Set(grouped.compactMap(\.hubAction)) == Set(ZenithHubAction.allCases))
         let reachable = Set(grouped.compactMap(\.page)).union([IslandTool.settings.page, IslandTool.allTools.page].compactMap { $0 })
         #expect(reachable == Set(IslandPage.allCases))
+        // Only System and Tools are pages of the island; the big ones are the Settings window's.
+        #expect(Set(IslandPage.allCases) == [.system, .tools])
 
         for tool in IslandTool.allCases {
             #expect(!tool.title.isEmpty && !tool.detail.isEmpty && !tool.icon.isEmpty)
-            // An action, a page, a switch or Quit: never two of them.
-            let roles = [tool.hubAction != nil, tool.page != nil, tool.isToggle].filter { $0 }.count
+            // An action, a page, the Settings window, a switch or Quit: never two of them.
+            let roles = [tool.hubAction != nil, tool.page != nil, tool.opensSettingsWindow, tool.isToggle].filter { $0 }.count
             #expect(roles <= 1, "\(tool.rawValue) has \(roles) roles")
             #expect(tool.hotKeyId == tool.hubAction?.hotKeyId)
         }
         // The names are the full ones, not abbreviations.
         #expect(IslandTool.area.title == ZenithHubAction.area.title)
-        #expect(IslandTool.uninstall.page == .cleaner)
+        // The pages that are too wide for the island open the Settings window, not an island page.
+        for tool in [IslandTool.uninstall, .cleaner, .ports, .homebrew, .settings] {
+            #expect(tool.opensSettingsWindow && tool.page == nil, "\(tool.rawValue)")
+        }
+        for tool in [IslandTool.system, .allTools] {
+            #expect(tool.page != nil && !tool.opensSettingsWindow, "\(tool.rawValue)")
+        }
+        #expect(IslandTool.allCases.filter(\.opensSettingsWindow).count == 5)
         #expect(IslandTool.privacyShield.isToggle && IslandTool.keepAwake.isToggle && !IslandTool.clean.isToggle)
     }
 
@@ -118,11 +127,11 @@ struct IslandToolsTests {
         ZenithIslandGeometry(screenFrame: CGRect(x: 0, y: 0, width: width, height: height), notch: nil)
     }
 
-    @Test("IT-06: The open island is 380 × 96, taller by the dock, and a page gets its own size under the top edge")
+    @Test("IT-06: The open island is 380 × 130, taller by the dock, and a page is no wider than it, under the top edge")
     func testExpandedSizes() {
         let plain = geometry()
-        #expect(plain.expandedSize(page: nil, showsDock: false) == CGSize(width: 380, height: 96))
-        #expect(plain.expandedSize(page: nil, showsDock: true) == CGSize(width: 380, height: 96 + ZenithIslandGeometry.dockHeight))
+        #expect(plain.expandedSize(page: nil, showsDock: false) == CGSize(width: 380, height: 130))
+        #expect(plain.expandedSize(page: nil, showsDock: true) == CGSize(width: 380, height: 130 + ZenithIslandGeometry.dockHeight))
 
         for page in IslandPage.allCases {
             let size = plain.expandedSize(page: page, showsDock: true)
@@ -130,13 +139,22 @@ struct IslandToolsTests {
             #expect(size.height == page.contentSize.height + plain.pageHeaderHeight)
             // A page has no dock, so the switch does not change its size.
             #expect(plain.expandedSize(page: page, showsDock: false) == size)
-            // Wide enough for a back button on one side of a notch and the title and close button on the other.
-            #expect(size.width >= 420)
+            // Never wider than the island, so it does not cover the menu bar's status items.
+            #expect(size.width <= plain.expandedWidth && size.width == 380)
 
             let frame = plain.expandedFrame(page: page, showsDock: true)
             #expect(frame.midX == plain.notchRect.midX)
             #expect(frame.maxY == plain.screenFrame.maxY)
             #expect(plain.canvasFrame(page: page) == frame)
+        }
+        // On a 13-inch display (1372 pt, the notch's centre at 686) the open island and its pages span 496 to 876.
+        let thirteen = ZenithIslandGeometry(
+            screenFrame: CGRect(x: 0, y: 0, width: 1372, height: 890),
+            notch: CGRect(x: 593, y: 858, width: 186, height: 32)
+        )
+        for page in [nil] + IslandPage.allCases.map(Optional.some) {
+            let frame = thirteen.expandedFrame(page: page, showsDock: true)
+            #expect(frame.minX == 496 && frame.maxX == 876)
         }
         // With no page the window is as large as the island with its dock, and no larger.
         #expect(plain.canvasFrame(page: nil).size == plain.expandedSize(page: nil, showsDock: true))
@@ -149,6 +167,78 @@ struct IslandToolsTests {
         let expectedHeader: CGFloat = 36
         #expect(notched.pageHeaderHeight == expectedHeader)
         #expect(notched.hasNotch)
+    }
+
+    @Test("IT-06b: The tabs, the card and the room under it fit the open island, beside any notch or none")
+    func testTabsAndCardFit() {
+        let none = geometry()
+        #expect(none.tabStripHeight + ZenithIslandGeometry.cardHeight + ZenithIslandGeometry.cardBottomGap <= none.expandedHeight)
+        for notchHeight: CGFloat in [32, 37, 44] {
+            let notched = ZenithIslandGeometry(
+                screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+                notch: CGRect(x: 663, y: 982 - notchHeight, width: 186, height: notchHeight)
+            )
+            // The strip of tabs is the notch's own row, and the card starts under it.
+            #expect(notched.tabStripHeight == notchHeight)
+            #expect(notched.tabStripHeight + ZenithIslandGeometry.cardHeight + ZenithIslandGeometry.cardBottomGap <= notched.expandedHeight)
+            // Either side of the notch is room for a capsule of two 26 pt pills, `tabEdgeInset` in from the edge, and a gap to
+            // the notch (a notch up to 200 pt wide).
+            let room = (notched.expandedWidth - notched.notchRect.width) / 2
+            #expect(room >= ZenithIslandGeometry.tabEdgeInset + ZenithIslandGeometry.tabCapsuleWidth(pills: ZenithIslandGeometry.tabPillsPerSide) + 4)
+        }
+        // The tray of tools needs the dock's height for its caption, its tray (the icons and 5 pt above and below) and the room below it.
+        #expect(ZenithIslandGeometry.dockHeight >= 11 + 3 + (ZenithIslandGeometry.dockIconSize + 10) + 6)
+        // Narrow: it must not cover the status items on the right of a 13-inch menu bar (on 1372 pt the island spans
+        // 496 to 876 and clears them in normal use).
+        #expect(ZenithIslandGeometry.expandedWidth == 380)
+        #expect(ZenithIslandGeometry.expandedHeight + ZenithIslandGeometry.dockHeight <= 200)
+    }
+
+    @Test("IT-06d: Every pinned tool, All Tools and the rule fit the dock's tray in the 380 pt island")
+    func testFullDockFits() {
+        // `maxPinned` tools and All Tools.
+        let icons = IslandDockLayout.maxPinned + 1
+        #expect(ZenithIslandGeometry.dockRowWidth(icons: icons) <= ZenithIslandGeometry.dockRowRoom)
+        #expect(ZenithIslandGeometry.dockRowWidth(icons: 1) == ZenithIslandGeometry.dockIconSize)
+        #expect(ZenithIslandGeometry.dockRowWidth(icons: 0) == 0)
+        // One more would not.
+        #expect(ZenithIslandGeometry.dockRowWidth(icons: icons + 1) > ZenithIslandGeometry.dockRowRoom)
+    }
+
+    @Test("IT-06e: Beside a notch the tabs are shared between its two sides, two pills each; without one the shelf is on the right")
+    func testTabStripLayout() {
+        typealias Tab = IslandExpandedTab
+        func notched(_ tabs: [Tab]) -> IslandTabStrip { IslandTabStrip.layout(tabs: tabs, hasNotch: true) }
+        func plain(_ tabs: [Tab]) -> IslandTabStrip { IslandTabStrip.layout(tabs: tabs, hasNotch: false) }
+
+        #expect(notched([.nowPlaying, .widgets, .aiAgents, .shelf]) == IslandTabStrip(left: [.nowPlaying, .widgets], right: [.aiAgents, .shelf]))
+        #expect(notched([.nowPlaying, .widgets, .aiAgents]) == IslandTabStrip(left: [.nowPlaying, .widgets], right: [.aiAgents]))
+        #expect(notched([.widgets, .shelf]) == IslandTabStrip(left: [.widgets], right: [.shelf]))
+        #expect(notched([.nowPlaying, .widgets]) == IslandTabStrip(left: [.nowPlaying, .widgets], right: []))
+        #expect(notched([.aiAgents, .shelf]) == IslandTabStrip(left: [.aiAgents], right: [.shelf]))
+        #expect(plain([.nowPlaying, .widgets, .aiAgents, .shelf]) == IslandTabStrip(left: [.nowPlaying, .widgets, .aiAgents], right: [.shelf]))
+
+        // Whatever the tabs, no side has more pills than fit beside a notch, and every tab appears once.
+        let all: [Tab] = [.nowPlaying, .widgets, .aiAgents, .shelf]
+        for mask in 0..<16 {
+            let tabs = all.enumerated().filter { mask & (1 << $0.offset) != 0 }.map(\.element)
+            let strip = notched(tabs)
+            #expect(strip.left.count <= ZenithIslandGeometry.tabPillsPerSide)
+            #expect(strip.right.count <= ZenithIslandGeometry.tabPillsPerSide)
+            #expect(strip.left + strip.right == tabs)
+        }
+    }
+
+    @Test("IT-06c: The Tools page is as wide as the island, and four groups of four tiles fit it")
+    func testToolsPageIsCompact() {
+        #expect(IslandPage.tools.contentSize.width == ZenithIslandGeometry.expandedWidth)
+        #expect(IslandPage.system.contentSize.width == ZenithIslandGeometry.expandedWidth)
+        // Four tiles to a row and a dock strip under the groups, nothing taller than a display can show.
+        #expect(IslandPage.tools.contentSize.height <= 480)
+        #expect(IslandTool.groups.allSatisfy { $0.tools.count <= 4 })
+        // A page asking for more is held to the island's width.
+        let geometry = geometry()
+        #expect(geometry.pageContentSize(for: .tools).width == 380)
     }
 
     @Test("IT-07: A page never outgrows a small display")
@@ -172,8 +262,8 @@ struct IslandToolsTests {
         #expect(island.page == nil)
         #expect(island.showsNotices)
 
-        island.openPage(.cleaner)
-        #expect(island.page == .cleaner)
+        island.openPage(.system)
+        #expect(island.page == .system)
         #expect(island.backPage == nil)
         #expect(island.isExpanded)
         #expect(!island.showsNotices)
@@ -181,7 +271,7 @@ struct IslandToolsTests {
         // The pointer goes away (to a confirmation, to another window): the page is still there afterwards.
         island.onMouseLeave()
         try? await Task.sleep(nanoseconds: 450_000_000)
-        #expect(island.isExpanded && island.page == .cleaner)
+        #expect(island.isExpanded && island.page == .system)
 
         // A notice does not take the page's place.
         island.triggerAlert(icon: "sparkles", title: "Freed 1 GB")
@@ -194,7 +284,7 @@ struct IslandToolsTests {
         #expect(!island.isExpanded)
 
         // Closing the island closes the page with it.
-        island.openPage(.settings)
+        island.openPage(.tools)
         island.close()
         #expect(!island.isExpanded && island.page == nil)
     }
@@ -205,8 +295,11 @@ struct IslandToolsTests {
         island.openPage(.tools)
         #expect(island.page == .tools && island.backPage == nil)
 
-        island.openPage(.ports)
-        #expect(island.page == .ports && island.backPage == .tools)
+        island.openPage(.system)
+        #expect(island.page == .system && island.backPage == .tools)
+        // Opening the page that is already showing changes nothing.
+        island.openPage(.system)
+        #expect(island.page == .system && island.backPage == .tools)
 
         island.closePage()
         #expect(island.page == .tools && island.backPage == nil)
@@ -216,17 +309,8 @@ struct IslandToolsTests {
         #expect(island.page == nil)
 
         // Opened straight from the dock, a page goes back to the island, not through the Tools page.
-        island.openPage(.cleaner)
-        #expect(island.backPage == nil)
-        // A page opened from another page (Ports from System) goes back to that page, and opening the page that
-        // is already showing changes nothing.
         island.openPage(.system)
-        #expect(island.backPage == .cleaner)
-        island.openPage(.ports)
-        island.openPage(.ports)
-        #expect(island.page == .ports && island.backPage == .system)
-        island.closePage()
-        #expect(island.page == .system && island.backPage == nil)
+        #expect(island.backPage == nil)
         island.closePage()
         #expect(island.page == nil)
         // Closing everything forgets where back would have led.
@@ -244,15 +328,15 @@ struct IslandToolsTests {
         island.setHiddenForFullscreen(true)
         #expect(island.page == nil && island.backPage == nil && !island.isExpanded)
 
-        island.openPage(.ports)
+        island.openPage(.system)
         #expect(island.page == nil && !island.isExpanded)
 
         island.setHiddenForFullscreen(false)
-        island.openPage(.ports)
-        #expect(island.page == .ports)
+        island.openPage(.system)
+        #expect(island.page == .system)
     }
 
-    // MARK: Menu bar icon and Settings
+    // MARK: Menu bar icon
 
     @Test("IT-11: The menu bar icon is off by default and comes back when asked for or when the island has no tools")
     func testMenuBarIconRule() {
@@ -274,20 +358,6 @@ struct IslandToolsTests {
         #expect(reloaded.showMenuBarIcon)
         reloaded.resetToDefaults()
         #expect(!reloaded.showMenuBarIcon && !reloaded.needsMenuBarIcon)
-    }
-
-    @Test("IT-12: Showing the settings asks the override first and opens no window when it takes over")
-    func testSettingsPresentationOverride() {
-        let controller = SettingsWindowController()
-        var asked = 0
-        controller.presentationOverride = {
-            asked += 1
-            return true
-        }
-        controller.show()
-        #expect(asked == 1)
-        #expect(controller.window == nil)
-        #expect(!controller.isVisible)
     }
 
     @Test("IT-16: Turning Keep Awake on from the island offers the preset times, then until turned off")

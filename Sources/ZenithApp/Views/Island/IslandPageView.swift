@@ -2,11 +2,12 @@ import SwiftUI
 import AppKit
 import ZenithCore
 
-/// A page of the island: a strip with the way back, the page's name and a close button, and below it one of
-/// Zenith's tools, drawn where it used to have a window.
+/// A page of the island: a strip with the way back, the page's name and a close button, and below it one of Zenith's
+/// tools, drawn where it used to have a window. Only the two that fit the island's 380 pt are pages (System and
+/// Tools); the others open Zenith's Settings window.
 ///
-/// The tools are the same views the Command Hub and the Settings window show. The island's window is dark
-/// (`ZenithIslandPanel` sets the appearance), so they arrive in their dark look on the island's black.
+/// The tools are the same views the Command Hub shows. The island's window is dark (`ZenithIslandPanel` sets the
+/// appearance), so they arrive in their dark look on the island's black.
 struct IslandPageView: View {
     let page: IslandPage
     let geometry: ZenithIslandGeometry
@@ -22,119 +23,75 @@ struct IslandPageView: View {
                 .clipped()
         }
         .onExitCommand { islandState.close() }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text(verbatim: title))
+    }
+
+    private var title: String {
+        page == .tools ? IslandTool.allTools.title : page.title
     }
 
     // MARK: Header
 
-    /// Beside a notch the back button has the strip on its left and the page's name and the close button the strip on
-    /// its right, like the tabs; without one they share a row.
+    /// The way back and the page's name on the left, the close button on the right. Beside a notch each side has
+    /// about 97 pt: the back button and the close button fill it, and the name is left to VoiceOver (the page itself
+    /// says what it is). The Tools page's "Edit Dock", Settings and Quit are in its dock strip at the bottom.
     private var header: some View {
         HStack(spacing: 0) {
-            backButton
-            if geometry.hasNotch {
-                Spacer(minLength: 0)
-                HStack(spacing: 6) {
-                    titleLabel
-                    appButtons
-                    closeButton
-                }
-                .frame(width: sideStripWidth, alignment: .trailing)
-            } else {
-                titleLabel.padding(.leading, 8)
-                Spacer(minLength: 8)
-                appButtons.padding(.trailing, 6)
-                closeButton
+            HStack(spacing: 8) {
+                backButton
+                if !geometry.hasNotch { titleLabel }
             }
+            Spacer(minLength: geometry.hasNotch ? geometry.notchRect.width + 16 : 8)
+            closeButton
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
     }
 
-    /// The room either side of the notch, inside the header's padding.
-    private var sideStripWidth: CGFloat {
-        max(0, (geometry.pageContentSize(for: page).width - geometry.notchRect.width) / 2 - 10 - 4)
-    }
-
-    /// Back one step. It names the page it leads to; when it leads to the island as it opens, an arrow says that
-    /// well enough.
+    /// Back one step. When it leads to another page, its tooltip names it.
     private var backButton: some View {
         Button {
             islandState.closePage()
         } label: {
-            HStack(spacing: 3) {
+            headerCircle {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 9, weight: .bold))
-                if let previous = islandState.backPage {
-                    Text(verbatim: previous.title)
-                        .font(.system(size: 10, weight: .semibold))
-                        .lineLimit(1)
-                }
+                    .font(.system(size: 13, weight: .semibold))
             }
-            .foregroundColor(.white.opacity(0.78))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .frame(minWidth: 22, minHeight: 18)
-            .background(Capsule().fill(Color.white.opacity(0.1)))
-            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help("Back")
+        .help(islandState.backPage.map { String(localized: "Back to \($0.title)") } ?? String(localized: "Back"))
         .accessibilityLabel("Back")
     }
 
     private var titleLabel: some View {
-        HStack(spacing: 4) {
-            Image(systemName: page.icon)
-                .font(.system(size: 9.5, weight: .semibold))
-                .accessibilityHidden(true)  // VoiceOver read the symbol's name ("Grid 2x2") as a heading
-            Text(verbatim: page.title)
-                .font(.system(size: 10.5, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .foregroundColor(.white)
-        .accessibilityAddTraits(.isHeader)
-    }
-
-    /// Settings and Quit, on the Tools page only, and apart from the tools on purpose: small, in the corner, where
-    /// nobody reaching for a tool lands on Quit.
-    @ViewBuilder
-    private var appButtons: some View {
-        if page == .tools {
-            headerIconButton(.settings)
-            headerIconButton(.quit)
-        }
-    }
-
-    private func headerIconButton(_ tool: IslandTool) -> some View {
-        Button {
-            IslandToolStyle.activate(tool, islandState: islandState)
-        } label: {
-            Image(systemName: tool.icon)
-                .font(.system(size: 9.5, weight: .semibold))
-                .foregroundColor(.white.opacity(0.78))
-                .frame(width: 18, height: 18)
-                .background(Circle().fill(Color.white.opacity(0.1)))
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .help(tool.title)
-        .accessibilityLabel(Text(verbatim: tool.title))
+        Text(verbatim: title)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(.white)
+            .lineLimit(1)
+            .accessibilityAddTraits(.isHeader)
     }
 
     private var closeButton: some View {
         Button {
             islandState.close()
         } label: {
-            Image(systemName: "xmark")
-                .font(.system(size: 8.5, weight: .bold))
-                .foregroundColor(.white.opacity(0.78))
-                .frame(width: 18, height: 18)
-                .background(Circle().fill(Color.white.opacity(0.1)))
-                .contentShape(Circle())
+            headerCircle {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+            }
         }
         .buttonStyle(.plain)
         .help("Close")
         .accessibilityLabel("Close")
+    }
+
+    /// A 28 pt circle with a faint light fill, for a glyph.
+    private func headerCircle<Glyph: View>(@ViewBuilder _ glyph: () -> Glyph) -> some View {
+        glyph()
+            .foregroundColor(.white.opacity(0.85))
+            .frame(width: 28, height: 28)
+            .background(Circle().fill(Color.white.opacity(0.09)))
+            .contentShape(Circle())
     }
 
     // MARK: Content
@@ -144,14 +101,6 @@ struct IslandPageView: View {
         switch page {
         case .system:
             IslandSystemPage(islandState: islandState)
-        case .cleaner:
-            CleanerSettingsTab()
-        case .ports:
-            PortsSettingsTab()
-        case .homebrew:
-            HomebrewSettingsTab()
-        case .settings:
-            IslandSettingsPage()
         case .tools:
             IslandAllToolsPage(islandState: islandState)
         }
@@ -173,9 +122,8 @@ struct IslandSystemPage: View {
                 onFullscreenCapture: { islandState.close(); ZenithToolActions.captureScreen() },
                 onScreenOCR: { islandState.close(); ScreenOCRCoordinator.shared.startAreaOCR() },
                 onOpenClipboard: { islandState.close(); ClipboardPanelController.shared.show() },
-                onOpenPreferences: { islandState.openPage(.settings) },
+                onOpenPreferences: { islandState.close(); ZenithToolActions.openSettings() },
                 onQuit: { ZenithToolActions.quit() },
-                // The hub closes itself before it opens something else; here that something is the next page.
                 onClose: {},
                 inIsland: true
             )
@@ -189,15 +137,5 @@ struct IslandSystemPage: View {
                 try? await Task.sleep(nanoseconds: 2_500_000_000)
             }
         }
-    }
-}
-
-/// Zenith's settings, in the island. The chosen pane lives here, so it survives the island redrawing itself (which
-/// it does on every hover).
-struct IslandSettingsPage: View {
-    @StateObject private var viewModel = SettingsViewModel()
-
-    var body: some View {
-        ZenithPreferencesView(viewModel: viewModel, inIsland: true)
     }
 }

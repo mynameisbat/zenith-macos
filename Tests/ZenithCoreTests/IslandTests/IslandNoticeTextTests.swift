@@ -29,8 +29,23 @@ struct IslandNoticeTextTests {
 
     @Test("NOTICE-04: The Boost notices fit on one line")
     func boostFits() {
-        for result in [BoostResult(flushedDNS: true), BoostResult(flushedDNS: false)] {
+        for result in [
+            BoostResult(flushedDNS: true), BoostResult(flushedDNS: false),
+            BoostResult(flushedDNS: true, releasedBytes: 128_400_000), BoostResult(flushedDNS: false, releasedBytes: 1_250_000_000)
+        ] {
             #expect(result.message.count <= IslandNoticeText.titleLimit + 4, "\(result.message)")
         }
+    }
+
+    @Test("NOTICE-05: The Boost notice says what happened: released memory only when measured, DNS only when flushed")
+    func boostIsHonest() {
+        #expect(BoostResult(flushedDNS: false).message.contains("DNS flush needs admin"))
+        #expect(!BoostResult(flushedDNS: false).message.contains("flushed"))
+        #expect(BoostResult(flushedDNS: true).message.contains("DNS flushed"))
+        // Noise below a megabyte is not announced as a gain.
+        #expect(BoostResult(flushedDNS: true, releasedBytes: 400_000) == BoostResult(flushedDNS: true, releasedBytes: 400_000))
+        #expect(!BoostResult(flushedDNS: true, releasedBytes: 400_000).message.contains("released"))
+        #expect(BoostResult(flushedDNS: false, releasedBytes: 50_000_000).message.contains("released"))
+        #expect(BoostResult.currentFootprint() > 0)
     }
 }

@@ -4,8 +4,8 @@ import ZenithCore
 
 // MARK: - Closed-island wings
 //
-// The disc and the equalizer move for as long as a track plays, so their motion is handed to Core Animation: each is
-// one set of layer animations that the render server runs. No timer or Task loop ticks and no SwiftUI body is
+// The equalizer moves for as long as a track plays, so its motion is handed to Core Animation: it is one set of layer
+// animations that the render server runs. No timer or Task loop ticks and no SwiftUI body is
 // evaluated per frame; the SwiftUI views below only start or stop the animations when the playing state changes.
 
 /// Runs layer changes without Core Animation's implicit 0.25 s animations, which standalone sublayers have.
@@ -78,19 +78,16 @@ class IslandWingLayerView: NSView {
     }
 }
 
-/// The vinyl disc: an 18 pt groove, the artwork (or the app's symbol) in a 14 pt circle and a spindle hole. The whole
-/// disc layer turns with one repeating rotation animation; pausing reads where it is and leaves it there.
+/// The closed island's picture of what plays: the artwork (or the app's symbol on a faint tile) in a 22 pt tile with
+/// rounded corners. It is still: a track that plays is told by the equalizer on the other side.
 @MainActor
-final class SpinningDiscLayerView: IslandWingLayerView {
-    static let side: CGFloat = 18
-    /// 60° a second, the speed the old 20 Hz timer turned it at (3° every 50 ms).
-    private static let secondsPerTurn: CFTimeInterval = 6
-    private static let spinKey = "zenith.spin"
+final class ArtworkThumbnailLayerView: IslandWingLayerView {
+    static let side: CGFloat = 22
+    static let cornerRadius: CGFloat = 6
 
-    private let disc = CALayer()
+    private let tile = CALayer()
     private let art = CALayer()
     private let icon = CALayer()
-    private var restAngle: CGFloat = 0
     private var shownArtwork: NSImage?
     private var shownIconName: String?
     private var shownTint: Color?
@@ -98,37 +95,27 @@ final class SpinningDiscLayerView: IslandWingLayerView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         let side = Self.side
-        disc.bounds = CGRect(x: 0, y: 0, width: side, height: side)
+        tile.bounds = CGRect(x: 0, y: 0, width: side, height: side)
+        tile.cornerRadius = Self.cornerRadius
+        tile.cornerCurve = .continuous
+        tile.masksToBounds = true
+        tile.backgroundColor = NSColor(white: 1, alpha: 0.1).cgColor
+        tile.borderWidth = 0.5
+        tile.borderColor = NSColor(white: 1, alpha: 0.15).cgColor
 
-        let groove = CAShapeLayer()
-        groove.frame = disc.bounds
-        groove.path = CGPath(ellipseIn: disc.bounds, transform: nil)
-        groove.fillColor = NSColor(white: 0.12, alpha: 1).cgColor
-        groove.strokeColor = NSColor(white: 1, alpha: 0.15).cgColor
-        groove.lineWidth = 0.5
-
-        art.frame = CGRect(x: 2, y: 2, width: 14, height: 14)
-        art.cornerRadius = 7
-        art.masksToBounds = true
+        art.frame = tile.bounds
         art.contentsGravity = .resizeAspectFill
-
         icon.contentsGravity = .resizeAspect
 
-        let spindle = CAShapeLayer()
-        let hole = CGRect(x: (side - 3.5) / 2, y: (side - 3.5) / 2, width: 3.5, height: 3.5)
-        spindle.path = CGPath(ellipseIn: hole, transform: nil)
-        spindle.fillColor = NSColor.black.cgColor
-        spindle.frame = disc.bounds
-
-        [groove, art, icon, spindle].forEach(disc.addSublayer)
-        layer?.addSublayer(disc)
+        [art, icon].forEach(tile.addSublayer)
+        layer?.addSublayer(tile)
     }
 
     override var intrinsicContentSize: NSSize { NSSize(width: Self.side, height: Self.side) }
 
     override func layout() {
         super.layout()
-        withoutLayerActions { disc.position = CGPoint(x: bounds.midX, y: bounds.midY) }
+        withoutLayerActions { tile.position = CGPoint(x: bounds.midX, y: bounds.midY) }
     }
 
     /// Shows the artwork, or the app's symbol in its colour when there is none. Does nothing when neither changed.
@@ -159,43 +146,10 @@ final class SpinningDiscLayerView: IslandWingLayerView {
         }
     }
 
-    override func updateMotion() {
-        if shouldMove { startSpinning() } else { stopSpinning() }
-    }
-
-    override func tearDown() {
-        super.tearDown()
-        disc.removeAllAnimations()
-    }
-
-    private func startSpinning() {
-        guard disc.animation(forKey: Self.spinKey) == nil else { return }
-        let spin = CABasicAnimation(keyPath: "transform.rotation.z")
-        spin.fromValue = NSNumber(value: Double(restAngle))
-        // Clockwise, as SwiftUI's positive `rotationEffect` turned it (a layer's positive angle is anticlockwise).
-        spin.toValue = NSNumber(value: Double(restAngle - 2 * .pi))
-        spin.duration = Self.secondsPerTurn
-        spin.repeatCount = .infinity
-        spin.timingFunction = CAMediaTimingFunction(name: .linear)
-        disc.add(spin, forKey: Self.spinKey)
-    }
-
-    /// Leaves the disc at the angle it had reached, so resuming continues from there.
-    private func stopSpinning() {
-        guard disc.animation(forKey: Self.spinKey) != nil else { return }
-        if let angle = disc.presentation()?.value(forKeyPath: "transform.rotation.z") as? NSNumber {
-            restAngle = CGFloat(angle.doubleValue)
-        }
-        withoutLayerActions {
-            disc.transform = CATransform3DMakeRotation(restAngle, 0, 0, 1)
-            disc.removeAnimation(forKey: Self.spinKey)
-        }
-    }
-
-    /// The symbol at 8 pt bold, filled with `color` (a symbol image is a template and would draw black in a layer).
+    /// The symbol at 11 pt bold, filled with `color` (a symbol image is a template and would draw black in a layer).
     private static func tintedSymbol(_ name: String, color: NSColor) -> NSImage? {
         guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 8, weight: .bold)) else { return nil }
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 11, weight: .bold)) else { return nil }
         let tinted = NSImage(size: symbol.size)
         tinted.lockFocus()
         let rect = NSRect(origin: .zero, size: symbol.size)
@@ -335,24 +289,23 @@ private struct EqualizerWing: NSViewRepresentable {
     }
 }
 
-private struct DiscWing: NSViewRepresentable {
+private struct ThumbnailWing: NSViewRepresentable {
     let track: NowPlayingTrack
 
-    func makeNSView(context: Context) -> SpinningDiscLayerView {
-        let side = SpinningDiscLayerView.side
-        return SpinningDiscLayerView(frame: NSRect(x: 0, y: 0, width: side, height: side))
+    func makeNSView(context: Context) -> ArtworkThumbnailLayerView {
+        let side = ArtworkThumbnailLayerView.side
+        return ArtworkThumbnailLayerView(frame: NSRect(x: 0, y: 0, width: side, height: side))
     }
 
-    func updateNSView(_ view: SpinningDiscLayerView, context: Context) {
+    func updateNSView(_ view: ArtworkThumbnailLayerView, context: Context) {
         view.show(
             artwork: track.artworkData.flatMap { IslandArtwork.image(for: $0) },
             iconName: track.app.iconName,
             tint: track.app.brandColor
         )
-        view.isPlaying = track.isPlaying
     }
 
-    static func dismantleNSView(_ view: SpinningDiscLayerView, coordinator: ()) {
+    static func dismantleNSView(_ view: ArtworkThumbnailLayerView, coordinator: ()) {
         view.tearDown()
     }
 }
@@ -373,7 +326,7 @@ public struct NowPlayingVisualizerView: View {
     }
 }
 
-/// Compact vinyl disc / album artwork shown on the left wing of the Dynamic Island.
+/// Album artwork (or the app's symbol), in a small rounded tile, shown on the left wing of the Dynamic Island.
 public struct NowPlayingCompactDiscView: View {
     public let track: NowPlayingTrack
 
@@ -382,13 +335,18 @@ public struct NowPlayingCompactDiscView: View {
     }
 
     public var body: some View {
-        DiscWing(track: track)
-            .frame(width: SpinningDiscLayerView.side, height: SpinningDiscLayerView.side)
+        ThumbnailWing(track: track)
+            .frame(width: ArtworkThumbnailLayerView.side, height: ArtworkThumbnailLayerView.side)
     }
 }
 
 // MARK: - Expanded Media Player View
 
+/// The Now Playing card: a rounded card tinted with the colour of the cover at 10 %, the cover with a soft glow of its
+/// own colours behind it, and beside it the title, the player, the progress bar and the controls.
+///
+/// The colour and the glow come from `IslandArtwork.palette(for:)`, worked out once per cover; this view is
+/// re-evaluated about once a second while a track plays and only looks them up.
 public struct NowPlayingExpandedView: View {
     public let track: NowPlayingTrack
     public var onPrevious: () -> Void
@@ -397,6 +355,8 @@ public struct NowPlayingExpandedView: View {
     public var onSeek: (TimeInterval) -> Void
 
     @StateObject private var scrub = ScrubState()
+
+    static let artworkSide: CGFloat = 60
 
     public init(
         track: NowPlayingTrack,
@@ -421,139 +381,162 @@ public struct NowPlayingExpandedView: View {
         track.canSeek && track.duration > 0
     }
 
-    /// The island panel is 96 pt high and the top of a notched display's hardware notch hides the first ~32 pt of it,
-    /// so this view gets about 60 pt. Everything, controls included, has to fit in that: anything lower is outside the
-    /// panel and can be neither seen nor clicked.
+    private var palette: ArtworkPalette? {
+        track.artworkData.flatMap { IslandArtwork.palette(for: $0) }
+    }
+
+    /// The cover's colour; the player's own when there is no cover.
+    private var tint: Color {
+        palette?.color ?? track.app.brandColor
+    }
+
     public var body: some View {
-        HStack(spacing: 10) {
+        let cardShape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        return HStack(spacing: 10) {
             artworkView
 
-            VStack(alignment: .leading, spacing: 3) {
-                // Title, artist and the app it comes from
+            // The title and the controls share the first row and the progress bar runs under both, so the card stays
+            // as tall as the cover.
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(track.title)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-
-                        Text(track.artist + (track.album != nil ? " • \(track.album!)" : ""))
-                            .font(.system(size: 9.5, weight: .regular))
-                            .foregroundColor(.white.opacity(0.68))
-                            .lineLimit(1)
-                    }
-
-                    Spacer(minLength: 4)
-
-                    HStack(spacing: 3) {
-                        Image(systemName: track.app.iconName)
-                            .font(.system(size: 8.5))
-                            .accessibilityHidden(true)  // the app's name says it; VoiceOver read "Globe" for a browser
-                        Text(track.app.displayName)
-                            .font(.system(size: 9, weight: .bold))
-                    }
-                    .foregroundColor(track.app.brandColor)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(track.app.brandColor.opacity(0.16))
-                    )
+                    titleBlock
+                    controlsRow
                 }
-
-                // Progress bar
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.white.opacity(0.15))
-
-                        Capsule()
-                            .fill(track.app.brandColor)
-                            .frame(width: max(0, geo.size.width * CGFloat(shownProgress)))
-                    }
-                    .frame(height: scrub.fraction == nil ? 3 : 5)
-                    .frame(maxHeight: .infinity)
-                    // The bar is 3 pt high; the whole 9 pt row takes the drag.
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                guard canScrub, geo.size.width > 0 else { return }
-                                scrub.fraction = min(1, max(0, Double(value.location.x / geo.size.width)))
-                            }
-                            .onEnded { _ in
-                                if let fraction = scrub.fraction, canScrub {
-                                    onSeek(fraction * track.duration)
-                                }
-                                scrub.fraction = nil
-                            }
-                    )
-                    .animation(.easeOut(duration: 0.12), value: scrub.fraction == nil)
-                }
-                .frame(height: 9)
-                .padding(.vertical, -3)
-                .accessibilityElement()
-                .accessibilityLabel("Playback position")
-                .accessibilityValue(Text(verbatim: track.formattedPosition))
-                .accessibilityAdjustableAction { direction in
-                    guard canScrub else { return }
-                    onSeek(track.position + (direction == .increment ? 10 : -10))
-                }
-
-                // Controls in the middle, times (or "Playing now") at the sides
-                ZStack {
-                    HStack(spacing: 18) {
-                        controlButton("backward.fill", label: "Previous track", isEnabled: track.canSkipPrevious, action: onPrevious)
-
-                        Button {
-                            onTogglePlayPause()
-                        } label: {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 22, height: 22)
-                                Image(systemName: track.isPlaying ? "pause.fill" : "play.fill")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.black)
-                                    .offset(x: track.isPlaying ? 0 : 0.7)
-                            }
-                            .contentShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .help(track.isPlaying ? "Pause" : "Play")
-                        .accessibilityLabel(track.isPlaying ? "Pause" : "Play")
-
-                        controlButton("forward.fill", label: "Next track", isEnabled: track.canSkipNext, action: onNext)
-                    }
-
-                    HStack {
-                        if track.duration > 0 {
-                            timeLabel(scrub.fraction.map { NowPlayingTrack.formatTime($0 * track.duration) } ?? track.formattedPosition)
-                            Spacer()
-                            timeLabel(track.formattedDuration)
-                        } else {
-                            // Audio detected from a browser has no known length or position.
-                            timeLabel(String(localized: "Playing now"))
-                            Spacer()
-                        }
-                    }
-                    .allowsHitTesting(false)
-                }
-                .frame(height: 22)
+                progressRow
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.bottom, 6)
+        .padding(8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(cardShape.fill(tint.opacity(0.10)))
+        .overlay(cardShape.strokeBorder(Color.white.opacity(0.07), lineWidth: 1))
+        .padding(.horizontal, 14)
+    }
+
+    // MARK: Pieces
+
+    /// The title, and under it "Artist · Album" with the player's own symbol in front, so the player is named to
+    /// VoiceOver and shown by its colour without a chip that would not fit. The line is cut at its end when it is
+    /// too long, so the artist is what stays; the player's name is in the tooltip.
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(verbatim: track.title)
+                .font(.system(size: 14, weight: .semibold))
+                .tracking(-0.15)
+                .foregroundColor(.white)
+                .lineLimit(1)
+
+            HStack(spacing: 4) {
+                Image(systemName: track.app.iconName)
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundColor(track.app.brandColor)
+                    .accessibilityHidden(true)
+                Text(verbatim: subtitle)
+                    .font(.system(size: 11.5))
+                    .foregroundColor(.white.opacity(0.62))
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .help(Text(verbatim: ([track.app.displayName] + [track.album].compactMap { $0 }).joined(separator: " · ")))
+    }
+
+    /// "Artist · Album", or the artist alone when the player does not say which album it is.
+    private var subtitle: String {
+        [track.artist, track.album ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    private var progressRow: some View {
+        HStack(spacing: 6) {
+            if track.duration > 0 {
+                timeLabel(scrub.fraction.map { NowPlayingTrack.formatTime($0 * track.duration) } ?? track.formattedPosition)
+                    .frame(minWidth: 26, alignment: .leading)
+                progressBar
+                timeLabel(track.formattedDuration)
+                    .frame(minWidth: 26, alignment: .trailing)
+            } else {
+                // Audio detected from a browser has no known length or position.
+                timeLabel(String(localized: "Playing now"))
+                progressBar
+            }
+        }
+    }
+
+    /// A 4 pt bar (6 while it is dragged); the whole 16 pt row takes the drag.
+    private var progressBar: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.14))
+
+                Capsule()
+                    .fill(Color.white)
+                    .frame(width: max(0, geo.size.width * CGFloat(shownProgress)))
+            }
+            .frame(height: scrub.fraction == nil ? 4 : 6)
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        guard canScrub, geo.size.width > 0 else { return }
+                        scrub.fraction = min(1, max(0, Double(value.location.x / geo.size.width)))
+                    }
+                    .onEnded { _ in
+                        if let fraction = scrub.fraction, canScrub {
+                            onSeek(fraction * track.duration)
+                        }
+                        scrub.fraction = nil
+                    }
+            )
+            .animation(.easeOut(duration: 0.12), value: scrub.fraction == nil)
+        }
+        .frame(height: 16)
+        .padding(.vertical, -4)
+        .accessibilityElement()
+        .accessibilityLabel("Playback position")
+        .accessibilityValue(Text(verbatim: track.formattedPosition))
+        .accessibilityAdjustableAction { direction in
+            guard canScrub else { return }
+            onSeek(track.position + (direction == .increment ? 10 : -10))
+        }
+    }
+
+    private var controlsRow: some View {
+        HStack(spacing: 0) {
+            controlButton("backward.fill", label: "Previous track", isEnabled: track.canSkipPrevious, action: onPrevious)
+
+            Button {
+                onTogglePlayPause()
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 32, height: 32)
+                        .shadow(color: tint.opacity(0.35), radius: 7, x: 0, y: 2)
+                    Image(systemName: track.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 13.5, weight: .bold))
+                        .foregroundColor(.black)
+                        .offset(x: track.isPlaying ? 0 : 1.2)
+                }
+                .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help(track.isPlaying ? "Pause" : "Play")
+            .accessibilityLabel(track.isPlaying ? "Pause" : "Play")
+
+            controlButton("forward.fill", label: "Next track", isEnabled: track.canSkipNext, action: onNext)
+        }
+        .fixedSize()
     }
 
     /// A command the player does not take stays in its place, dimmed, so the play button does not move.
     private func controlButton(_ symbol: String, label: LocalizedStringKey, isEnabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 12))
-                .foregroundColor(.white.opacity(isEnabled ? 0.8 : 0.22))
-                .frame(width: 26, height: 22)
+                .font(.system(size: 12.5))
+                .foregroundColor(.white.opacity(isEnabled ? 0.85 : 0.22))
+                .frame(width: 28, height: 34)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -563,34 +546,49 @@ public struct NowPlayingExpandedView: View {
     }
 
     private func timeLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 8.5, weight: .medium, design: .monospaced))
-            .foregroundColor(.white.opacity(0.5))
+        Text(verbatim: text)
+            .font(.system(size: 10).monospacedDigit())
+            .foregroundColor(.white.opacity(0.55))
+            .lineLimit(1)
+            .allowsHitTesting(false)
     }
 
     private var artworkView: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(Color.white.opacity(0.06))
-
-            if let data = track.artworkData, let nsImage = IslandArtwork.image(for: data) {
-                Image(nsImage: nsImage)
+        let side = Self.artworkSide
+        let shape = RoundedRectangle(cornerRadius: 13, style: .continuous)
+        return ZStack {
+            // A soft glow in the cover's own colours: the cover reduced to 16 × 16, scaled up smoothly and faded out
+            // towards its edge. No blur filter to run.
+            if let glow = palette?.glow {
+                Image(decorative: glow, scale: 1)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            } else {
-                Image(systemName: track.app.iconName)
-                    .font(.system(size: 20))
-                    .foregroundColor(track.app.brandColor)
+                    .interpolation(.high)
+                    .frame(width: side + 18, height: side + 18)
+                    .mask(
+                        RadialGradient(colors: [.white, .white.opacity(0)], center: .center, startRadius: side * 0.3, endRadius: (side + 18) / 2)
+                    )
+                    .opacity(0.75)
+                    .accessibilityHidden(true)
             }
+
+            ZStack {
+                shape.fill(Color.white.opacity(0.06))
+                if let data = track.artworkData, let nsImage = IslandArtwork.image(for: data) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: side, height: side)
+                        .clipShape(shape)
+                } else {
+                    Image(systemName: track.app.iconName)
+                        .font(.system(size: 24))
+                        .foregroundColor(track.app.brandColor)
+                }
+            }
+            .frame(width: side, height: side)
+            .overlay(shape.strokeBorder(Color.white.opacity(0.15), lineWidth: 1))
         }
-        .frame(width: 44, height: 44)
-        .overlay(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
-        )
-        .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
+        .frame(width: side, height: side)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Artwork")
     }
@@ -602,21 +600,45 @@ final class ScrubState: ObservableObject {
     @Published var fraction: Double?
 }
 
-/// Decoded artwork, kept for the few most recent tracks. The island's views are re-evaluated about once a second
-/// while a track plays (its position moves); decoding the picture on each of those is wasted work.
+/// Decoded artwork, kept for the few most recent tracks, with the colour worked out from each. The island's views
+/// are re-evaluated about once a second while a track plays (its position moves); decoding the picture, or
+/// reducing it to its colour, on each of those would be wasted work, so both happen once per cover.
 @MainActor
 enum IslandArtwork {
-    private static let cache: NSCache<NSData, NSImage> = {
-        let cache = NSCache<NSData, NSImage>()
+    private final class Entry {
+        let image: NSImage
+        /// `nil` until asked for; `.some(nil)` when the picture has no colour to take (and is not tried again).
+        var palette: ArtworkPalette??
+
+        init(image: NSImage) { self.image = image }
+    }
+
+    private static let cache: NSCache<NSData, Entry> = {
+        let cache = NSCache<NSData, Entry>()
         cache.countLimit = 8
         return cache
     }()
 
-    static func image(for data: Data) -> NSImage? {
+    private static func entry(for data: Data) -> Entry? {
         let key = data as NSData
         if let cached = cache.object(forKey: key) { return cached }
         guard let image = NSImage(data: data) else { return nil }
-        cache.setObject(image, forKey: key)
-        return image
+        let entry = Entry(image: image)
+        cache.setObject(entry, forKey: key)
+        return entry
+    }
+
+    static func image(for data: Data) -> NSImage? {
+        entry(for: data)?.image
+    }
+
+    /// The cover's dominant colour and glow, computed the first time and kept with the decoded picture.
+    static func palette(for data: Data) -> ArtworkPalette? {
+        guard let entry = entry(for: data) else { return nil }
+        if let known = entry.palette { return known }
+        var rect = CGRect(origin: .zero, size: entry.image.size)
+        let palette = entry.image.cgImage(forProposedRect: &rect, context: nil, hints: nil).flatMap(ArtworkPalette.make(from:))
+        entry.palette = .some(palette)
+        return palette
     }
 }

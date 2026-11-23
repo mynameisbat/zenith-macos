@@ -14,18 +14,18 @@ struct ZenithSettingsPage<Content: View>: View {
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 22) {
                 content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, 20)
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
         }
     }
 }
 
-/// A section title in the System Settings style: sentence case, semibold, primary.
+/// A section title: small, semibold, secondary, above its card.
 struct ZenithSettingsHeader: View {
     let title: Text
 
@@ -40,8 +40,8 @@ struct ZenithSettingsHeader: View {
     var body: some View {
         title
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.primary)
-            .padding(.leading, 2)
+            .foregroundStyle(.secondary)
+            .padding(.leading, 4)
             .accessibilityAddTraits(.isHeader)
     }
 }
@@ -59,14 +59,14 @@ struct ZenithSettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 8) {
             if let title {
                 ZenithSettingsHeader(text: title)
             }
             VStack(alignment: .leading, spacing: 0) {
                 content
             }
-            .zenithSettingsCard(padding: 0)
+            .zenithSettingsCard(cornerRadius: ZenithSettingsMetrics.cardRadius, padding: 0)
             if let footer {
                 footer
                     .font(.system(size: 11.5))
@@ -112,17 +112,17 @@ struct ZenithSettingsRow<Trailing: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
             if let symbol {
-                ZenithIconTile(systemName: symbol, tint: tint, size: 22)
+                ZenithIconTile(systemName: symbol, tint: tint, size: ZenithSettingsMetrics.rowIcon, cornerRatio: 0.3)
             }
             VStack(alignment: .leading, spacing: 2) {
                 title
-                    .font(.system(size: 13))
+                    .font(.system(size: 13.5, weight: .semibold))
                     .foregroundStyle(.primary)
                 if let subtitle {
                     subtitle
-                        .font(.system(size: 11.5))
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -132,8 +132,8 @@ struct ZenithSettingsRow<Trailing: View>: View {
 
             trailing
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.horizontal, ZenithSettingsMetrics.rowInset)
+        .padding(.vertical, 12)
     }
 }
 
@@ -143,13 +143,24 @@ extension ZenithSettingsRow where Trailing == EmptyView {
     }
 }
 
-/// The hairline between two rows of a section, inset like System Settings.
+/// The hairline between two rows of a section. `inset` is what callers have always passed: the default (12) is a row
+/// without an icon, anything larger a row with one, so the line starts under the title text.
 struct ZenithSettingsDivider: View {
     var inset: CGFloat = 12
 
     var body: some View {
-        Divider().padding(.leading, inset)
+        Rectangle()
+            .fill(Color.primary.opacity(0.08))
+            .frame(height: 1)
+            .padding(.leading, inset > 12 ? ZenithSettingsMetrics.rowInset + ZenithSettingsMetrics.rowIcon + 12 : ZenithSettingsMetrics.rowInset)
     }
+}
+
+/// Sizes shared by the Settings rows and their dividers.
+enum ZenithSettingsMetrics {
+    static let cardRadius: CGFloat = 20
+    static let rowInset: CGFloat = 16
+    static let rowIcon: CGFloat = 30
 }
 
 /// A small status capsule: green "Allowed", orange "Not Allowed", or a neutral note.
@@ -197,7 +208,7 @@ struct ZenithSettingsNotice: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.horizontal, ZenithSettingsMetrics.rowInset)
+        .padding(.vertical, 12)
     }
 }

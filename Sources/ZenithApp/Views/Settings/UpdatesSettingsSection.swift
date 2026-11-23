@@ -25,7 +25,7 @@ struct UpdatesSettingsSection: View {
             ZenithSettingsRow(
                 title: Text("Zenith \(updater.runningVersion.description)"),
                 // The row below already says a version is available; here say when GitHub was last asked.
-                subtitle: Text(verbatim: updater.phase == .available
+                subtitle: Text(verbatim: updater.phase == .available || updater.phase == .requiresNewerSystem
                     ? updater.lastCheckedDescription(at: Date())
                     : updater.statusDescription(at: Date())),
                 symbol: "arrow.down.circle.fill",
@@ -60,6 +60,11 @@ struct UpdatesSettingsSection: View {
                 availableRow(release)
             }
 
+            if let release = updater.unsupportedRelease {
+                ZenithSettingsDivider(inset: 44)
+                unsupportedRow(release)
+            }
+
             ZenithSettingsDivider(inset: 44)
 
             ZenithSettingsRow(
@@ -72,6 +77,22 @@ struct UpdatesSettingsSection: View {
                     .toggleStyle(.switch)
                     .labelsHidden()
             }
+        }
+    }
+
+    /// A newer Zenith that needs a newer macOS: information and the release page, no install or download.
+    @ViewBuilder
+    private func unsupportedRow(_ release: UpdateRelease) -> some View {
+        ZenithSettingsRow(
+            title: Text(verbatim: updater.unsupportedTitle(for: release)),
+            subtitle: Text(verbatim: updater.unsupportedDetail),
+            symbol: "info.circle.fill",
+            tint: ZenithTint.general
+        ) {
+            Button("What's New") {
+                UpdateController.openReleasePage(release)
+            }
+            .buttonStyle(.link)
         }
     }
 

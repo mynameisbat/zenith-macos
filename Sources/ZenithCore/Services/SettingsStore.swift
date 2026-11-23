@@ -3,7 +3,7 @@ import Combine
 
 /// High-performance, thread-safe user configuration store backed by UserDefaults.
 /// An `ObservableObject`: SwiftUI views hold it with `@ObservedObject`, AppKit code subscribes to `objectWillChange`.
-/// (It is not `@Observable`, which macOS 15 would allow: the stores have not been moved over.)
+/// (It is not `@Observable`, which the deployment target allows: the stores have not been moved over.)
 public final class SettingsStore: ObservableObject, @unchecked Sendable {
     public static let shared = SettingsStore()
 

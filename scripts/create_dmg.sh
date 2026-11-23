@@ -38,6 +38,17 @@ else
     echo "    (the certificate leaf hash above must be the same for every release)"
 fi
 
+# The updater of every installed copy reads which macOS a release needs from ONE line in the GitHub release notes,
+# before it announces the release (an older Mac must not be told about an update it cannot run). The line comes from
+# the app's own LSMinimumSystemVersion, so the notes and the app can never disagree. A release without the line is
+# taken as compatible by the updater, so a build without a minimum is refused here instead of being published blind.
+MINIMUM_MACOS="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP_PATH/Contents/Info.plist" 2>/dev/null || true)"
+if [ -z "$MINIMUM_MACOS" ]; then
+    echo "error: Zenith.app has no LSMinimumSystemVersion in its Info.plist (set it in scripts/bundle_app.sh)." >&2
+    exit 1
+fi
+MINIMUM_MACOS_LINE="Minimum macOS: $MINIMUM_MACOS"
+
 echo "==> Preparing DMG staging environment..."
 rm -rf "$TEMP_DMG_DIR"
 mkdir -p "$TEMP_DMG_DIR"
@@ -68,3 +79,13 @@ rm -rf "$TEMP_DMG_DIR"
 echo "==> Successfully created release DMG at:"
 echo "    $DMG_OUTPUT"
 echo "    Size: $(du -h "$DMG_OUTPUT" | cut -f1)"
+
+echo ""
+echo "==> RELEASE NOTES: put this line, exactly, in the GitHub release description:"
+echo ""
+echo "    $MINIMUM_MACOS_LINE"
+echo ""
+echo "    Installed copies read it to decide whether this release can run on their Mac. Without it an old Mac"
+echo "    would be offered an update it cannot open (the install-time check would still refuse it, but only after"
+echo "    the download). If the notes are in a file whose last line is the one above:"
+echo "      gh release create v$VERSION \"$DMG_OUTPUT\" --title \"Zenith v$VERSION\" --notes-file notes.md"

@@ -9,6 +9,28 @@ public struct ZenithIslandGeometry: Sendable, Equatable {
     public let notchRect: CGRect
     public let idleWidth: CGFloat
     public let idleHeight: CGFloat
+    /// The open island's width, and the height of what is going on in it: the strip of tabs (beside a notch the
+    /// notch's own row) and the card under it. The dock is `dockHeight` more. The island is never wider than this,
+    /// pages included: it is a black bar over the menu bar, and anything wider covers the status items to the right
+    /// of a notch on a 13-inch Mac (on a 1372 pt display it spans 496 to 876 pt, clear of them in normal use).
+    public static let expandedWidth: CGFloat = 380
+    public static let expandedHeight: CGFloat = 130
+    /// The card under the tabs: Now Playing, the widgets, the agents or the shelf. It sits at the bottom of the
+    /// `expandedHeight` and the strip of tabs at the top, so a taller notch only makes the gap between them smaller.
+    public static let cardHeight: CGFloat = 80
+    /// The room under the card, before the dock's caption.
+    public static let cardBottomGap: CGFloat = 6
+    /// Beside a notch the tabs share the two strips either side of it (`IslandTabStrip`, about 97 pt each at 380 pt):
+    /// at most this many pills a side, `tabPillWidth` wide, in a capsule with 2 pt of padding, `tabEdgeInset` in from
+    /// the island's edge (the card's own inset, so the two line up).
+    public static let tabPillsPerSide = 2
+    public static let tabPillWidth: CGFloat = 26
+    public static let tabEdgeInset: CGFloat = 14
+    /// The width of a capsule of `count` pills.
+    public static func tabCapsuleWidth(pills count: Int) -> CGFloat {
+        CGFloat(count) * tabPillWidth + 4
+    }
+
     public let expandedWidth: CGFloat
     public let expandedHeight: CGFloat
     public let alertWidth: CGFloat
@@ -59,8 +81,8 @@ public struct ZenithIslandGeometry: Sendable, Equatable {
             self.idleHeight = idleH
         }
 
-        self.expandedWidth = 380
-        self.expandedHeight = 96
+        self.expandedWidth = Self.expandedWidth
+        self.expandedHeight = Self.expandedHeight
         self.alertWidth = 280
         self.alertHeight = 36
     }
@@ -102,24 +124,50 @@ public struct ZenithIslandGeometry: Sendable, Equatable {
 
     // MARK: Sizes that depend on what the open island shows
 
-    /// The row of tool buttons under the open island, with the line above it that names the button under the pointer.
+    /// The tray of tool buttons under the open island, with the line above it that names the button under the pointer.
     public static let dockHeight: CGFloat = 66
+    /// The dock's icons: `IslandDockLayout.maxPinned` tools and All Tools, 8 pt apart, with a rule before the last,
+    /// in a tray 14 pt in from the island's edge with 5 pt of padding (`dockRowRoom`).
+    public static let dockIconSize: CGFloat = 36
+    public static let dockIconSpacing: CGFloat = 8
+    public static let dockSideInset: CGFloat = 14
+    public static let dockTrayPadding: CGFloat = 5
+    public static let dockRuleWidth: CGFloat = 3
+    /// The width the dock's row needs with `tools` icons on it (All Tools is one of them) and, if there are tools, the
+    /// rule before the last.
+    public static func dockRowWidth(icons: Int) -> CGFloat {
+        guard icons > 0 else { return 0 }
+        let items = icons + (icons > 1 ? 1 : 0)
+        return CGFloat(icons) * dockIconSize + (icons > 1 ? dockRuleWidth : 0) + CGFloat(items - 1) * dockIconSpacing
+    }
+    /// What the tray inside the island leaves for that row.
+    public static var dockRowRoom: CGFloat {
+        expandedWidth - 2 * dockSideInset - 2 * dockTrayPadding
+    }
+
+    /// The strip of tabs at the top of the open island: beside a notch the notch's own row, otherwise a row of its own
+    /// with a little room above it.
+    public var tabStripHeight: CGFloat {
+        hasNotch ? notchRect.height : 36
+    }
+
 
     /// The strip at the top of a page with its title and its back and close buttons. Beside a notch it is the notch's
     /// own row; without one it is a row of its own.
     public var pageHeaderHeight: CGFloat {
-        hasNotch ? notchRect.height + 4 : 34
+        hasNotch ? notchRect.height + 4 : 44
     }
 
     /// The room a page's content gets: what it asks for, less on a display too small for it.
     public func pageContentSize(for page: IslandPage) -> CGSize {
         let wanted = page.contentSize
-        let width = min(wanted.width, max(expandedWidth, screenFrame.width - 40))
+        // Never wider than the island, whatever the page asks for: it must not cover the menu bar's status items.
+        let width = min(wanted.width, expandedWidth, max(160, screenFrame.width - 40))
         let height = min(wanted.height, max(160, screenFrame.height - pageHeaderHeight - 90))
         return CGSize(width: width, height: height)
     }
 
-    /// The size of the open island: 380 × 96 for what is going on (taller by the dock when it has one), or a page's.
+    /// The size of the open island: 380 × 130 for what is going on (taller by the dock when it has one), or a page's.
     public func expandedSize(page: IslandPage?, showsDock: Bool) -> CGSize {
         if let page {
             let content = pageContentSize(for: page)
@@ -569,11 +617,28 @@ public final class ZenithIslandState: ObservableObject {
         isHoverEmphasized = false
         isHoverSuppressed = false
         guard !isExpanded else { return }
+        pinTabForOpening()
         isRimLightVisible = false
         withAnimation(Self.openingAnimation) {
             isExpanded = true
         }
         scheduleRimLight()
+    }
+
+    /// Fixes the tab the island opens on before it starts to open. `activeTab` is only a preference: with the default
+    /// one (or one that has gone) the resolved tab depends on what exists, and Now Playing or the AI agents arriving
+    /// while the island grows changed it halfway, cross-fading two cards. The tab the island would show right now
+    /// becomes the chosen one, so the open morph has one card in it from the first frame. (A file being dragged over
+    /// is not part of this: the drop target is shown for as long as it is.)
+    func pinTabForOpening() {
+        activeTab = Self.resolvedTab(
+            active: activeTab,
+            hasTrack: nowPlayingTrack != nil,
+            hasShelfItems: !droppedItems.isEmpty,
+            showsWidgets: showsWidgets,
+            showsAIAgents: showsAIAgentsTab,
+            isDropTargeted: false
+        )
     }
 
     /// Grows the island into `newPage` and keeps it open: a page does not close when the pointer leaves it.
@@ -587,6 +652,7 @@ public final class ZenithIslandState: ObservableObject {
         isHoverSuppressed = false
         // One step of history: a page opened from another page goes back to it.
         let previous = page == newPage ? backPage : page
+        if !isExpanded { pinTabForOpening() }
         withAnimation(Self.openingAnimation) {
             backPage = previous
             page = newPage

@@ -115,16 +115,41 @@ public enum ZenithHubAction: String, CaseIterable, Sendable {
 /// What a Boost managed to do.
 public struct BoostResult: Sendable, Equatable {
     public let flushedDNS: Bool
+    /// How much smaller Zenith's own memory footprint got (its caches and malloc pages), measured before and after.
+    /// Boost does not free other apps' memory, and the notice never says it did.
+    public let releasedBytes: Int64
 
-    public init(flushedDNS: Bool) {
+    /// Less than this is noise (a footprint moves by itself), so it is not announced.
+    public static let minimumReportedBytes: Int64 = 1_000_000
+
+    public init(flushedDNS: Bool, releasedBytes: Int64 = 0) {
         self.flushedDNS = flushedDNS
+        self.releasedBytes = releasedBytes
     }
 
-    /// The notice after a Boost. Short, because the island shows one line.
+    /// The notice after a Boost: what really happened, in one line (the island shows one).
     public var message: String {
-        flushedDNS
-            ? String(localized: "Boost done: memory freed, DNS flushed")
-            : String(localized: "Boost done: memory freed")
+        if releasedBytes >= Self.minimumReportedBytes {
+            let size = HardwareTelemetryService.formatBytes(releasedBytes)
+            return flushedDNS
+                ? String(localized: "Zenith released \(size), DNS flushed")
+                : String(localized: "Zenith released \(size) of memory")
+        }
+        return flushedDNS
+            ? String(localized: "Caches cleared, DNS flushed")
+            : String(localized: "Caches cleared; DNS flush needs admin")
+    }
+
+    /// Zenith's own physical footprint right now, the number Activity Monitor calls Memory. 0 if the kernel does not say.
+    public static func currentFootprint() -> Int64 {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return result == KERN_SUCCESS ? Int64(info.phys_footprint) : 0
     }
 }
 
@@ -244,6 +269,7 @@ public final class ZenithCommandHubState: ObservableObject {
     /// a flush that had failed.
     @discardableResult
     public func boostSystem() async -> BoostResult {
+        let footprintBefore = BoostResult.currentFootprint()
         ImageThumbnailService.shared.clearCache()
         malloc_zone_pressure_relief(nil, 0)
         HardwareTelemetryService.shared.invalidateProcessCache()
@@ -257,7 +283,9 @@ public final class ZenithCommandHubState: ObservableObject {
             return flushed
         }.value
         refreshHardwareSnapshot(sync: true)
-        return BoostResult(flushedDNS: flushedDNS)
+        malloc_zone_pressure_relief(nil, 0)
+        let released = max(0, footprintBefore - BoostResult.currentFootprint())
+        return BoostResult(flushedDNS: flushedDNS, releasedBytes: released)
     }
 
     public func setSearchText(_ text: String) {

@@ -109,6 +109,8 @@ public final class ZenithUpdater: ObservableObject {
         case checking
         case upToDate
         case available
+        /// A newer release exists but needs a newer macOS than this Mac runs: shown as information, never offered.
+        case requiresNewerSystem
         case downloading(Double?)
         case verifying
         case installing
@@ -120,6 +122,8 @@ public final class ZenithUpdater: ObservableObject {
 
     @Published public private(set) var phase: Phase = .idle
     @Published public private(set) var availableRelease: UpdateRelease?
+    /// The newer release this Mac cannot run (`phase == .requiresNewerSystem`). Never installed, never downloaded.
+    @Published public private(set) var unsupportedRelease: UpdateRelease?
     /// Why Zenith will not replace itself for `availableRelease` (then the Download button is offered).
     @Published public private(set) var installRefusal: UpdateInstallRefusal?
     /// The last failure of something the user asked for; automatic checks fail silently.
@@ -128,6 +132,8 @@ public final class ZenithUpdater: ObservableObject {
 
     public let settings: UpdateSettings
     public let runningVersion: AppVersion
+    /// The macOS this Mac runs.
+    public let systemVersion: AppVersion
     /// Set by the app to route a notice through the island or the toast.
     public var notifier: (@MainActor (_ title: String, _ subtitle: String) -> Void)?
 
@@ -147,6 +153,7 @@ public final class ZenithUpdater: ObservableObject {
         feed: UpdateFeed = GitHubUpdateFeed(),
         installer: UpdateInstalling = UpdateInstaller(),
         runningVersion: AppVersion = .running,
+        systemVersion: AppVersion = .runningOperatingSystem,
         now: @escaping @MainActor () -> Date = { Date() },
         autoSchedule: Bool = true
     ) {
@@ -154,6 +161,7 @@ public final class ZenithUpdater: ObservableObject {
         self.feed = feed
         self.installer = installer
         self.runningVersion = runningVersion
+        self.systemVersion = systemVersion
         self.now = now
         self.autoSchedule = autoSchedule
     }
@@ -269,6 +277,16 @@ public final class ZenithUpdater: ObservableObject {
             let latest = try await feed.latestRelease()
             settings.lastCheckDate = now()
             lastFailedAttempt = nil
+            if let latest, latest.version > runningVersion, !latest.isCompatible(withSystem: systemVersion) {
+                // Newer, but it cannot run here: say so in Settings, offer nothing, and tell nobody (an island notice
+                // about something the user cannot act on is noise, and `lastNotifiedVersion` stays as it was).
+                availableRelease = nil
+                installRefusal = nil
+                unsupportedRelease = latest
+                phase = .requiresNewerSystem
+                return false
+            }
+            unsupportedRelease = nil
             if let latest, latest.version > runningVersion {
                 if availableRelease != latest { availableRelease = latest }
                 installRefusal = installer.automaticInstallRefusal()
@@ -283,7 +301,7 @@ public final class ZenithUpdater: ObservableObject {
             lastFailedAttempt = now()
             if reportingErrors {
                 errorMessage = error.localizedDescription
-                phase = availableRelease == nil ? .idle : .available
+                phase = availableRelease != nil ? .available : (unsupportedRelease != nil ? .requiresNewerSystem : .idle)
             } else {
                 phase = previousPhase == .checking ? .idle : previousPhase
             }
@@ -365,6 +383,7 @@ public final class ZenithUpdater: ObservableObject {
     public func presentForScreenshot(release: UpdateRelease, refusal: UpdateInstallRefusal?, checkedAt: Date) {
         settings.lastCheckDate = checkedAt
         availableRelease = release
+        unsupportedRelease = nil
         installRefusal = refusal
         errorMessage = nil
         phase = .available
@@ -376,6 +395,17 @@ public final class ZenithUpdater: ObservableObject {
     public func lastCheckedDescription(at date: Date) -> String {
         guard let last = settings.lastCheckDate else { return String(localized: "Not checked yet.") }
         return String(localized: "Last checked \(CleanerScanScheduleSettings.relative(last, now: date)).")
+    }
+
+    /// "Zenith 3.0 needs macOS 26 or later." Versions are digits and dots, never grouped.
+    public func unsupportedTitle(for release: UpdateRelease) -> String {
+        let required = release.minimumSystemVersion?.shortDescription ?? ""
+        return String(localized: "Zenith \(release.version.description) needs macOS \(required) or later.")
+    }
+
+    /// "This Mac runs macOS 15.6."
+    public var unsupportedDetail: String {
+        String(localized: "This Mac runs macOS \(systemVersion.shortDescription).")
     }
 
     /// One line describing where things stand, in the user's language. Versions are digits and dots, never grouped.
@@ -390,6 +420,9 @@ public final class ZenithUpdater: ObservableObject {
             return String(localized: "Zenith is up to date.")
         case .available:
             return String(localized: "Zenith \(version) is available.")
+        case .requiresNewerSystem:
+            guard let release = unsupportedRelease else { return lastCheckedDescription(at: date) }
+            return unsupportedTitle(for: release) + " " + unsupportedDetail
         case .downloading(let fraction):
             if let fraction {
                 let percent = String(Int((min(max(fraction, 0), 1) * 100).rounded()))

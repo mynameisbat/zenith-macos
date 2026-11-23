@@ -6,14 +6,13 @@ import CoreGraphics
 /// A page is opened from the dock or from the Tools page (`ZenithIslandState.openPage`) and stays open until it is closed: by its
 /// close button, Escape or a click anywhere else. Leaving it with the pointer does not close it, because a page is
 /// something to work in (lists to scroll, fields to type in, confirmations that appear elsewhere on screen).
+///
+/// There are two, and neither is wider than the island (`ZenithIslandGeometry.expandedWidth`, 380 pt): the island is a
+/// black bar over the menu bar, and a wider one would cover the status items beside the notch. Everything that needs
+/// more room (Settings, the Cleaner, Ports, Homebrew) opens in Zenith's Settings window instead.
 public enum IslandPage: String, CaseIterable, Sendable, Identifiable {
     /// What the machine is doing: running apps, CPU, memory, storage and network speed.
     case system
-    /// The cleaner with its tools, the uninstaller among them.
-    case cleaner
-    case ports
-    case homebrew
-    case settings
     /// Every tool, in groups (`IslandTool.groups`): what the dock's last button opens.
     case tools
 
@@ -22,10 +21,6 @@ public enum IslandPage: String, CaseIterable, Sendable, Identifiable {
     public var title: String {
         switch self {
         case .system: return String(localized: "System")
-        case .cleaner: return String(localized: "Cleaner")
-        case .ports: return String(localized: "Ports")
-        case .homebrew: return String(localized: "Homebrew")
-        case .settings: return String(localized: "Settings")
         case .tools: return String(localized: "Tools")
         }
     }
@@ -33,26 +28,17 @@ public enum IslandPage: String, CaseIterable, Sendable, Identifiable {
     public var icon: String {
         switch self {
         case .system: return "cpu"
-        case .cleaner: return "sparkles"
-        case .ports: return "network"
-        case .homebrew: return "shippingbox.fill"
-        case .settings: return "gearshape.fill"
         case .tools: return "square.grid.2x2.fill"
         }
     }
 
-    /// The size the page's content wants, below the island's top strip. A small display gets less
-    /// (`ZenithIslandGeometry.expandedSize`). No page is narrower than 420 pt: beside a notch its top strip has to
-    /// hold the back button on one side and the page's name and the close button on the other.
+    /// The size the page's content wants, below the island's top strip, and never wider than the island. A small
+    /// display gets less (`ZenithIslandGeometry.expandedSize`).
     public var contentSize: CGSize {
         switch self {
-        case .system: return CGSize(width: 420, height: 392)
-        case .cleaner: return CGSize(width: 600, height: 540)
-        case .ports: return CGSize(width: 580, height: 440)
-        case .homebrew: return CGSize(width: 620, height: 480)
-        // The Settings window's own size and a little more: at 720 × 500 its long panes needed a lot of scrolling.
-        case .settings: return CGSize(width: 780, height: 600)
-        case .tools: return CGSize(width: 520, height: 264)
+        case .system: return CGSize(width: ZenithIslandGeometry.expandedWidth, height: 476)
+        // Four groups of four tiles in a row each, and under them the dock strip.
+        case .tools: return CGSize(width: ZenithIslandGeometry.expandedWidth, height: 430)
         }
     }
 }
@@ -60,8 +46,9 @@ public enum IslandPage: String, CaseIterable, Sendable, Identifiable {
 /// One of Zenith's tools as the island offers it: a button of the dock under the open island, and a labelled tile of
 /// the Tools page (`IslandPage.tools`), where every tool is, in groups.
 ///
-/// A tool starts something and nothing more: it opens its page in the island, flips a switch (Privacy Shield, Keep
-/// Awake), or runs the same code the Command Hub's button did, with the same confirmations. Nothing here runs in
+/// A tool starts something and nothing more: it opens its page in the island (System, All Tools), opens Zenith's
+/// Settings window on the right tab (Cleaner, Ports, Homebrew, Uninstall, Settings), flips a switch (Privacy Shield,
+/// Keep Awake), or runs the same code the Command Hub's button did, with the same confirmations. Nothing here runs in
 /// the background.
 public enum IslandTool: String, CaseIterable, Sendable, Identifiable {
     case area, screen, record, ocr
@@ -80,7 +67,7 @@ public enum IslandTool: String, CaseIterable, Sendable, Identifiable {
     }
 
     /// Every tool that does something, by what it is for. Settings and Quit are not in a group: the Tools page
-    /// keeps them apart, in its top strip, so nobody quits Zenith reaching for a tool.
+    /// keeps them apart, as two small buttons at the end of its dock strip, so nobody quits Zenith reaching for a tool.
     public static var groups: [Group] {
         [
             Group(id: "capture", title: String(localized: "Capture"), tools: [.area, .screen, .record, .ocr]),
@@ -106,13 +93,18 @@ public enum IslandTool: String, CaseIterable, Sendable, Identifiable {
     /// The page this tool opens in the island, if it opens one.
     public var page: IslandPage? {
         switch self {
-        case .uninstall, .cleaner: return .cleaner
         case .system: return .system
-        case .ports: return .ports
-        case .homebrew: return .homebrew
-        case .settings: return .settings
         case .allTools: return .tools
         default: return nil
+        }
+    }
+
+    /// Whether this tool opens Zenith's Settings window (on its own tab) instead of anything on the island. Those
+    /// pages are too wide for the island.
+    public var opensSettingsWindow: Bool {
+        switch self {
+        case .uninstall, .cleaner, .ports, .homebrew, .settings: return true
+        default: return false
         }
     }
 
@@ -169,9 +161,9 @@ public enum IslandTool: String, CaseIterable, Sendable, Identifiable {
         case .cleaner: return "externaldrive.fill"
         case .boost: return "bolt.fill"
         case .system: return IslandPage.system.icon
-        case .ports: return IslandPage.ports.icon
-        case .homebrew: return IslandPage.homebrew.icon
-        case .settings: return IslandPage.settings.icon
+        case .ports: return "network"
+        case .homebrew: return "shippingbox.fill"
+        case .settings: return "gearshape.fill"
         case .quit: return "power"
         default: return IslandPage.tools.icon
         }

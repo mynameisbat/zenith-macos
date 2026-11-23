@@ -40,6 +40,17 @@ public struct AppVersion: Comparable, Hashable, Sendable, CustomStringConvertibl
         self.components = components
     }
 
+    /// A macOS version (`15.6.1`) as the system reports it.
+    public init(operatingSystem version: OperatingSystemVersion) {
+        components = [max(version.majorVersion, 0), max(version.minorVersion, 0), max(version.patchVersion, 0)]
+    }
+
+    /// The macOS this process runs on. Logic that decides anything takes the version as a parameter instead of calling
+    /// this, so tests never depend on the Mac they run on.
+    public static var runningOperatingSystem: AppVersion {
+        AppVersion(operatingSystem: ProcessInfo.processInfo.operatingSystemVersion)
+    }
+
     /// Components without trailing zeros, so `2.4` and `2.4.0` are equal and hash alike.
     private var normalized: [Int] {
         var trimmed = components
@@ -50,6 +61,11 @@ public struct AppVersion: Comparable, Hashable, Sendable, CustomStringConvertibl
     /// `2.4.0`: digits and dots only, safe to show (never digit-grouped) and to build a file name from.
     public var description: String {
         components.map { String($0) }.joined(separator: ".")
+    }
+
+    /// `26` for `26.0.0`, `15.6` for `15.6.0`, `15.6.1` as is: how a macOS version is written in a sentence.
+    public var shortDescription: String {
+        normalized.map { String($0) }.joined(separator: ".")
     }
 
     public static func == (lhs: AppVersion, rhs: AppVersion) -> Bool {

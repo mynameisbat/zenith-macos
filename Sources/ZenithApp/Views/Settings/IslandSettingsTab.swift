@@ -10,11 +10,13 @@ public struct IslandSettingsTab: View {
 
     public init() {}
 
-    /// The Widgets tab is 380 pt wide: with a timer, an event and the network speed side by side, the event title is cut.
+    /// The Widgets tab is 380 pt wide: with all three widgets on, the network speed is a line in the event's card, and a very long event title is cut.
     private var allWidgetsOn: Bool { settings.showTimer && settings.showCalendar && settings.showNetwork }
 
     public var body: some View {
         ZenithSettingsPage {
+            IslandSettingsPreview()
+
             ZenithSettingsSection(
                 "Widgets",
                 footer: allWidgetsOn
@@ -102,6 +104,25 @@ public struct IslandSettingsTab: View {
                 ZenithSettingsDivider(inset: 44)
 
                 ZenithSettingsRow(
+                    "Dock Icons",
+                    subtitle: "Tinted draws each tool's color on a faint tile; Color fills the whole tile with it.",
+                    symbol: "paintpalette.fill",
+                    tint: ZenithTint.island
+                ) {
+                    Picker("Dock Icons", selection: $settings.dockIconStyle) {
+                        ForEach(IslandDockIconStyle.allCases) { style in
+                            Text(verbatim: style.title).tag(style)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 150)
+                    .disabled(!settings.showTools)
+                }
+
+                ZenithSettingsDivider(inset: 44)
+
+                ZenithSettingsRow(
                     "Hover Delay",
                     subtitle: "How long the pointer rests on the closed island before it opens. A click opens it at once.",
                     symbol: "cursorarrow.rays",
@@ -178,7 +199,7 @@ public struct IslandSettingsTab: View {
                     .labelsHidden()
             }
         }
-        .padding(.leading, 32)
+        .padding(.leading, 42)
     }
 
     @ViewBuilder
@@ -208,7 +229,7 @@ public struct IslandSettingsTab: View {
                 }
             }
         }
-        .padding(.leading, 32)
+        .padding(.leading, 42)
     }
 
     private var timerControlRow: some View {

@@ -113,58 +113,6 @@ private func keepAwakeBinding(_ service: KeepAwakeService) -> Binding<Bool> {
     )
 }
 
-// MARK: - Command Hub
-
-/// A row under the hub's controls: the switch ("until turned off"), the status, and a menu of modes.
-struct KeepAwakeHubRow: View {
-    @ObservedObject private var service: KeepAwakeService = .shared
-    @ObservedObject private var settings: KeepAwakeSettings = .shared
-
-    /// A row of the Command Hub's controls grid (see `ZenithCommandHubView`), so its switch lines up with Privacy
-    /// Shield's: label, switch, then the status and the options menu at the trailing edge.
-    var body: some View {
-        GridRow {
-            HStack(spacing: 6) {
-                ZenithIconTile(systemName: "mug.fill", tint: ZenithTint.keepAwake, size: 20)
-                Text("Keep Awake")
-                    .font(.system(size: 12.5))
-                    .lineLimit(1)
-                    .fixedSize()
-            }
-            .accessibilityHidden(true)
-
-            Toggle("Keep Awake", isOn: keepAwakeBinding(service))
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .help(service.isActive ? "On: the Mac does not go to sleep on its own" : "Off. Turn on to keep the Mac from going to sleep until you turn it off")
-
-            HStack(spacing: 8) {
-                if let snapshot = service.snapshot {
-                    Text(verbatim: snapshot.statusText)
-                        .font(.system(size: 11.5))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-
-                Menu {
-                    KeepAwakeModeMenuItems(service: service, settings: settings)
-                } label: {
-                    Image(systemName: "clock")
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .help("Keep the Mac awake for a while, or while apps run or the adapter is connected")
-                .accessibilityLabel("Keep Awake Options")
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-        }
-    }
-}
-
 // MARK: - Settings
 
 /// Running apps for the picker, refreshed when apps launch or quit.

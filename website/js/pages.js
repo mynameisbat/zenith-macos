@@ -8,8 +8,8 @@ import { appsHTML, metersHTML, jitterSpeed, handleQuitClicks } from './hub.js';
 function mountSystem(el) {
   el.innerHTML = `<div class="sys">
     <div class="hub-search">${icon('search')}<input type="text" placeholder="Search running apps" aria-label="Search running apps" autocomplete="off" spellcheck="false"></div>
+    <div class="hub-meters hub-module"></div>
     <div class="sys-dyn"></div>
-    <div class="hub-meters"></div>
   </div>`;
   const input = $('input', el);
   let query = '';
@@ -17,7 +17,8 @@ function mountSystem(el) {
     const q = query.trim().toLowerCase();
     const { apps, portRows, html } = appsHTML(q);
     $('.sys-dyn', el).innerHTML = html + (!apps.length && !portRows.length ? `<div class="hub-none">Nothing matches “${esc(query)}”.</div>` : '');
-    $('.hub-meters', el).innerHTML = metersHTML();
+    $('.hub-meters', el).hidden = !!q;
+    $('.hub-meters', el).innerHTML = q ? '' : metersHTML();
   };
   input.addEventListener('input', () => { query = input.value; render(); });
   el.addEventListener('click', handleQuitClicks);

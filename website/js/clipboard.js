@@ -1,4 +1,4 @@
-// Clipboard history (two panes, filters, keyboard), copies made on this page, the ignored-app and concealed rules,
+// Clipboard history (a docked strip of preview cards, filters, keyboard), copies made on this page, the ignored-app and concealed rules,
 // auto-clear, clean links, and text snippets.
 import {
   $, $$, bus, esc, icon, html, settings, notify, registerAction, runAction, frontWindow, windowSpec, store,
@@ -150,6 +150,8 @@ bus.on('copy-image', ({ img, w, h, size, label }) => {
 });
 
 // ---------------------------------------------------------------- the panel
+// A strip docked to the bottom of the screen: a search field and the filters on top, preview cards in a row, the keys and the
+// Paste button under them. Left and right browse the cards (so they no longer move the caret in the search field).
 
 let panel = null;
 let filter = 'all';
@@ -157,7 +159,7 @@ let query = '';
 let selectedId = null;
 let pasteTarget = null;
 
-const FILTERS = [['all', 'tray', 'All'], ['text', 'lines', 'Text'], ['link', 'link', 'Links'], ['image', 'photo', 'Images'], ['pinned', 'pin', 'Pinned']];
+const FILTERS = [['all', 'All'], ['text', 'Text'], ['link', 'Links'], ['image', 'Images'], ['pinned', 'Pinned']];
 
 function matches(item) {
   if (filter === 'pinned' && !item.pinned) return false;
@@ -175,85 +177,104 @@ function matches(item) {
 
 function visibleItems() { return items.filter(matches); }
 
-function dayGroup(at) {
-  const d = new Date(at);
-  const today = new Date();
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-  if (at >= start) return 'Today';
-  if (at >= start - 86400000) return 'Yesterday';
-  return 'Earlier';
+/** A guess on top of the kind, like ClipboardItem.looksLikeCode: it never changes what the Text filter shows. */
+function looksLikeCode(item) {
+  if (item.kind !== 'text') return false;
+  const t = item.text.trim();
+  return /^(\$ |brew |swift |npm |pnpm |yarn |git |cd |ls |sudo |curl |python3? |node |\.\/)/.test(t) || /[{};]\s*$|=>|\(\)|<\/?[a-z]+>/.test(t);
 }
 
-function rowIcon(item) {
-  if (item.kind === 'image') return `<img class="cb-thumb" src="${item.img}" alt="">`;
-  if (item.kind === 'color') return `<span class="cb-swatch" style="background:${esc(item.text)}"></span>`;
-  return `<span class="cb-ic">${icon(item.kind === 'link' ? 'link' : 'lines')}</span>`;
+const KIND_LABEL = { text: 'Text', link: 'Link', image: 'Image', color: 'Color', code: 'Code' };
+const cardKind = (it) => (looksLikeCode(it) ? 'code' : it.kind);
+
+/** Where a copy came from: an app icon in a small tile (a system app's, or the kind's symbol when the app is unknown). */
+const SOURCE_APPS = {
+  Notes: ['notes', '#f5c93a'], Terminal: ['code', '#1c1c1e'], Mail: ['doc', '#2f8cf5'], Safari: ['globe', '#2f8cf5'], Zenith: ['zenith', '#5856d6'],
+  Scratchpad: ['notes', '#f5c93a'], 'Read Me': ['doc', '#8e8e93'], Finder: ['folder', '#2f8cf5'], 'Design Tool': ['brush', '#af52de'], 'Chat App': ['chat', '#34c759'], 'Code Editor': ['code', '#0a84ff'],
+};
+function sourceTile(it) {
+  const [ic, color] = SOURCE_APPS[it.source] ?? [it.kind === 'link' ? 'link' : it.kind === 'image' ? 'photo' : it.kind === 'color' ? 'swatch' : 'lines', '#8e8e93'];
+  return `<span class="cb-src" style="--c:${color}" title="${esc(it.source ?? '')}">${icon(ic)}</span>`;
+}
+
+/** "6 min ago", "3 h ago", "yesterday", "3 days ago" (ClipboardCardContent.relativeTime). */
+function relativeTime(at) {
+  const m = Math.floor((Date.now() - at) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} h ago`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'yesterday' : `${d} days ago`;
+}
+
+function linkParts(text) {
+  try {
+    const u = new URL(text.trim());
+    return { host: u.hostname.replace(/^www\./, ''), path: `${u.pathname === '/' ? '' : u.pathname}${u.search}` };
+  } catch { return { host: text.trim().slice(0, 40), path: '' }; }
+}
+
+function hexRGB(hex) {
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = [...h].map((c) => c + c).join('');
+  const n = parseInt(h, 16);
+  return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
+}
+
+function cardBody(it) {
+  if (it.kind === 'image') return `<div class="cb-pv cb-photo"><img src="${it.img}" alt="${esc(it.text)}"></div>`;
+  if (it.kind === 'color') return `<div class="cb-pv cb-swatch-big" style="background:${esc(it.text)}"><b>${esc(it.text.toUpperCase())}</b></div>`;
+  if (it.kind === 'link') {
+    const { host, path } = linkParts(it.text);
+    return `<div class="cb-pv cb-link"><span class="cb-link-ic">${icon('link')}</span><b>${esc(host)}</b><span>${esc(path)}</span></div>`;
+  }
+  return `<div class="cb-pv cb-text ${looksLikeCode(it) ? 'is-code' : ''}">${esc(it.text.slice(0, 600))}</div>`;
+}
+
+function cardMeta(it) {
+  if (it.kind === 'image') return `${it.w} × ${it.h} · ${formatBytes(it.size ?? 0)}`;
+  if (it.kind === 'color') return `RGB ${hexRGB(it.text)}`;
+  if (it.kind === 'link') return linkParts(it.text).host;
+  if (looksLikeCode(it)) { const n = it.text.split('\n').length; return n === 1 ? '1 line' : `${n} lines`; }
+  const n = it.text.length;
+  return n === 1 ? '1 character' : `${n.toLocaleString('en-GB')} characters`;
+}
+
+function pasteLabel(it) {
+  if (it.kind === 'image') return it.text;
+  const t = it.text.replace(/\s+/g, ' ').trim();
+  return t.length > 16 ? `${t.slice(0, 14)}…` : t;
 }
 
 function render() {
   if (!panel) return;
   const list = visibleItems();
   if (!list.some((i) => i.id === selectedId)) selectedId = list[0]?.id ?? null;
-  const groups = [];
-  for (const it of list) {
-    const g = dayGroup(it.at);
-    if (!groups.length || groups[groups.length - 1].name !== g) groups.push({ name: g, items: [] });
-    groups[groups.length - 1].items.push(it);
-  }
-  let n = 0;
-  $('.cb-list', panel).innerHTML = list.length
-    ? groups.map((g) => `<div class="cb-group" role="presentation">${g.name}</div>${g.items.map((it) => {
-      n++;
-      return `<div class="cb-row ${it.id === selectedId ? 'sel' : ''}" role="option" id="cb-${it.id}" data-id="${it.id}" aria-selected="${it.id === selectedId}">
-        ${rowIcon(it)}<span class="cb-text">${esc(it.text.replace(/\s+/g, ' ').slice(0, 140))}</span>
-        ${it.pinned ? `<span class="cb-pin" aria-label="Pinned">${icon('pin')}</span>` : ''}
-        ${n <= 9 ? `<span class="cb-key">⌘${n}</span>` : ''}
-      </div>`;
-    }).join('')}`).join('')
+  const strip = $('.cb-strip', panel);
+  const scroll = strip.scrollLeft;
+  strip.innerHTML = list.length
+    ? list.map((it, i) => `<div class="cb-card ${it.id === selectedId ? 'sel' : ''}" role="option" id="cb-${it.id}" data-id="${it.id}" aria-selected="${it.id === selectedId}">
+        <div class="cb-card-head">${sourceTile(it)}<span class="cb-ct"><b>${KIND_LABEL[cardKind(it)]}</b><span>${relativeTime(it.at)}</span></span>${it.pinned ? `<span class="cb-pin" aria-label="Pinned">${icon('pin')}</span>` : ''}</div>
+        ${cardBody(it)}
+        <div class="cb-card-foot"><span>${esc(cardMeta(it))}</span>${i < 9 ? `<span class="cb-key">⌘${i + 1}</span>` : ''}</div>
+      </div>`).join('')
     : `<div class="cb-empty">${query ? `Nothing matches “${esc(query)}”.` : 'Nothing here yet.'}</div>`;
+  strip.scrollLeft = scroll;
   $$('.cb-filter', panel).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === filter)));
   $('.cb-input', panel).setAttribute('aria-activedescendant', selectedId ? `cb-${selectedId}` : '');
-  renderPreview();
-  updateFoot();
-  $(`#cb-${selectedId}`, panel)?.scrollIntoView({ block: 'nearest' });
-}
-
-function renderPreview() {
   const it = items.find((i) => i.id === selectedId);
-  const box = $('.cb-preview', panel);
-  if (!it) { box.innerHTML = '<div class="cb-empty">Select an item to see it here.</div>'; return; }
-  let view = '';
-  const meta = [['Type', { text: 'Text', link: 'Link', image: 'Image', color: 'Color' }[it.kind]], ['Copied', new Date(it.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })]];
-  if (it.source) meta.push(['From', it.source]);
-  if (it.kind === 'image') {
-    view = `<img class="cb-big" src="${it.img}" alt="${esc(it.text)}">`;
-    meta.push(['Dimensions', `${it.w} × ${it.h}`], ['Size', formatBytes(it.size ?? 0)]);
-  } else if (it.kind === 'color') {
-    view = `<div class="cb-color" style="background:${esc(it.text)}"><b>${esc(it.text.toUpperCase())}</b></div>`;
-  } else {
-    view = `<pre class="cb-full">${esc(it.text.slice(0, 20000))}</pre>`;
-    const words = it.text.trim().split(/\s+/).filter(Boolean).length;
-    meta.push(['Characters', it.text.length.toLocaleString('en-GB')], ['Words', words.toLocaleString('en-GB')], ['Lines', String(it.text.split('\n').length)]);
-    if (it.kind === 'link') {
-      const c = cleanLink(it.text);
-      if (c.removed) meta.push(['Clean link', `${c.removed} tracking parameter${c.removed === 1 ? '' : 's'} removed with ⇧↵`]);
-    }
-  }
-  box.innerHTML = `<div class="cb-view">${view}</div>
-    <dl class="cb-meta">${meta.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
-    <div class="cb-actions">
-      <button type="button" class="btn" data-cb="paste">Paste</button>
-      ${it.kind === 'link' && cleanLink(it.text).removed ? '<button type="button" class="btn" data-cb="clean">Paste Clean Link</button>' : ''}
-      <span class="grow"></span>
-      <button type="button" class="btn btn-icon" data-cb="pin" aria-label="${it.pinned ? 'Unpin' : 'Pin'}" aria-pressed="${it.pinned}">${icon('pin')}</button>
-      <button type="button" class="btn btn-icon" data-cb="delete" aria-label="Delete">${icon('trash')}</button>
-    </div>`;
+  const btn = $('[data-cb="paste"]', panel);
+  btn.textContent = it ? `Paste “${pasteLabel(it)}”` : 'Paste';
+  btn.disabled = !it;
+  updateFoot();
+  $(`#cb-${selectedId}`, panel)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 function updateFoot() {
   if (!panel) return;
   const list = visibleItems();
-  const count = list.length === 1 ? '1 item' : `${list.length} items`;
+  $('.cb-count', panel).textContent = list.length === 1 ? '1 item' : `${list.length} items`;
   let pb = 'The clipboard is empty';
   if (pasteboard) {
     const label = pasteboard.label.replace(/\s+/g, ' ');
@@ -263,7 +284,7 @@ function updateFoot() {
       pb += ` · empties in ${left} s`;
     }
   }
-  $('.cb-count', panel).textContent = `${count} · ${pb}`;
+  $('.cb-pb', panel).textContent = pb;
 }
 
 function select(delta) {
@@ -320,6 +341,8 @@ function onPanelKey(e) {
   if (e.key === 'Escape') { e.preventDefault(); closePanel(); return; }
   if (e.key === 'ArrowDown' || (e.ctrlKey && codeOf(e) === 'KeyN')) { e.preventDefault(); select(1); return; }
   if (e.key === 'ArrowUp' || (e.ctrlKey && codeOf(e) === 'KeyP')) { e.preventDefault(); select(-1); return; }
+  // Left and right browse the cards; with ⌥, ⌘ or ⇧ they still move the caret in the search field.
+  if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && !e.altKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); select(e.key === 'ArrowRight' ? 1 : -1); return; }
   if (e.key === 'Enter') { e.preventDefault(); paste(item, e.shiftKey ? 'plain' : 'normal'); return; }
   if (meta && /^Digit[1-9]$/.test(codeOf(e))) { e.preventDefault(); paste(visibleItems()[Number(codeOf(e).slice(5)) - 1]); return; }
   if (meta && codeOf(e) === 'KeyP' && item) { e.preventDefault(); togglePin(item); return; }
@@ -335,10 +358,16 @@ function openPanel() {
   filter = 'all';
   selectedId = null;
   panel = html`<div class="scrim cb-scrim"><div class="cb-panel" role="dialog" aria-modal="true" aria-label="Clipboard history">
-    <div class="cb-search">${icon('search')}<input class="cb-input" type="text" placeholder="Search clipboard history" aria-label="Search clipboard history" role="combobox" aria-controls="cb-list" aria-expanded="true" autocomplete="off" spellcheck="false"></div>
-    <div class="cb-filters" role="toolbar" aria-label="Filters">${FILTERS.map(([id, ic, label]) => `<button type="button" class="cb-filter" data-filter="${id}" aria-pressed="false">${icon(ic)}${label}</button>`).join('')}</div>
-    <div class="cb-main"><div class="cb-list" id="cb-list" role="listbox" aria-label="History"></div><div class="cb-preview"></div></div>
-    <div class="cb-foot"><span class="cb-count"></span><span class="cb-keys"><kbd>↵</kbd> Paste <kbd>⇧↵</kbd> Plain / clean link <kbd>⌘P</kbd> Pin <kbd>⌘⌫</kbd> Delete <kbd>esc</kbd> Close</span></div>
+    <div class="cb-top">
+      <div class="cb-search">${icon('search')}<input class="cb-input" type="text" placeholder="Search clipboard history" aria-label="Search clipboard history" role="combobox" aria-controls="cb-list" aria-expanded="true" autocomplete="off" spellcheck="false"></div>
+      <div class="cb-filters" role="toolbar" aria-label="Filters">${FILTERS.map(([id, label]) => `<button type="button" class="cb-filter" data-filter="${id}" aria-pressed="false">${label}</button>`).join('')}</div>
+      <span class="grow"></span><span class="cb-pb"></span><span class="cb-count"></span>
+    </div>
+    <div class="cb-strip" id="cb-list" role="listbox" aria-orientation="horizontal" aria-label="History"></div>
+    <div class="cb-foot">
+      <span class="cb-keys"><span><kbd>↵</kbd>Paste</span><span><kbd>⇧↵</kbd>Plain Text</span><span><kbd>⌘1–9</kbd>Quick Paste</span><span><kbd>←→</kbd>Browse</span><span><kbd>⌘P</kbd>Pin</span><span><kbd>⌘⌫</kbd>Delete</span><span><kbd>esc</kbd>Close</span></span>
+      <button type="button" class="cb-paste" data-cb="paste">Paste</button>
+    </div>
   </div></div>`;
   document.body.append(panel);
   const input = $('.cb-input', panel);
@@ -348,30 +377,31 @@ function openPanel() {
     if (e.target === panel) { closePanel(); return; }
     const f = e.target.closest?.('[data-filter]');
     if (f) { filter = f.dataset.filter; selectedId = null; render(); input.focus(); return; }
-    const row = e.target.closest?.('.cb-row');
-    if (row) { selectedId = Number(row.dataset.id); render(); input.focus(); return; }
+    // A click selects a card, a double-click pastes it.
+    const card = e.target.closest?.('.cb-card');
+    if (card) { selectedId = Number(card.dataset.id); render(); input.focus(); return; }
     const act = e.target.closest?.('[data-cb]')?.dataset.cb;
     const item = items.find((i) => i.id === selectedId);
     if (act === 'paste') paste(item);
-    if (act === 'clean') paste(item, 'clean');
-    if (act === 'pin') togglePin(item);
-    if (act === 'delete') remove(item);
   });
   panel.addEventListener('dblclick', (e) => {
-    const row = e.target.closest?.('.cb-row');
-    if (row) paste(items.find((i) => i.id === Number(row.dataset.id)));
+    const card = e.target.closest?.('.cb-card');
+    if (card) paste(items.find((i) => i.id === Number(card.dataset.id)));
   });
   panel.addEventListener('contextmenu', (e) => {
-    const row = e.target.closest?.('.cb-row');
-    if (!row) return;
+    const card = e.target.closest?.('.cb-card');
+    if (!card) return;
     e.preventDefault();
-    const item = items.find((i) => i.id === Number(row.dataset.id));
+    const item = items.find((i) => i.id === Number(card.dataset.id));
     selectedId = item.id;
     render();
     showContextMenu(e.clientX, e.clientY, [
       { label: 'Paste', shortcut: '↵', action: () => paste(item) },
       { label: 'Paste as Plain Text', shortcut: '⇧↵', disabled: item.kind === 'image', action: () => paste(item, 'plain') },
-      ...(item.kind === 'link' ? [{ label: 'Paste Clean Link', disabled: !cleanLink(item.text).removed, action: () => paste(item, 'clean') }] : []),
+      ...(item.kind === 'link' ? [
+        { label: 'Paste Clean Link', disabled: !cleanLink(item.text).removed, action: () => paste(item, 'clean') },
+        { label: 'Open Link', action: () => notify({ icon: 'link', title: 'Opens in your browser', subtitle: `${linkParts(item.text).host} (not on this page)`, tint: 'plain' }) },
+      ] : []),
       { separator: true },
       { label: item.pinned ? 'Unpin' : 'Pin', shortcut: '⌘P', action: () => togglePin(item) },
       { label: 'Delete', shortcut: '⌘⌫', action: () => remove(item) },
@@ -440,15 +470,15 @@ function snippetPicker() {
   let q = '';
   let sel = 0;
   const scrim = html`<div class="scrim sp-scrim"><div class="sp-panel" role="dialog" aria-modal="true" aria-label="Snippets">
-    <div class="cb-search">${icon('search')}<input type="text" placeholder="Search snippets" aria-label="Search snippets" autocomplete="off"></div>
+    <div class="cb-search">${icon('search')}<input type="text" placeholder="Search Snippets" aria-label="Search snippets" autocomplete="off"></div>
     <div class="sp-list" role="listbox"></div>
-    <div class="cb-foot"><span>${target ? 'Return types it into Scratchpad' : 'Return puts it in Scratchpad'}</span><span><kbd>esc</kbd> Close</span></div>
+    <div class="sp-foot"><span class="cb-keys"><span><kbd>↵</kbd>Insert</span><span><kbd>↑↓</kbd>Choose</span><span><kbd>esc</kbd>Close</span></span><span class="sp-where">${target ? 'Types it into Scratchpad' : 'Puts it in Scratchpad'}</span></div>
   </div></div>`;
   const list = () => snippetStore.list.filter((s) => `${s.name} ${s.trigger} ${s.text}`.toLowerCase().includes(q.toLowerCase()));
   const draw = () => {
     const l = list();
     sel = Math.min(sel, Math.max(0, l.length - 1));
-    $('.sp-list', scrim).innerHTML = l.length ? l.map((s, i) => `<div class="sp-row ${i === sel ? 'sel' : ''}" role="option" data-i="${i}" aria-selected="${i === sel}"><b>${esc(s.name)}</b><code>${esc(s.trigger)}</code><span>${esc(expandSnippet(s.text).text.replace(/\s+/g, ' '))}</span></div>`).join('') : '<div class="cb-empty">No snippet matches.</div>';
+    $('.sp-list', scrim).innerHTML = l.length ? l.map((s, i) => `<div class="sp-row ${i === sel ? 'sel' : ''}" role="option" data-i="${i}" aria-selected="${i === sel}"><b>${esc(s.name)}</b><code>${esc(s.trigger)}</code><span>${esc(s.text.replace(/\s+/g, ' '))}</span></div>`).join('') : '<div class="cb-empty">No snippet matches.</div>';
   };
   const choose = (s) => {
     if (!s) return;

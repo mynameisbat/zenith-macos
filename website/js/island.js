@@ -9,7 +9,7 @@ import { cleaner, boost, keepAwake, keepAwakeMenuItems, uninstaller, AWAKE_CHOIC
 import { TOOLS, TOOL_GROUPS, PAGES, DOCK_MAX, dockPinned, dockIsFull, dockIsDefault, dockLayout } from './tools.js';
 
 const NOTCH_H = 32;
-const SLOT = 40; // an icon on the Tools page's dock strip: the icon and the gap to the next
+const SLOT = 34; // an icon on the Tools page's dock strip: the 28 pt icon and the 6 pt gap to the next
 // A phone has room for a smaller notch only, or the menu bar items disappear under it.
 const notchWidth = () => (window.innerWidth <= 720 ? 110 : 186);
 const headerH = () => (settings.notch ? NOTCH_H + 4 : 34);
@@ -69,8 +69,7 @@ const aiWorking = () => settings.aiAgents;
 const hasActivity = () => S.playing || S.timer.mode || aiWorking() || keepAwake.on;
 
 function pageSize(id) {
-  let [w, h] = PAGES[id].size;
-  if (id === 'tools' && isNarrow()) h = 440; // the groups stack on a phone
+  const [w, h] = PAGES[id].size;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   // A small display gets less, and a phone gets the full width.
@@ -85,7 +84,7 @@ function geometry() {
   if (S.alert) return { w: Math.min(Math.max(nw + 220, 400), vw - 16), h: NOTCH_H + 42 };
   if (S.open) {
     if (S.page) { const p = pageSize(S.page); return { w: p.w, h: headerH() + p.h }; }
-    return { w: Math.min(380, vw - 12), h: 96 + (settings.toolDock ? 66 : 0) };
+    return { w: Math.min(380, vw - 12), h: 130 + (settings.toolDock ? 66 : 0) };
   }
   const wing = S.timer.mode ? (narrow ? 58 : 76) : keepAwake.on && !S.playing && !aiWorking() ? (narrow ? 50 : 62) : (narrow ? 36 : 42);
   let w = hasActivity() ? nw + 2 * wing : nw;
@@ -457,8 +456,11 @@ function hintText() {
   return `${t.title}: ${on ? 'On' : 'Off'}`;
 }
 
+/** 15 min, 1 h, 2 h, 5 h and the infinity sign (a tooltip names it: the words did not fit). Dark text on yellow. */
 function awakeChoicesHTML() {
-  return `<div class="awake-choices">${AWAKE_CHOICES.map(([label, m]) => `<button type="button" class="awake-chip" data-act="awake" data-min="${m === Infinity ? 'inf' : m}">${label}</button>`).join('')}<span class="grow"></span><button type="button" class="awake-x" data-act="awake-cancel" aria-label="Cancel">${icon('x')}</button></div>`;
+  return `<div class="awake-choices">${AWAKE_CHOICES.map(([label, m]) => (m === Infinity
+    ? `<button type="button" class="awake-chip is-inf" data-act="awake" data-min="inf" aria-label="${esc(label)}" title="${esc(label)}">∞</button>`
+    : `<button type="button" class="awake-chip" data-act="awake" data-min="${m}">${label}</button>`)).join('')}<span class="grow"></span><button type="button" class="awake-x" data-act="awake-cancel" aria-label="Cancel" title="Cancel">${icon('x')}</button></div>`;
 }
 
 function dockHTML() {
@@ -496,7 +498,13 @@ function activateTool(id) {
     return;
   }
   if (t.page) {
-    openPage(t.page, id === 'uninstall' ? { tab: 'uninstall' } : id === 'cleaner' ? { tab: 'system' } : undefined);
+    openPage(t.page);
+    return;
+  }
+  if (t.settingsTab) {
+    // Settings, Cleaner, Ports and Homebrew open Zenith's Settings window, not a page of the island.
+    close({ suppress: true });
+    setTimeout(() => runAction('settings', { tab: t.settingsTab, cleanTab: t.cleanTab }), 140);
     return;
   }
   // Anything else closes the island first: a capture must not start with the open island in the picture.
@@ -556,9 +564,9 @@ function onContextMenu(e) {
 
 // ---------------------------------------------------------------- the Tools page
 
+/** Every tool with its full name, in groups stacked one under the other, four tiles to a row. */
 function toolsPageHTML() {
-  const col = (groups) => `<div class="tp-col">${groups.map((g) => `<div class="tp-group"><h4>${g.title}</h4><div class="tp-tiles">${g.tools.map(tileHTML).join('')}</div></div>`).join('')}</div>`;
-  return `<div class="tp-grid">${col([TOOL_GROUPS[0], TOOL_GROUPS[2]])}${col([TOOL_GROUPS[1], TOOL_GROUPS[3]])}</div><div class="tp-strip"></div>`;
+  return `<div class="tp-grid">${TOOL_GROUPS.map((g) => `<div class="tp-group"><h4>${g.title}</h4><div class="tp-tiles">${g.tools.map(tileHTML).join('')}</div></div>`).join('')}</div><div class="tp-strip"></div>`;
 }
 
 function tileHTML(id) {
@@ -572,6 +580,7 @@ function tileHTML(id) {
     <span class="tool ${on === false ? 'is-off' : ''}" style="--tint:${t.tint}">${icon(t.icon)}${badge}</span><span class="tp-name">${esc(t.title)}</span></button>`;
 }
 
+/** The strip under the groups: the dock as it is now, its Edit Dock button, and Settings and Quit as two small circles. */
 function stripHTML() {
   if (S.awakePrompt) return `<div class="tp-ask"><div class="tp-cap">Keep the Mac awake for</div>${awakeChoicesHTML()}</div>`;
   const pinned = dockPinned();
@@ -583,12 +592,13 @@ function stripHTML() {
     return `<span class="tool tp-pin ${on === false ? 'is-off' : ''} ${dragged === id ? 'is-gap' : ''}" data-tool="${id}" data-pin="${id}" style="--tint:${t.tint}" role="img" aria-label="${esc(t.title)}" title="${esc(t.title)}">${icon(t.icon)}${minus}</span>`;
   }).join('');
   const ghost = S.drag ? `<span class="tool tp-pin tp-ghost" style="--tint:${TOOLS[S.drag.id].tint};transform:translateX(${S.drag.x}px)" aria-hidden="true">${icon(TOOLS[S.drag.id].icon)}</span>` : '';
-  const caption = !S.editing ? 'Dock' : dockIsFull() ? 'The dock is full. Click a tool on it to take it off, or drag to reorder.' : 'Click a tool to put it on the dock or take it off. Drag the icons here to reorder.';
-  const buttons = S.editing
-    ? `<button type="button" class="strip-btn" data-act="dock-reset" ${dockIsDefault() ? 'disabled' : ''}>Reset</button><button type="button" class="strip-btn is-prominent" data-act="dock-done">Done</button>`
-    : `<button type="button" class="strip-btn" data-act="dock-edit">Edit</button>`;
-  return `<div class="tp-cap ${S.editing ? 'is-edit' : ''} tp-hint-line">${esc(caption)}</div>
-    <div class="tp-row"><div class="tp-icons" style="--slot:${SLOT}px">${icons}<span class="tool tp-pin is-all" title="All Tools is always the last icon on the dock" role="img" aria-label="All Tools" style="--tint:${TOOLS.allTools.tint}">${icon('grid')}</span>${ghost}</div><span class="grow"></span>${buttons}</div>`;
+  const caption = !S.editing ? 'Dock' : dockIsFull() ? 'The dock is full. Click a tool on it to remove it.' : 'Click a tool to add it or remove it.';
+  const edit = S.editing ? '' : '<button type="button" class="strip-btn" data-act="dock-edit">Edit Dock</button>';
+  const trailing = S.editing
+    ? `<span class="grow"></span><button type="button" class="strip-btn" data-act="dock-reset" ${dockIsDefault() ? 'disabled' : ''}>Reset</button><button type="button" class="strip-btn is-prominent" data-act="dock-done">Done</button>`
+    : `<span class="grow"></span><button type="button" class="isl-round big" data-act="page-settings" aria-label="Settings" title="Settings">${icon('gear')}</button><button type="button" class="isl-round big" data-act="page-quit" aria-label="Quit Zenith" title="Quit Zenith">${icon('power')}</button>`;
+  return `<div class="tp-capline"><span class="tp-cap ${S.editing ? 'is-edit' : ''}">${esc(caption)}</span><span class="grow"></span>${edit}</div>
+    <div class="tp-row"><div class="tp-icons" style="--slot:${SLOT}px">${icons}<span class="tool tp-pin is-all" title="All Tools is always the last icon on the dock" role="img" aria-label="All Tools" style="--tint:${TOOLS.allTools.tint}">${icon('grid')}</span>${ghost}</div>${trailing}</div>`;
 }
 
 function renderToolsPage() {
@@ -703,13 +713,13 @@ function tabsAvailable() {
   return tabs;
 }
 
+/** Icon pills in a capsule on each side of the notch (a tooltip and VoiceOver carry the names); the shelf's carries a count badge. */
 function tabsHTML() {
   const tabs = tabsAvailable();
   if (!tabs.some(([id]) => id === S.tab)) S.tab = 'music';
-  const compact = tabs.length > 2;
-  // Beside a notch the tabs sit either side of it; without one they share the row.
-  const leftCount = settings.notch ? Math.ceil(tabs.length / 2) : tabs.length;
-  const btn = ([id, ic, label, count]) => `<button type="button" role="tab" class="isl-tab ${id === S.tab ? 'on' : ''}" data-act="tab" data-tab="${id}" aria-selected="${id === S.tab}" aria-label="${esc(label)}" title="${esc(label)}">${icon(ic)}${count ? `<b>${count}</b>` : ''}${compact ? '' : `<span>${esc(label)}</span>`}</button>`;
+  // Beside a notch the tabs sit either side of it (the first two on the left); without one they share the row.
+  const leftCount = settings.notch ? Math.min(2, Math.ceil(tabs.length / 2)) : tabs.length;
+  const btn = ([id, ic, label, count]) => `<button type="button" role="tab" class="isl-tab ${id === S.tab ? 'on' : ''}" data-act="tab" data-tab="${id}" aria-selected="${id === S.tab}" aria-label="${esc(label)}${count ? ` (${count})` : ''}" title="${esc(label)}">${icon(ic)}${count ? `<b class="isl-badge">${count}</b>` : ''}</button>`;
   return `<div class="isl-tabs" role="tablist">${tabs.slice(0, leftCount).map(btn).join('')}</div><span class="isl-gap"></span><div class="isl-tabs" role="tablist">${tabs.slice(leftCount).map(btn).join('')}</div>`;
 }
 
@@ -738,79 +748,89 @@ function renderPageView() {
   const head = $('.isl-page-head', root);
   const body = $('.isl-page-body', root);
   const back = S.backPage ? PAGES[S.backPage].title : '';
-  const tools = S.page === 'tools'
-    ? `<button type="button" class="isl-round" data-act="page-settings" aria-label="Settings" title="Settings">${icon('gear')}</button><button type="button" class="isl-round" data-act="page-quit" aria-label="Quit Zenith" title="Quit Zenith">${icon('power')}</button>`
-    : '';
-  head.innerHTML = `<button type="button" class="isl-back" data-act="page-back" aria-label="${back ? `Back to ${esc(back)}` : 'Back'}">${icon('back')}${back ? `<span>${esc(back)}</span>` : ''}</button>
-    <span class="grow"></span><span class="isl-page-title">${icon(spec.icon)}${esc(spec.title)}</span>${tools}<button type="button" class="isl-round" data-act="page-close" aria-label="Close" title="Close">${icon('x')}</button>`;
+  // Beside a notch each side of the strip has about 97 pt: only the back arrow and Close fit. The title is drawn without a
+  // notch; the page always has it for assistive technology.
+  head.innerHTML = `<button type="button" class="isl-back isl-round big" data-act="page-back" aria-label="${back ? `Back to ${esc(back)}` : 'Back'}" title="${back ? `Back to ${esc(back)}` : 'Back'}">${icon('back')}</button>
+    <span class="grow"></span><span class="isl-page-title ${settings.notch ? 'sr-only' : ''}">${icon(spec.icon)}${esc(spec.title)}</span><span class="grow"></span><button type="button" class="isl-round big" data-act="page-close" aria-label="Close" title="Close">${icon('x')}</button>`;
   body.className = `isl-page-body page-${S.page}`;
   body.scrollTop = 0;
   body.innerHTML = '';
   pageDispose = pageSpecs[S.page]?.mount(body, S.pageArg) ?? null;
 }
 
+/** The Now Playing card: tinted by the cover's colours, with a soft glow behind the artwork. */
 function musicPanel() {
   const t = track();
-  return `<div class="np">
+  const [ca, cb] = t.art;
+  return `<div class="np" style="--np-a:${ca};--np-b:${cb};--tint:${t.tint}">
+    <span class="np-glow" style="background-image:url(${arts[S.track]})" aria-hidden="true"></span>
     <img class="np-art" src="${arts[S.track]}" alt="">
     <div class="np-main">
       <div class="np-top">
-        <div class="np-meta"><b>${esc(t.title)}</b><span>${esc([t.artist, t.album].filter(Boolean).join(' · '))}</span></div>
-        <span class="np-app" style="--tint:${t.tint}">${icon('music')}${esc(t.app === 'Music' ? 'Apple Music' : t.app)}</span>
-      </div>
-      <div class="np-bar ${t.canSeek ? '' : 'no-seek'}" data-act="seek" role="slider" tabindex="0" aria-label="Position" aria-valuemin="0" aria-valuemax="${t.duration}">
-        <span class="np-fill" style="--tint:${t.tint}"></span>
-      </div>
-      <div class="np-controls">
-        <span class="np-time np-pos">0:00</span>
+        <div class="np-meta"><b>${esc(t.title)}</b><span><i class="np-note" title="${esc(t.app === 'Music' ? 'Apple Music' : t.app)}">${icon('music')}</i><em>${esc([t.artist, t.album].filter(Boolean).join(' · '))}</em></span></div>
         <span class="np-buttons">
           <button type="button" class="np-btn" data-act="prev" ${t.canSkip ? '' : 'disabled'} aria-label="Previous">${icon('prev')}</button>
           <button type="button" class="np-btn np-play" data-act="play" aria-label="${S.playing ? 'Pause' : 'Play'}">${icon(S.playing ? 'pause' : 'play')}</button>
           <button type="button" class="np-btn" data-act="next" ${t.canSkip ? '' : 'disabled'} aria-label="Next">${icon('next')}</button>
         </span>
+      </div>
+      <div class="np-prog">
+        <span class="np-time np-pos">0:00</span>
+        <div class="np-bar ${t.canSeek ? '' : 'no-seek'}" data-act="seek" role="slider" tabindex="0" aria-label="Position" aria-valuemin="0" aria-valuemax="${t.duration}">
+          <span class="np-fill"></span>
+        </div>
         <span class="np-time np-dur">${formatClock(t.duration)}</span>
       </div>
     </div>
   </div>`;
 }
 
+/** With the timer, the event and the network speed all on, the speed is a one-line chip inside the event's card. */
+const foldsNetworkIntoEvent = () => settings.timerWidget && settings.calendarWidget && settings.speedWidget;
+
+function speedLine() {
+  return `<span class="net-line">${icon('download')}<b class="sp-down">${formatBytes(S.speed.down)}/s</b></span><span class="net-line">${icon('download', 'ic flip')}<b class="sp-up">${formatBytes(S.speed.up)}/s</b></span>`;
+}
+
 function widgetsPanel() {
   const cards = [];
   if (settings.timerWidget) {
+    const compact = settings.calendarWidget ? ' is-compact' : '';
     if (S.timer.mode) {
-      cards.push(`<div class="wcard wcard-timer">
+      cards.push(`<div class="wcard wcard-timer${compact}"><span class="wcap">${S.timer.mode === 'break' ? 'Break' : 'Focus timer'}</span><div class="wrow">
         <span class="wt-ring">${timerRing(40, 4)}${icon('timer')}</span>
         <span class="wt-text"><b class="wt-time">${formatClock(S.timer.remaining)}</b><span>${S.timer.mode === 'break' ? 'Break' : 'Focus'}${S.timer.paused ? ' · paused' : ''}</span></span>
         <button type="button" class="wbtn wbtn-orange" data-act="timer-pause" aria-label="${S.timer.paused ? 'Resume' : 'Pause'}">${icon(S.timer.paused ? 'play' : 'pause')}</button>
         <button type="button" class="wbtn" data-act="timer-stop" aria-label="Stop">${icon('stop')}</button>
-      </div>`);
+      </div></div>`);
     } else {
-      cards.push(`<div class="wcard wcard-timer">
-        <span class="wt-ring">${timerRing(40, 4)}${icon('timer')}</span>
-        <span class="wt-text"><b>Focus</b><span>${settings.focusMinutes} min · break ${settings.breakMinutes} min</span></span>
+      cards.push(`<div class="wcard wcard-timer${compact}"><span class="wcap">Focus timer</span><div class="wrow">
+        <span class="wt-ring is-idle">${timerRing(40, 4)}${icon('timer')}</span>
+        <span class="wt-text"><b>Focus</b><span>${settings.calendarWidget ? `${settings.focusMinutes} min` : `${settings.focusMinutes} min · break ${settings.breakMinutes} min`}</span></span>
         <button type="button" class="wbtn wbtn-orange" data-act="timer-focus" aria-label="Start focus">${icon('play')}</button>
         <button type="button" class="wbtn wbtn-text" data-act="timer-break">Break</button>
-      </div>`);
+      </div></div>`);
     }
   }
   if (settings.calendarWidget) {
+    const chip = foldsNetworkIntoEvent() ? `<div class="net-chip">${speedLine()}</div>` : '';
     if (settings.calendarAccess === 'granted') {
       const mins = Math.max(0, Math.round((S.eventAt - Date.now()) / 60000));
-      cards.push(`<div class="wcard wcard-event"><span class="ev-bar"></span><span class="wt-text"><b>Design review</b><span class="ev-when">${mins > 0 ? `In ${mins} min` : 'Now'}</span></span></div>`);
+      cards.push(`<div class="wcard wcard-event"><span class="wcap">Next event</span><div class="wrow"><span class="ev-bar"></span><span class="wt-text"><b>Design review</b><span class="ev-when">${mins > 0 ? `In ${mins} min` : 'Now'}</span></span></div>${chip}</div>`);
     } else {
-      cards.push(`<div class="wcard wcard-event"><span class="ev-bar off"></span><span class="wt-text"><b>No access</b><span>Allow Calendars in Settings</span></span></div>`);
+      cards.push(`<div class="wcard wcard-event"><span class="wcap">Next event</span><div class="wrow"><span class="ev-bar off"></span><span class="wt-text"><b>No access</b><span>Allow Calendars in Settings</span></span></div>${chip}</div>`);
     }
   }
-  if (settings.speedWidget) {
-    cards.push(`<div class="wcard wcard-speed"><span>${icon('download')}<b class="sp-down">${formatBytes(S.speed.down)}/s</b></span><span>${icon('download', 'ic flip')}<b class="sp-up">${formatBytes(S.speed.up)}/s</b></span></div>`);
+  if (settings.speedWidget && !foldsNetworkIntoEvent()) {
+    cards.push(`<div class="wcard wcard-speed"><span class="wcap">Network</span><div class="net-col">${speedLine()}</div></div>`);
   }
   return `<div class="widgets">${cards.join('')}</div>`;
 }
 
 function aiPanel() {
   return `<div class="ai-cards">
-    <div class="aicard"><b>${icon('sparkles')}Claude Code<i class="ai-dot"></i></b><span class="is-working">Working · example-app</span><span>Today 10M · Session 3.2M</span></div>
-    <div class="aicard"><b>${icon('code')}Codex</b><span>Idle · website</span><span>Today 2.3M · Session 778K</span></div>
+    <div class="aicard" title="Today 10M · Session 3.2M"><b>${icon('sparkles')}Claude Code<i class="ai-dot"></i></b><span class="is-working">Working · example-app</span><span>Today 10M</span></div>
+    <div class="aicard" title="Today 2.3M · Session 778K"><b>${icon('code')}Codex</b><span>Idle · website</span><span>Today 2.3M</span></div>
   </div>`;
 }
 
@@ -977,7 +997,7 @@ export function initIsland() {
     if (act === 'awake-cancel') { S.awakePrompt = false; refreshTools(); }
     if (act === 'page-back') closePage();
     if (act === 'page-close') close({ suppress: true });
-    if (act === 'page-settings') openPage('settings');
+    if (act === 'page-settings') activateTool('settings');
     if (act === 'page-quit') { close({ suppress: true }); runAction('quit'); }
     if (act === 'dock-edit') { S.editing = true; bus.emit('tour', 'dock-edit'); renderToolsPage(); }
     if (act === 'dock-done') { S.editing = false; renderToolsPage(); }

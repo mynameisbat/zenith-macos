@@ -25,6 +25,15 @@ enum IslandToolStyle {
         }
     }
 
+    /// The glyph colour of the tinted style: the tool's colour, and for the tools that have none (Settings, Quit, All
+    /// Tools: their solid tile is dark grey) a light grey.
+    static func glyphTint(for tool: IslandTool) -> Color {
+        switch tool {
+        case .settings, .quit, .allTools: return Color(white: 0.92)
+        default: return tint(for: tool)
+        }
+    }
+
     /// The tool's name and, where it has a shortcut that is on, the shortcut: what the dock shows for the button
     /// under the pointer.
     static func caption(for tool: IslandTool) -> String {
@@ -45,8 +54,10 @@ enum IslandToolStyle {
             ?? HotKeyDefinition.menuStyle(action.shortcut)
     }
 
-    /// A page opens inside the island and a switch flips in place. Anything else closes the island first: a capture
-    /// must not start with the open island in the picture.
+    /// A page (System, All Tools) opens inside the island and a switch flips in place. Anything else closes the
+    /// island first: a capture must not start with the open island in the picture, and the tools that open
+    /// Zenith's Settings window (Cleaner, Ports, Homebrew, Uninstall, Settings) would otherwise leave the island
+    /// open over it.
     static func activate(_ tool: IslandTool, islandState: ZenithIslandState) {
         if tool == .keepAwake {
             // On: turn it off. Off: ask for how long, right there, instead of silently meaning "until turned off".
@@ -81,17 +92,28 @@ struct IslandKeepAwakeChoices: View {
                     KeepAwakeService.shared.start(mode)
                     prompt.isShowing = false
                 } label: {
-                    Text(verbatim: mode.title)
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .padding(.horizontal, 9)
-                        .frame(height: 26)
-                        .background(Capsule().fill(ZenithTint.keepAwake.opacity(0.85)))
-                        .contentShape(Capsule())
+                    Group {
+                        if mode == .indefinite {
+                            // "Until Turned Off" does not fit beside four times in the dock: the infinity sign, named by its tooltip.
+                            Image(systemName: "infinity")
+                                .font(.system(size: 12, weight: .bold))
+                        } else {
+                            Text(verbatim: mode.title)
+                                .font(.system(size: 10.5, weight: .semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                        }
+                    }
+                    // Dark on the yellow: white on it was about 1.6:1; black is above 10:1.
+                    .foregroundColor(Color.black.opacity(0.88))
+                    .padding(.horizontal, 9)
+                    .frame(height: 26)
+                    .background(Capsule().fill(ZenithTint.keepAwake))
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .help(Text(verbatim: mode.title))
+                .accessibilityLabel(Text(verbatim: mode.title))
             }
             Spacer(minLength: 0)
             Button {
@@ -134,29 +156,68 @@ final class IslandToolSwitches: ObservableObject {
     }
 }
 
-/// A tool as a coloured, rounded icon. A switch that is off is grey.
+/// A tool as a rounded icon, in the style the user chose (`IslandWidgetSettings.dockIconStyle`).
+///
+/// Tinted: a faint light tile with an inner highlight and the glyph in the tool's colour; a switch that is off is a
+/// dimmer tile with a grey glyph. Color: a solid tile in the tool's colour with a white glyph; a switch that is off is
+/// grey. The corners are 36 % of the side (14 pt at 40), concentric with the dock's tray around the icons.
+///
+/// Under the pointer (`isHovered`, set by the dock) the icon lifts a little, unless Reduce Motion is on.
 struct IslandToolIcon: View {
     let tool: IslandTool
     let size: CGFloat
     let isHovered: Bool
     @ObservedObject private var switches = IslandToolSwitches.shared
+    @ObservedObject private var settings = IslandWidgetSettings.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let isOff = switches.isOn(tool) == false
-        Image(systemName: tool.icon)
+        let shape = RoundedRectangle(cornerRadius: size * 0.36, style: .continuous)
+        return Image(systemName: tool.icon)
+            .symbolRenderingMode(.monochrome)
             .font(.system(size: size * 0.44, weight: .semibold))
-            .foregroundColor(.white.opacity(isOff ? 0.7 : 1))
+            .foregroundStyle(glyphColor(isOff: isOff))
             .frame(width: size, height: size)
-            .background(
-                RoundedRectangle(cornerRadius: size * 0.29, style: .continuous)
-                    .fill(isOff ? Color(white: 0.2) : IslandToolStyle.tint(for: tool))
+            .background(tileFill(isOff: isOff), in: shape)
+            .overlay(highlight(shape))
+            // The island clips everything to its rounded shape, and a clip flattens a symbol's colour to white (record,
+            // sparkles, the window and viewfinder symbols came out white in the tinted style). Drawing the icon as one
+            // group first keeps the glyph's colour.
+            .compositingGroup()
+            .offset(y: isHovered && !reduceMotion ? -2 : 0)
+            .scaleEffect(isHovered && !reduceMotion ? 1.06 : 1)
+            .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.7), value: isHovered)
+    }
+
+    private var isTinted: Bool { settings.dockIconStyle == .tinted }
+
+    private func glyphColor(isOff: Bool) -> Color {
+        if isTinted {
+            return isOff ? .white.opacity(0.45) : IslandToolStyle.glyphTint(for: tool)
+        }
+        return .white.opacity(isOff ? 0.7 : 1)
+    }
+
+    private func tileFill(isOff: Bool) -> Color {
+        if isTinted { return .white.opacity(isOff ? 0.04 : 0.08) }
+        return isOff ? Color(white: 0.2) : IslandToolStyle.tint(for: tool)
+    }
+
+    /// Tinted tiles get a 1 pt inner stroke, brighter along the top edge; solid ones a light edge on top.
+    @ViewBuilder
+    private func highlight(_ shape: RoundedRectangle) -> some View {
+        if isTinted {
+            shape.strokeBorder(
+                LinearGradient(colors: [.white.opacity(0.18), .white.opacity(0.07)], startPoint: .top, endPoint: .bottom),
+                lineWidth: 1
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: size * 0.29, style: .continuous)
-                    .strokeBorder(Color.white.opacity(isHovered ? 0.55 : 0), lineWidth: 1.2)
+        } else {
+            shape.strokeBorder(
+                LinearGradient(colors: [.white.opacity(0.3), .clear], startPoint: .top, endPoint: .center),
+                lineWidth: 1
             )
-            .scaleEffect(isHovered ? 1.06 : 1)
-            .animation(.easeOut(duration: 0.12), value: isHovered)
+        }
     }
 }
 
@@ -173,8 +234,8 @@ struct IslandToolMenuItems: View {
             Divider()
         case .privacyShield:
             Button("Privacy Shield Settings…") {
-                SettingsTab.requestSelection(.privacy)
-                islandState.openPage(.settings)
+                islandState.close()
+                ZenithToolActions.openSettings(on: .privacy)
             }
             Divider()
         default:
@@ -203,7 +264,7 @@ private struct IslandDockDragGhost: View {
     @ObservedObject private var position = IslandDockDragPosition.shared
 
     var body: some View {
-        IslandToolIcon(tool: tool, size: 30, isHovered: true)
+        IslandToolIcon(tool: tool, size: IslandDockEditor.stripIconSize, isHovered: true)
             .offset(x: position.x)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
@@ -215,8 +276,10 @@ private struct IslandDockDragGhost: View {
 final class IslandDockEditor: ObservableObject {
     static let shared = IslandDockEditor()
 
-    /// An icon's slot on the Tools page's dock strip: the icon and the gap to the next.
-    static let slotWidth: CGFloat = 40
+    /// An icon on the Tools page's dock strip, and its slot: the icon and the gap to the next. Seven slots, and in
+    /// edit mode Reset and Done after them, fit the 348 pt the strip has in the 380 pt island.
+    static let stripIconSize: CGFloat = 28
+    static let slotWidth: CGFloat = 34
 
     @Published var isEditing = false
     /// The icon being dragged on the strip. Its slot in the row is left empty (and moves as the others make room);
@@ -282,6 +345,8 @@ final class IslandDockEditor: ObservableObject {
 /// one line names the icon under the pointer, so an icon never has to be guessed at. Right-click an icon to move or
 /// remove it.
 struct IslandDock: View {
+    /// Seven icons (six tools and All Tools) and the rule fit the tray in 380 pt (`ZenithIslandGeometry.dockRowWidth`).
+    static let iconSize: CGFloat = ZenithIslandGeometry.dockIconSize
     @ObservedObject var islandState: ZenithIslandState
     @StateObject private var hover = IslandToolHover()
     @ObservedObject private var switches = IslandToolSwitches.shared
@@ -290,37 +355,50 @@ struct IslandDock: View {
     @ObservedObject private var keepAwake = KeepAwakeService.shared
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 3) {
             Text(verbatim: caption)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(.white.opacity(0.72))
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundColor(.white.opacity(0.6))
                 .lineLimit(1)
-                .frame(height: 14)
+                .frame(height: 11)
                 .accessibilityHidden(keepAwakePrompt.isShowing ? false : true)
 
             Group {
                 if keepAwakePrompt.isShowing {
                     IslandKeepAwakeChoices()
-                        .padding(.horizontal, 10)
-                        .frame(height: 34)
+                        .padding(.horizontal, 6)
+                        .frame(height: ZenithIslandGeometry.dockIconSize)
                 } else {
-                    HStack(spacing: 15) {
-                        ForEach(settings.dockLayout.tools) { tool in
+                    HStack(spacing: ZenithIslandGeometry.dockIconSpacing) {
+                        ForEach(settings.dockLayout.pinned) { tool in
                             button(tool)
                         }
+                        if !settings.dockLayout.pinned.isEmpty {
+                            // A thin rule before the way to everything that is not on the dock.
+                            Rectangle()
+                                .fill(Color.white.opacity(0.12))
+                                .frame(width: 1, height: 22)
+                                .padding(.horizontal, (ZenithIslandGeometry.dockRuleWidth - 1) / 2)
+                                .accessibilityHidden(true)
+                        }
+                        button(.allTools)
                     }
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
+            .padding(ZenithIslandGeometry.dockTrayPadding)
             .background(
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .fill(Color.white.opacity(0.07))
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(Color.white.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.07), lineWidth: 1)
             )
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, ZenithIslandGeometry.dockSideInset)
         .padding(.bottom, 6)
-        .frame(width: 380, height: ZenithIslandGeometry.dockHeight, alignment: .bottom)
+        .frame(width: ZenithIslandGeometry.expandedWidth, height: ZenithIslandGeometry.dockHeight, alignment: .bottom)
         // The question is not left open behind a closed island.
         .onDisappear { keepAwakePrompt.isShowing = false }
     }
@@ -341,7 +419,7 @@ struct IslandDock: View {
         Button {
             IslandToolStyle.activate(tool, islandState: islandState)
         } label: {
-            IslandToolIcon(tool: tool, size: 34, isHovered: hover.tool == tool)
+            IslandToolIcon(tool: tool, size: Self.iconSize, isHovered: hover.tool == tool)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -376,8 +454,9 @@ struct IslandDock: View {
     }
 }
 
-/// The Tools page: every tool as an icon with its full name under it, in named groups, two groups side by side, and
-/// at the bottom the dock as it is now, with Edit.
+/// The Tools page: every tool as an icon with its full name under it, in named groups one under the other (four
+/// tiles to a row), and at the bottom the dock as it is now, with Edit, Settings and Quit. It is as wide as the
+/// island, 380 pt.
 ///
 /// In edit mode a click on a tool puts it on the dock or takes it off, and the icons on the strip can be dragged
 /// into another order (or moved from their context menu). Every change is saved as it is made.
@@ -388,17 +467,20 @@ struct IslandAllToolsPage: View {
     @ObservedObject private var settings = IslandWidgetSettings.shared
     @ObservedObject private var keepAwakePrompt = IslandKeepAwakePrompt.shared
 
+    private static let sideInset: CGFloat = 16
+    /// Four tiles fill a row of the page.
+    private static let tileWidth = (ZenithIslandGeometry.expandedWidth - 2 * sideInset) / 4
+    private static let stripHeight: CGFloat = 64
+
     var body: some View {
-        let groups = IslandTool.groups
-        let left = groups.enumerated().filter { $0.offset % 2 == 0 }.map(\.element)
-        let right = groups.enumerated().filter { $0.offset % 2 == 1 }.map(\.element)
-        return VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 18) {
-                column(left)
-                column(right)
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(IslandTool.groups) { group in
+                    groupView(group)
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 6)
+            .padding(.horizontal, Self.sideInset)
+            .padding(.top, 2)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
             dockStrip
@@ -409,29 +491,30 @@ struct IslandAllToolsPage: View {
         }
     }
 
-    private func column(_ groups: [IslandTool.Group]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(groups) { group in
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(verbatim: group.title)
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.5))
-                        .accessibilityAddTraits(.isHeader)
-                    HStack(alignment: .top, spacing: 4) {
-                        ForEach(group.tools) { tool in
-                            tile(tool)
-                        }
-                    }
+    /// A group's name and its tools in one row, every tile as wide as a quarter of the page, whether the group has
+    /// four tools or three.
+    private func groupView(_ group: IslandTool.Group) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(verbatim: group.title)
+                .textCase(.uppercase)
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.6)
+                .foregroundColor(.white.opacity(0.5))
+                .padding(.leading, 4)
+                .accessibilityAddTraits(.isHeader)
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(group.tools) { tool in
+                    tile(tool)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func tile(_ tool: IslandTool) -> some View {
         let isPinned = settings.dockLayout.contains(tool)
         // In edit mode a tool that cannot be added (the dock is full) steps back.
         let isUnavailable = editor.isEditing && !isPinned && settings.dockLayout.isFull
+        let isHovered = hover.tool == tool
         return Button {
             if editor.isEditing {
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
@@ -442,25 +525,32 @@ struct IslandAllToolsPage: View {
             }
         } label: {
             VStack(spacing: 4) {
-                IslandToolIcon(tool: tool, size: 36, isHovered: hover.tool == tool)
+                // The tile as a whole lights up under the pointer, so the icon itself does not lift here.
+                IslandToolIcon(tool: tool, size: 38, isHovered: false)
                     .overlay(alignment: .topTrailing) {
                         if editor.isEditing && !isUnavailable {
                             Image(systemName: isPinned ? "checkmark.circle.fill" : "plus.circle.fill")
                                 .font(.system(size: 13, weight: .bold))
                                 .symbolRenderingMode(.palette)
                                 .foregroundStyle(.white, isPinned ? Color(nsColor: .systemGreen) : Color(white: 0.42))
-                                .offset(x: 5, y: -5)
+                                .offset(x: 4, y: -4)
                         }
                     }
                 Text(verbatim: tool.title)
-                    .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.88))
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
-                    .minimumScaleFactor(0.85)
+                    .minimumScaleFactor(0.8)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 2)
             }
-            .frame(width: 56, height: 68, alignment: .top)
+            .padding(.top, 5)
+            .frame(width: Self.tileWidth, height: 72, alignment: .top)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(isHovered ? 0.07 : 0))
+            )
             .contentShape(Rectangle())
             .opacity(isUnavailable ? 0.35 : 1)
         }
@@ -495,32 +585,53 @@ struct IslandAllToolsPage: View {
                     .foregroundColor(.white.opacity(0.72))
                     .lineLimit(1)
                 IslandKeepAwakeChoices()
-                    .frame(height: 30)
+                    .frame(height: 28)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 7)
-            .padding(.bottom, 10)
-            .frame(height: 64)
+            .padding(.horizontal, Self.sideInset)
+            .padding(.top, 6)
+            .padding(.bottom, 8)
+            .frame(height: Self.stripHeight)
             .background(Color.white.opacity(0.05))
         } else {
             dockIcons
         }
     }
 
+    /// Caption row (the strip's name and Edit, or while editing what to do), then the icons; while editing, Reset and
+    /// Done at the end of the icons; otherwise Settings and Quit.
     private var dockIcons: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: stripCaption)
-                .font(.system(size: 10.5, weight: editor.isEditing ? .regular : .semibold))
-                .foregroundColor(.white.opacity(editor.isEditing ? 0.72 : 0.5))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            HStack(spacing: 8) {
+                if editor.isEditing {
+                    Text(verbatim: stripCaption)
+                        .font(.system(size: 10.5))
+                        .foregroundColor(.white.opacity(0.72))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                } else {
+                    // The same small uppercase label as the groups above.
+                    Text(verbatim: stripCaption)
+                        .textCase(.uppercase)
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.6)
+                        .foregroundColor(.white.opacity(0.5))
+                        .lineLimit(1)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 0)
+                    stripButton("Edit Dock") {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { editor.isEditing = true }
+                    }
+                    .help("Choose which tools are on the dock under the island, and in what order")
+                }
+            }
+            .frame(height: 20)
 
             HStack(spacing: 0) {
-                HStack(spacing: IslandDockEditor.slotWidth - 30) {
+                HStack(spacing: IslandDockEditor.slotWidth - IslandDockEditor.stripIconSize) {
                     ForEach(settings.dockLayout.pinned) { tool in
                         stripIcon(tool)
                     }
-                    IslandToolIcon(tool: .allTools, size: 30, isHovered: false)
+                    IslandToolIcon(tool: .allTools, size: IslandDockEditor.stripIconSize, isHovered: false)
                         .opacity(0.55)
                         .help("All Tools is always the last icon on the dock")
                         .accessibilityLabel(Text(verbatim: IslandTool.allTools.title))
@@ -531,6 +642,13 @@ struct IslandAllToolsPage: View {
                     }
                 }
                 Spacer(minLength: 8)
+                if !editor.isEditing {
+                    // Apart from the tools on purpose: small, in the corner, where nobody reaching for a tool lands on Quit.
+                    HStack(spacing: 6) {
+                        cornerButton(.settings)
+                        cornerButton(.quit)
+                    }
+                }
                 if editor.isEditing {
                     stripButton("Reset") {
                         withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { settings.dockLayout = IslandDockLayout() }
@@ -538,30 +656,44 @@ struct IslandAllToolsPage: View {
                     .disabled(settings.dockLayout == IslandDockLayout())
                     .padding(.trailing, 6)
                     stripButton("Done", prominent: true) { editor.isEditing = false }
-                } else {
-                    stripButton("Edit") { editor.isEditing = true }
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 7)
-        .padding(.bottom, 10)
-        .frame(height: 64)
+        .padding(.horizontal, Self.sideInset)
+        .padding(.top, 5)
+        .padding(.bottom, 7)
+        .frame(height: Self.stripHeight)
         .background(Color.white.opacity(0.05))
+    }
+
+    private func cornerButton(_ tool: IslandTool) -> some View {
+        Button {
+            IslandToolStyle.activate(tool, islandState: islandState)
+        } label: {
+            Image(systemName: tool.icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.85))
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(Color.white.opacity(0.09)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(tool.title)
+        .accessibilityLabel(Text(verbatim: tool.title))
     }
 
     private var stripCaption: String {
         guard editor.isEditing else { return String(localized: "Dock") }
         return settings.dockLayout.isFull
-            ? String(localized: "The dock is full. Click a tool on it to take it off, or drag to reorder.")
-            : String(localized: "Click a tool to put it on the dock or take it off. Drag the icons here to reorder.")
+            ? String(localized: "The dock is full. Click a tool on it to remove it.")
+            : String(localized: "Click a tool to add or remove it. Drag icons to reorder.")
     }
 
     /// An icon on the strip. In edit mode it can be dragged sideways, clicked to take it off, and moved from its
     /// context menu (the way to reorder without a pointer drag).
     private func stripIcon(_ tool: IslandTool) -> some View {
         let isDragged = editor.draggedTool == tool
-        return IslandToolIcon(tool: tool, size: 30, isHovered: false)
+        return IslandToolIcon(tool: tool, size: IslandDockEditor.stripIconSize, isHovered: false)
             // While it is dragged the icon is drawn by `IslandDockDragGhost`; this is its empty slot.
             .opacity(isDragged ? 0 : 1)
             .overlay(alignment: .topTrailing) {

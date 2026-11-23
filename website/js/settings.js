@@ -23,8 +23,8 @@ const TABS = [
   { id: 'permissions', title: 'Permissions', icon: 'hand', tint: 'blue', keys: 'screen recording accessibility automation calendars' },
 ];
 
-// Settings is drawn in two places: the island's Settings page (and its Cleaner, Ports and Homebrew pages) and, while a full-screen
-// window hides the island, a window. Each place is a "mount"; one shared state, so what changes shows in all of them.
+// Settings is a window (the island's Settings, Cleaner, Ports and Homebrew tools open it on their tab). The window is a "mount";
+// the state is shared, so what changes shows wherever it is drawn.
 const mounts = new Set();
 let current = 'general';
 const live = () => [...mounts].filter((m) => m.el.isConnected && !m.el.closest('[hidden]'));
@@ -53,15 +53,33 @@ function stepper(key, min, max, step, unit, label) {
   return `<span class="stepper"><span class="stepper-val">${settings[key]} ${unit}</span><span class="stepper-btns"><button type="button" data-step="${key}" data-delta="${step}" data-min="${min}" data-max="${max}" aria-label="Increase ${esc(label)}">▲</button><button type="button" data-step="${key}" data-delta="${-step}" data-min="${min}" data-max="${max}" aria-label="Decrease ${esc(label)}">▼</button></span></span>`;
 }
 
+// ---------------------------------------------------------------- the live preview (IslandSettingsPreview)
+
+/** A static island at the top of the Dynamic Island pane: a made-up track, fixed times, no timers. It follows the timer,
+ *  calendar, network and tool-dock switches. */
+function islandPreview() {
+  const pills = [
+    settings.timerWidget ? '<span class="ip-pill is-timer">24:12</span>' : '',
+    settings.calendarWidget ? `<span class="ip-pill is-event">${icon('calendar')}15 min</span>` : '',
+    settings.speedWidget ? `<span class="ip-pill is-net">${icon('download')}2.4 MB/s</span>` : '',
+  ].join('');
+  const dock = ['crop:#3d8bff', 'clipboard:#f39c48', 'sparkles:#c040f0', 'trash:#f0506e', 'lockshield:#8e8e93', 'mug:#8e8e93', 'grid:#d8d8de']
+    .map((d) => { const [ic, c] = d.split(':'); return `<span class="tool ${c === '#8e8e93' ? 'is-off' : ''}" style="--tint:${c}">${icon(ic)}</span>`; }).join('');
+  return `<div class="isl-preview" aria-label="Live preview of the island"><div class="ip-island ${settings.notch ? '' : 'no-notch'}">
+    <div class="ip-row"><span class="ip-art"></span><span class="ip-meta"><b>Dawn Chorus</b><span>Example Band</span></span><span class="ip-pills">${pills}</span></div>
+    ${settings.toolDock ? `<div class="ip-dock">${dock}</div>` : ''}
+  </div><span class="ip-cap">Live preview</span></div>`;
+}
+
 // ---------------------------------------------------------------- panes
 
 const panes = {
   general() {
     const ignored = settings.ignoredApps;
     return [
-      section('Startup', [row({ ic: 'zenith', tint: 'indigo', title: 'Open at Login', sub: 'Start Zenith in the menu bar when you log in.', control: sw('openAtLogin', 'Open at Login') })]),
+      section('Startup', [row({ ic: 'zenith', tint: 'indigo', title: 'Open at Login', sub: 'Start Zenith when you log in.', control: sw('openAtLogin', 'Open at Login') })]),
       section('Updates', [
-        row({ ic: 'download', tint: 'blue', title: 'Check Automatically', sub: 'Once a day, from GitHub. Nothing is installed without your click.', control: sw('checkUpdates', 'Check for updates automatically') }),
+        row({ ic: 'download', tint: 'blue', title: 'Check Automatically', sub: 'Look for a new version once a day while Zenith is running. Nothing is installed without your click.', control: sw('checkUpdates', 'Check for updates automatically') }),
         row({ title: `Zenith ${VERSION}`, sub: 'You have the version this page shows.', control: '<button type="button" class="btn" data-act="check-update">Check Now</button>' }),
       ]),
       section('Clipboard', [
@@ -115,7 +133,7 @@ const panes = {
   island() {
     const t = timerSnapshot();
     const access = { granted: 'Allowed', denied: 'Not allowed', notDetermined: 'Not asked yet' }[settings.calendarAccess];
-    return section('', [
+    return islandPreview() + section('', [
       row({ ic: 'island', tint: 'black', title: 'Show the Island', sub: 'When off, notices use a floating panel instead.', control: sw('islandEnabled', 'Show the island') }),
       row({ title: 'Display Has a Notch', sub: 'This page only: the app sees whether your display has one.', control: sw('notch', 'Display has a notch') }),
     ]) + section('Widgets', [
@@ -438,7 +456,7 @@ function selectTab(id, m) {
   if (id === 'shortcuts') bus.emit('tour', 'settings');
 }
 
-/** Settings with its sidebar, in `el` (the island's Settings page, or the window). Returns what unmounts it. */
+/** Settings with its sidebar, in `el` (the window's body). Returns what unmounts it. */
 export function mountSettings(el, tab) {
   if (tab && panes[tab]) current = tab;
   el.innerHTML = `<div class="settings">
@@ -450,12 +468,6 @@ export function mountSettings(el, tab) {
     <section class="pane"><h3 class="pane-title"></h3><div class="pane-body"></div></section>
   </div>`;
   return mount(el, 'full');
-}
-
-/** One pane without the sidebar: the island's Cleaner, Ports and Homebrew pages. */
-export function mountPane(el, pane, arg) {
-  if (pane === 'cleaner' && arg?.tab) cleanTab = arg.tab;
-  return mount(el, 'pane', pane);
 }
 
 function mount(el, kind, pane) {
@@ -524,7 +536,7 @@ async function onClick(e) {
   const bi = t.closest('[data-brew-install]')?.dataset.brewInstall;
   if (bi) {
     const p = BREW_SEARCH.find((x) => x.name === bi);
-    brewRun([`$ brew install ${p.cask ? '--cask ' : ''}${bi}`, `==> Fetching ${bi}`, `==> Downloading https://ghcr.io/v2/homebrew/core/${bi}/blobs/sha256:…`, `==> Pouring ${bi}--${p.latest}.arm64_sequoia.bottle.tar.gz`, `🍺  ${bi} ${p.latest} is installed (simulated)`], () => {
+    brewRun([`$ brew install ${p.cask ? '--cask ' : ''}${bi}`, `==> Fetching ${bi}`, `==> Downloading https://ghcr.io/v2/homebrew/core/${bi}/blobs/sha256:…`, `==> Pouring ${bi}--${p.latest}.arm64_tahoe.bottle.tar.gz`, `🍺  ${bi} ${p.latest} is installed (simulated)`], () => {
       brew.installed.push({ name: bi, version: p.latest, latest: p.latest, desc: p.desc, size: 3e6 + Math.random() * 4e7, cask: p.cask });
       notify({ icon: 'mug', title: `${bi} installed`, subtitle: 'Simulated: nothing ran on your computer', tint: 'amber' });
     });
@@ -789,23 +801,15 @@ export function initSettings() {
       render();
     },
   });
-  // Every way to Settings (⌘, menus, the Read Me) opens the island's Settings page; the window is only for while a
-  // full-screen window hides the island.
-  registerAction('settings', (tab) => {
-    if (!island.openPage('settings', { tab })) openWindow('settings', tab);
+  // Every way to Settings (⌘, the menus, the island's Settings, Cleaner, Ports and Homebrew tools, the hub) opens this window.
+  // `arg` is a tab id, or { tab, cleanTab } to land on the Cleaner's Uninstall list.
+  registerAction('settings', (arg) => {
+    const tab = typeof arg === 'string' ? arg : arg?.tab;
+    if (arg?.cleanTab) cleanTab = arg.cleanTab;
+    openWindow('settings', tab);
   });
-  island.registerPage('settings', { mount: (el, arg) => mountSettings(el, arg?.tab) });
-  island.registerPage('cleaner', { mount: (el, arg) => mountPane(el, 'cleaner', arg) });
-  island.registerPage('ports', { mount: (el) => mountPane(el, 'ports') });
-  island.registerPage('homebrew', { mount: (el) => mountPane(el, 'homebrew') });
   bus.on('setting:shieldOn', shieldChanged);
   if (settings.shieldOn) feedTimer = setInterval(feedTick, 1600);
-  // Turning the island off while its Settings page is open: the settings move to the window.
-  bus.on('setting:islandEnabled', (on) => {
-    if (on || island.state.page !== 'settings') return;
-    island.close();
-    openWindow('settings', current);
-  });
   ['timer', 'cleaner', 'ports', 'system', 'keep-awake', 'snippets', 'uninstalled', 'setting:shieldOn', 'setting:calendarAccess', 'setting:ignoredApps', 'setting:islandEnabled', 'setting:notch'].forEach((t) => bus.on(t, () => {
     // Re-render quietly; the timer only matters on its own pane.
     if (t === 'timer' && current !== 'island') return;

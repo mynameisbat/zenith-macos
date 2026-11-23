@@ -12,7 +12,7 @@ struct ZenithDynamicIslandTests {
         let geometry = ZenithIslandGeometry(screen: screen)
 
         #expect(geometry.expandedWidth == 380)
-        #expect(geometry.expandedHeight == 96)
+        #expect(geometry.expandedHeight == 130)
 
         let idleFrame = geometry.windowFrame(isExpanded: false)
         let expandedFrame = geometry.windowFrame(isExpanded: true)
@@ -46,7 +46,7 @@ struct ZenithDynamicIslandTests {
         let expectedDefaultFrame = expectedDefaultScreen?.frame ?? CGRect(x: 0, y: 0, width: 1920, height: 1080)
         #expect(defaultGeometry.screenFrame == expectedDefaultFrame)
         #expect(defaultGeometry.expandedWidth == 380)
-        #expect(defaultGeometry.expandedHeight == 96)
+        #expect(defaultGeometry.expandedHeight == 130)
     }
 
     @Test("ISL-02: ZenithIslandState hover expansion and toggle behaviors")
@@ -477,7 +477,7 @@ struct ZenithDynamicIslandTests {
         let geometry = ZenithIslandGeometry()
         // Points outside the idle notch (e.g. menubar icons to the far right, or windows below)
         let menubarRightIcon = CGPoint(x: geometry.screenFrame.maxX - 50, y: geometry.screenFrame.maxY - 10)
-        let windowBelowIsland = CGPoint(x: geometry.notchRect.midX, y: geometry.screenFrame.maxY - 150)
+        let windowBelowIsland = CGPoint(x: geometry.notchRect.midX, y: geometry.screenFrame.maxY - geometry.expandedHeight - ZenithIslandGeometry.dockHeight - 40)
 
         #expect(!geometry.idleFrame.contains(menubarRightIcon))
         #expect(!geometry.idleFrame.contains(windowBelowIsland))

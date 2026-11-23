@@ -176,6 +176,77 @@ struct LocalProxyServerBehaviorTests {
         #expect(options?.noDelay == true)
     }
 
+    @Test("LP-14b: The listener is bound to 127.0.0.1 only: this Mac's LAN address gets no answer")
+    func testListenerIsBoundToLoopbackOnly() async throws {
+        let (server, port) = try await startProxy()
+        defer { server.stop() }
+
+        // Any non-loopback IPv4 address of this machine (none on a Mac with no network: then there is nothing to check).
+        var found: String?
+        var list: UnsafeMutablePointer<ifaddrs>?
+        if getifaddrs(&list) == 0 {
+            var cursor = list
+            while let entry = cursor?.pointee {
+                if let sa = entry.ifa_addr, sa.pointee.sa_family == UInt8(AF_INET), entry.ifa_flags & UInt32(IFF_LOOPBACK) == 0,
+                   entry.ifa_flags & UInt32(IFF_UP) != 0 {
+                    var buffer = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+                    var addr = UnsafeRawPointer(sa).load(as: sockaddr_in.self).sin_addr
+                    if inet_ntop(AF_INET, &addr, &buffer, socklen_t(INET_ADDRSTRLEN)) != nil {
+                        found = String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+                        break
+                    }
+                }
+                cursor = entry.ifa_next
+            }
+            freeifaddrs(list)
+        }
+        let lanAddress = found
+
+        let (reachable, viaLAN) = await offPool { () -> (Bool, Bool?) in
+            // Non-blocking connect with a short wait: a listener bound to loopback refuses at once.
+            func canConnect(_ ip: String) -> Bool {
+                let fd = socket(AF_INET, SOCK_STREAM, 0)
+                defer { close(fd) }
+                var addr = Sock.address(port: port)
+                addr.sin_addr.s_addr = inet_addr(ip)
+                _ = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK)
+                let result = withUnsafePointer(to: &addr) {
+                    $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+                }
+                if result == 0 { return true }
+                var poll = pollfd(fd: fd, events: Int16(POLLOUT), revents: 0)
+                _ = Darwin.poll(&poll, 1, 1_500)
+                var error: Int32 = 0
+                var length = socklen_t(MemoryLayout<Int32>.size)
+                getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &length)
+                return poll.revents & Int16(POLLOUT) != 0 && error == 0
+            }
+            return (canConnect("127.0.0.1"), lanAddress.map(canConnect))
+        }
+        #expect(reachable)
+
+        // The socket itself is on 127.0.0.1 (lsof printed `*:port` before: the interface restriction alone left it on
+        // the wildcard address).
+        let listing = await offPool { () -> String in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+            process.arguments = ["-nP", "-a", "-p", String(ProcessInfo.processInfo.processIdentifier), "-iTCP:\(port)", "-sTCP:LISTEN"]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+            guard (try? process.run()) != nil else { return "" }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return String(decoding: data, as: UTF8.self)
+        }
+        if !listing.isEmpty {
+            #expect(listing.contains("127.0.0.1:\(port)"), "\(listing)")
+            #expect(!listing.contains("*:\(port)"), "\(listing)")
+        }
+
+        if let viaLAN { #expect(viaLAN == false, "the proxy answered on \(lanAddress ?? "?")") }
+    }
+
     // MARK: - Request rewriting
 
     @Test("LP-01: A proxy-form request becomes an origin-form request with hop-by-hop headers removed")

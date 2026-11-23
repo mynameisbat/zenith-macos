@@ -1,7 +1,8 @@
-// The Command Hub: the popover under Zenith's menu bar icon. The icon is there only when Settings → Dynamic Island → Behavior →
-// Menu Bar Icon is on, or the tool dock is off. While the island has its dock, the hub leaves out its quick-action grid and its
-// Clean and Boost buttons (typing in its search still finds and runs them). Its running-apps and meters are shared with the
-// island's System page.
+// The Command Hub, Control Center style: the popover under Zenith's menu bar icon. The icon is there only when Settings → Dynamic
+// Island → Behavior → Menu Bar Icon is on, or the tool dock is off. A search capsule, two toggle tiles (Privacy Shield, Keep
+// Awake: filled with the feature's colour while on), ring gauges, the running apps and a footer (Listening Ports, Settings, Quit).
+// While the island has its dock, the hub leaves out Scan and Boost (typing in its search still finds and runs them). The gauges
+// and the running apps are shared with the island's System page, which leaves out everything the island has itself.
 import {
   $, bus, esc, icon, html, settings, setSetting, registerAction, runAction, shortcutText, formatBytes, closeMenus,
   showMenu, app, codeOf,
@@ -30,9 +31,21 @@ const EXTRA = [
   { id: 'settings', title: 'Settings…', icon: 'gear' },
 ];
 
-const cpuText = (p) => `${p.cpu.toFixed(1)}%`;
+/** A running app's CPU: from 100 % up the decimal goes ("156%"), below it keeps one ("9.5%"). */
+const cpuText = (p) => `${p.cpu >= 100 ? Math.round(p.cpu) : (Math.round(p.cpu * 10) / 10).toFixed(1)}%`;
+/** Orange above 20 %, red above 50 % (HubGaugeLevel.process). */
+const cpuLevel = (cpu) => (cpu > 50 ? 'crit' : cpu > 20 ? 'warn' : '');
 
-/** The running-apps list (and, for a number, the ports), as the hub and the System page draw it. */
+/** A size short enough for a 60 pt ring: one decimal below 10 GB, whole numbers above (HubStatus.compactSize). */
+function compactSize(bytes) {
+  const gb = Math.max(bytes, 0) / 1e9;
+  if (gb >= 1000) return `${(gb / 1000) >= 10 ? Math.round(gb / 1000) : (gb / 1000).toFixed(1)} TB`;
+  if (gb >= 10) return `${Math.round(gb)} GB`;
+  if (gb >= 0.1) return `${gb.toFixed(1)} GB`;
+  return `${Math.round(bytes / 1e6)} MB`;
+}
+
+/** The running-apps module (and, for a number typed in the search, the ports), as the hub and the System page draw them. */
 export function appsHTML(q) {
   const apps = processes.list.filter((p) => !q || p.name.toLowerCase().includes(q)).slice(0, 5);
   const portQuery = q.replace(/^:/, '');
@@ -40,21 +53,29 @@ export function appsHTML(q) {
   return {
     apps,
     portRows,
-    html: `${portRows.length ? `<div class="hub-sec"><div class="hub-head"><span>Ports</span></div>${portRows.map((p) => `<div class="hub-app"><span class="app-ic">${icon('port')}</span><span class="grow"><b>${String(p.port)} · ${esc(p.process)}</b><span>${p.proto} · ${esc(p.address)} · PID ${String(p.pid)}</span></span><button type="button" class="x-btn" data-stop-port="${p.port}" aria-label="Stop ${esc(p.process)} on port ${p.port}">${icon('xcircle')}</button></div>`).join('')}</div>` : ''}
-    ${apps.length ? `<div class="hub-sec"><div class="hub-head"><span>Running Apps</span><span>${system.cpu}% CPU · 8 cores</span></div>
-      ${apps.map((p, i) => `<div class="hub-app"><span class="app-ic">${icon(p.icon)}</span><span class="grow"><b>${esc(p.name)}</b><span>${formatBytes(p.mem)}</span></span><span class="cpu ${p.cpu > 15 ? 'hot' : ''}">${cpuText(p)}</span><button type="button" class="x-btn" data-quit="${esc(p.name)}" aria-label="Quit ${esc(p.name)} (⌘${i + 1})" title="Quit (⌘${i + 1})">${icon('xcircle')}</button></div>`).join('')}
+    html: `${portRows.length ? `<div class="hub-module hub-apps"><div class="hub-head"><span>Ports</span></div>${portRows.map((p) => `<div class="hub-app"><span class="app-ic">${icon('port')}</span><span class="grow"><b>${String(p.port)} · ${esc(p.process)}</b><span>${p.proto} · ${esc(p.address)} · PID ${String(p.pid)}</span></span><button type="button" class="x-btn" data-stop-port="${p.port}" aria-label="Stop ${esc(p.process)} on port ${p.port}" title="Stop">${icon('xcircle')}</button></div>`).join('')}</div>` : ''}
+    ${apps.length ? `<div class="hub-module hub-apps"><div class="hub-head"><span>Running Apps</span><span>8 cores</span></div>
+      ${apps.map((p, i) => `<div class="hub-app"><span class="app-ic">${icon(p.icon)}</span><span class="grow"><b>${esc(p.name)}</b><span>${formatBytes(p.mem)}</span></span><span class="cpu-bar"><span class="${cpuLevel(p.cpu)}" style="width:${Math.min(100, Math.max(0, p.cpu / 2))}%"></span></span><span class="cpu ${cpuLevel(p.cpu)}">${cpuText(p)}</span><button type="button" class="x-btn" data-quit="${esc(p.name)}" aria-label="Quit ${esc(p.name)}${i < 4 ? ` (⌘${i + 1})` : ''}" title="Quit${i < 4 ? ` (⌘${i + 1})` : ''}">${icon('xcircle')}</button></div>`).join('')}
     </div>` : ''}`,
   };
 }
 
+/** One 60 pt ring gauge: a 5 pt round-capped arc on a faint track, the value in the middle and the name under it. */
+function gauge(title, value, fraction, color) {
+  const r = 27.5;
+  const c = 2 * Math.PI * r;
+  const f = Math.min(1, Math.max(0.001, fraction));
+  return `<div class="gauge" role="img" aria-label="${esc(title)}: ${esc(value)}"><span class="gauge-ring"><svg width="60" height="60" viewBox="0 0 60 60" aria-hidden="true"><circle class="g-track" cx="30" cy="30" r="${r}"/><circle class="g-arc" cx="30" cy="30" r="${r}" style="stroke:${color}" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(c * (1 - f)).toFixed(2)}" transform="rotate(-90 30 30)"/></svg><b class="${value.length > 5 ? 'is-long' : ''}">${esc(value)}</b></span><span class="gauge-name">${esc(title)}</span></div>`;
+}
+
+/** The inside of the gauges module: CPU, memory and free space as rings, and the network line. */
 export function metersHTML() {
-  const usedPct = Math.round((system.memUsed / system.memTotal) * 100);
-  const diskPct = Math.round(((system.diskTotal - system.diskFree) / system.diskTotal) * 100);
-  return `
-    <div class="meter-box"><span>CPU</span><b>${system.cpu}%</b><span class="meter"><span style="width:${system.cpu}%"></span></span></div>
-    <div class="meter-box"><span>Memory</span><b>${usedPct}%</b><span class="meter"><span style="width:${usedPct}%"></span></span></div>
-    <div class="meter-box"><span>Free Space</span><b>${formatBytes(system.diskFree)}</b><span class="meter"><span style="width:${diskPct}%"></span></span></div>
-    <div class="hub-speed">${icon('download')}${formatBytes(speed.down)}/s <span>${icon('download', 'ic flip')}${formatBytes(speed.up)}/s</span></div>`;
+  const memPct = Math.round((system.memUsed / system.memTotal) * 100);
+  const cpuColor = system.cpu > 75 ? 'var(--red)' : system.cpu > 40 ? 'var(--orange)' : 'var(--accent)';
+  return `${gauge('CPU', `${system.cpu}%`, system.cpu / 100, cpuColor)}
+    ${gauge('Memory', `${memPct}%`, memPct / 100, memPct > 85 ? 'var(--red)' : 'var(--orange)')}
+    ${gauge('Free Space', compactSize(system.diskFree), system.diskFree / system.diskTotal, '#5ac8d8')}
+    <div class="hub-speed"><span>${icon('download')}${formatBytes(speed.down)}/s</span><span>${icon('download', 'ic flip')}${formatBytes(speed.up)}/s</span></div>`;
 }
 
 export function jitterSpeed() {
@@ -77,23 +98,29 @@ function render() {
   if (!pop) return;
   const q = query.trim().toLowerCase();
   const dockOn = settings.toolDock;
-  // With the dock the quick actions are the island's; a search still finds them.
-  const tiles = dockOn && !q ? [] : TILES.filter((t) => !q || t.title.toLowerCase().includes(q));
-  const extras = q ? EXTRA.filter((t) => t.title.toLowerCase().includes(q)) : [];
+  // Searching: the matching actions come first (with the dock they are the island's, and only a search finds them here).
+  const actions = q ? [...TILES, ...EXTRA].filter((t) => t.title.toLowerCase().includes(q)) : [];
   const { apps, portRows, html: appsPart } = appsHTML(q);
   const scanLabel = scanState === 'scanning' ? 'Scanning…' : scanState === 'found' ? `Clean ${formatBytes(cleaner.selectedSize('system'))}` : 'Scan';
 
   $('.hub-dyn', pop).innerHTML = `
-    ${tiles.length ? `<div class="hub-tiles">${tiles.map((t) => `<button type="button" class="hub-tile" data-run="${t.id}"><span class="tile-ic tint-${t.tint}">${icon(t.icon)}</span><span><b>${t.title}</b><kbd>${esc(shortcutText(t.id) || '—')}</kbd></span></button>`).join('')}</div>` : ''}
-    ${extras.length ? `<div class="hub-list">${extras.map((t) => `<button type="button" class="hub-row" data-run="${t.id}">${icon(t.icon)}<span class="grow">${t.title}</span>${shortcutText(t.id) ? `<kbd>${esc(shortcutText(t.id))}</kbd>` : ''}</button>`).join('')}</div>` : ''}
+    ${actions.length ? `<div class="hub-module hub-list">${actions.map((t) => `<button type="button" class="hub-row" data-run="${t.id}">${icon(t.icon)}<span class="grow">${t.title}</span>${shortcutText(t.id) ? `<kbd>${esc(shortcutText(t.id))}</kbd>` : ''}</button>`).join('')}</div>` : ''}
     ${appsPart}
-    ${!q ? `<button type="button" class="hub-awake hub-ports" data-hub="ports"><span class="tile-ic small tint-cyan">${icon('globe')}</span><span class="grow">Listening Ports</span><span class="dim">${ports.list.filter((p) => p.proto === 'TCP').length}</span>${icon('chevron')}</button>` : ''}
-    ${!tiles.length && !extras.length && !apps.length && !portRows.length ? `<div class="hub-none">Nothing matches “${esc(query)}”.</div>` : ''}`;
+    ${!actions.length && !apps.length && !portRows.length ? `<div class="hub-none">Nothing matches “${esc(query)}”.</div>` : ''}`;
 
-  $('.hub-meters', pop).innerHTML = metersHTML();
-  $('.hub-shield input', pop).checked = settings.shieldOn;
-  $('.hub-awake-switch', pop).checked = keepAwake.on;
-  $('.hub-controls', pop).hidden = dockOn;
+  const shield = $('[data-hub="shield"]', pop);
+  shield.classList.toggle('is-on', !!settings.shieldOn);
+  shield.setAttribute('aria-pressed', String(!!settings.shieldOn));
+  $('.ht-status', shield).textContent = settings.shieldOn ? 'On' : 'Off';
+  const awake = $('[data-hub="awake-toggle"]', pop);
+  awake.classList.toggle('is-on', keepAwake.on);
+  awake.setAttribute('aria-pressed', String(keepAwake.on));
+  $('.ht-status', awake).textContent = keepAwake.on ? keepAwake.leftText().replace(/^On until/, 'Until') : 'Off';
+  $('.hub-tiles', pop).hidden = !!q;
+  $('.hub-meters', pop).hidden = !!q;
+  $('.hub-meters', pop).innerHTML = q ? '' : metersHTML();
+  $('.hub-controls', pop).hidden = dockOn || !!q;
+  $('.hub-ports-count', pop).textContent = String(ports.list.filter((p) => p.proto === 'TCP').length);
   const scan = $('[data-hub="scan"]', pop);
   scan.innerHTML = `${icon('sparkles')}${scanLabel}`;
   scan.disabled = scanState === 'scanning';
@@ -128,20 +155,20 @@ function openHub() {
   const anchor = $('#mb-zenith');
   pop = html`<div class="hub" role="dialog" aria-label="Zenith Command Hub">
     <div class="hub-search">${icon('search')}<input type="text" placeholder="Search actions and apps" aria-label="Search actions and apps" autocomplete="off" spellcheck="false"></div>
-    <div class="hub-dyn"></div>
-    <div class="hub-meters"></div>
+    <div class="hub-tiles">
+      <div class="hub-tilewrap"><button type="button" class="hub-tile" data-hub="shield" aria-pressed="false" style="--on:#238a3d" title="Look sites up over encrypted DNS through a local proxy"><span class="ht-ic">${icon('lockshield')}</span><span class="ht-t"><b>Privacy Shield</b><span class="ht-status">Off</span></span></button></div>
+      <div class="hub-tilewrap"><button type="button" class="hub-tile" data-hub="awake-toggle" aria-pressed="false" style="--on:#b35000" title="Keep the Mac from going to sleep until you turn it off"><span class="ht-ic">${icon('mug')}</span><span class="ht-t"><b>Keep Awake</b><span class="ht-status">Off</span></span></button><button type="button" class="ht-clock" data-hub="awake" aria-label="Keep Awake options" title="Keep the Mac awake for a while">${icon('timer')}</button></div>
+    </div>
     <div class="hub-controls">
-      <span class="grow"></span>
-      <button type="button" class="chip" data-hub="scan">${icon('sparkles')}Scan</button>
-      <button type="button" class="chip" data-hub="boost">${icon('boost')}Boost</button>
+      <button type="button" class="hub-capsule" data-hub="scan">${icon('sparkles')}Scan</button>
+      <button type="button" class="hub-capsule" data-hub="boost">${icon('boost')}Boost</button>
     </div>
-    <div class="hub-switches">
-      <label class="hub-shield"><span class="tile-ic tint-green small">${icon('lockshield')}</span><span class="grow">Privacy Shield</span><input type="checkbox" class="switch" role="switch"></label>
-      <div class="hub-shield hub-awake-row"><span class="tile-ic tint-amber small">${icon('mug')}</span><span class="grow">Keep Awake</span><button type="button" class="x-btn" data-hub="awake" aria-label="Keep Awake for how long" title="For how long">${icon('timer')}</button><input type="checkbox" class="switch hub-awake-switch" role="switch" aria-label="Keep Awake"></div>
-    </div>
+    <div class="hub-meters hub-module"></div>
+    <div class="hub-dyn"></div>
     <div class="hub-foot">
-      <button type="button" data-hub="settings">Settings… <kbd>⌘,</kbd></button>
-      <button type="button" data-hub="quit">Quit Zenith <kbd>⌘Q</kbd></button>
+      <button type="button" class="hub-capsule" data-hub="ports">${icon('globe')}<span class="grow">Listening Ports</span><span class="dim hub-ports-count"></span>${icon('chevron')}</button>
+      <button type="button" class="hub-circle" data-hub="settings" aria-label="Settings" title="Settings (⌘,)">${icon('gear')}</button>
+      <button type="button" class="hub-circle" data-hub="quit" aria-label="Quit Zenith" title="Quit Zenith (⌘Q)">${icon('power')}</button>
     </div>
   </div>`;
   document.body.append(pop);
@@ -180,11 +207,11 @@ function openHub() {
     if (act === 'boost') doBoost();
     if (act === 'settings') { closeHub(); runAction('settings'); }
     if (act === 'quit') { closeHub(); runAction('quit'); }
-    if (act === 'ports') { closeHub(); if (!island.openPage('ports')) runAction('settings', 'ports'); }
+    if (act === 'shield') setSetting('shieldOn', !settings.shieldOn);
+    if (act === 'awake-toggle') keepAwake.set(keepAwake.on ? null : Infinity);
+    if (act === 'ports') { closeHub(); runAction('settings', 'ports'); }
     if (act === 'awake') showMenu(e.target.closest?.('[data-hub]'), keepAwakeMenuItems(), { align: 'right', className: 'menu-over' });
   });
-  $('.hub-shield input', pop).addEventListener('change', (e) => setSetting('shieldOn', e.target.checked));
-  $('.hub-awake-switch', pop).addEventListener('change', (e) => keepAwake.set(e.target.checked ? Infinity : null));
   query = '';
   render();
   input.focus();

@@ -4,9 +4,9 @@ import ZenithCore
 
 /// The Command Hub: the popover under Zenith's menu bar icon.
 ///
-/// Laid out like a macOS menu bar extra: a search field, four quick actions as Control Center-style tiles, the
-/// running apps that use the most CPU (each can be quit, after a confirmation), system meters, a few switches, and
-/// "Settings…" / "Quit Zenith" at the bottom the way a menu ends.
+/// Laid out like Control Center: a search capsule, two big tiles (Privacy Shield, Keep Awake), a module of ring gauges,
+/// the running apps that use the most CPU (each can be quit, after a confirmation), and a footer with the listening
+/// ports and round Settings / Quit buttons. Each group is a rounded, translucent module (`HubSurface`).
 public struct ZenithCommandHubView: View {
     @ObservedObject public var hubState: ZenithCommandHubState = .shared
     @ObservedObject public var privacyController: PrivacyShieldController = .shared
@@ -24,8 +24,8 @@ public struct ZenithCommandHubView: View {
     public var onQuit: () -> Void
     public var onClose: () -> Void
     /// Drawn as the island's System page: what the machine is doing (running apps and the meters) and nothing else.
-    /// Ports, Privacy Shield, Keep Awake, Homebrew, Settings and Quit have their own places on the island, so they
-    /// are left out.
+    /// Ports, Privacy Shield, Keep Awake, Homebrew, Settings and Quit have their own places on the island (or open
+    /// Settings), so they are left out.
     public var inIsland: Bool
 
     public init(
@@ -48,27 +48,41 @@ public struct ZenithCommandHubView: View {
         self.inIsland = inIsland
     }
 
-    private static let width: CGFloat = 340
+    /// The popover's content width. The island's System page is as wide as the island (380 pt) and shows the same column.
+    public static let width: CGFloat = 392
+    private static let spacing: CGFloat = 10
 
     public var body: some View {
+        // No stack spacing: the ports list and the Homebrew capsule are empty most of the time, and an empty row
+        // would still get its gap. Every row below the search field carries its own 10 pt above it instead.
         VStack(spacing: 0) {
             searchBar
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-                .padding(.bottom, 10)
 
-            // While the island has a Tools tab the grid is there; a search still brings the matching actions up here.
+            // While the island has a dock the grid is there; a search still brings the matching actions up here.
             if !inIsland && !matchingActions.isEmpty && hubState.showsActionGrid(query: trimmedQuery) {
                 actionGrid
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 10)
+                    .padding(.top, Self.spacing)
             }
 
-            sectionDivider
+            if !inIsland {
+                HStack(spacing: Self.spacing) {
+                    HubPrivacyShieldTile(controller: privacyController)
+                    HubKeepAwakeTile()
+                }
+                .padding(.top, Self.spacing)
 
-            runningAppsSection
-                .padding(.horizontal, 6)
-                .padding(.vertical, 8)
+                // Clean and Boost are on the island's dock while it has one.
+                if !hubState.launchButtonsOnIsland {
+                    cleanAndBoostRow
+                        .padding(.top, Self.spacing)
+                }
+            }
+
+            metersModule
+                .padding(.top, Self.spacing)
+
+            runningAppsModule
+                .padding(.top, Self.spacing)
 
             if !inIsland {
                 HubPortsSection(query: trimmedQuery) {
@@ -76,40 +90,18 @@ public struct ZenithCommandHubView: View {
                     onClose()
                     onOpenPreferences()
                 }
-                .padding(.horizontal, 6)
-                .padding(.bottom, 8)
-            }
 
-            sectionDivider
-
-            VStack(spacing: 12) {
-                metersRow
-                if !inIsland {
-                    // One grid, so the switches of Privacy Shield and Keep Awake line up whatever the labels' width
-                    // (it changes with the language).
-                    Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 12) {
-                        controlsRow
-                        KeepAwakeHubRow()
-                    }
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-
-            if !inIsland {
                 HomebrewHubRow {
                     HomebrewSettingsLink.request()
                     onOpenPreferences()
                 }
 
-                sectionDivider
-
-                appRow
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 5)
+                footer
+                    .padding(.top, Self.spacing)
             }
         }
-        .frame(width: Self.width)
+        .padding(14)
+        .frame(width: inIsland ? ZenithIslandGeometry.expandedWidth : Self.width)
         .onExitCommand {
             onClose()
         }
@@ -125,27 +117,25 @@ public struct ZenithCommandHubView: View {
         }
     }
 
-    private var sectionDivider: some View {
-        Divider().padding(.horizontal, 12)
-    }
-
     private var trimmedQuery: String {
         hubState.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - Search
 
+    /// A capsule. It carries no shortcut hint: the hub has no shortcut of its own for the field (it is focused when the
+    /// hub opens), and a hint for one that does not exist would only mislead.
     private var searchBar: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 13))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
 
             // On the island this page lists running apps only, so that is all the field finds.
             TextField(inIsland ? LocalizedStringKey("Search running apps") : LocalizedStringKey("Search actions and apps"),
                       text: $hubState.searchText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 13))
+                .font(.system(size: 14))
                 .focused($isSearchFocused)
                 .onSubmit {
                     handleSubmit()
@@ -157,22 +147,19 @@ public struct ZenithCommandHubView: View {
                     hubState.searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Clear search")
             }
         }
-        .padding(.horizontal, 9)
-        .frame(height: 30)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
+        .padding(.horizontal, 14)
+        .frame(height: 38)
+        .hubCapsule()
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(isSearchFocused ? ZenithTheme.accent.opacity(0.55) : Color.clear, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 1000, style: .circular)
+                .strokeBorder(isSearchFocused ? ZenithTheme.accent.opacity(0.6) : Color.clear, lineWidth: 1.5)
         )
     }
 
@@ -222,9 +209,9 @@ public struct ZenithCommandHubView: View {
     private var actionGrid: some View {
         let actions = matchingActions
         let rowStarts = Array(stride(from: 0, to: actions.count, by: 2))
-        return VStack(spacing: 6) {
+        return VStack(spacing: Self.spacing) {
             ForEach(rowStarts, id: \.self) { start in
-                HStack(spacing: 6) {
+                HStack(spacing: Self.spacing) {
                     actionTile(actions[start], isReturnTarget: !trimmedQuery.isEmpty && start == 0)
                     if start + 1 < actions.count {
                         actionTile(actions[start + 1], isReturnTarget: false)
@@ -263,7 +250,7 @@ public struct ZenithCommandHubView: View {
             executeAction(action)
         } label: {
             HStack(spacing: 8) {
-                ZenithIconTile(systemName: action.icon, tint: tint(for: action), size: 26)
+                ZenithIconTile(systemName: action.icon, tint: tint(for: action), size: 28)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(action.title)
@@ -280,21 +267,19 @@ public struct ZenithCommandHubView: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(isHovered ? ZenithTheme.surfaceActive : ZenithTheme.groupedFill)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(isHovered ? ZenithTheme.surfaceHover : Color.clear)
             )
+            .hubModule(radius: 18)
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(
-                        isReturnTarget ? ZenithTheme.accent : ZenithTheme.groupedStroke,
-                        lineWidth: isReturnTarget ? 1.5 : ZenithTheme.hairline
-                    )
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(ZenithTheme.accent, lineWidth: isReturnTarget ? 1.5 : 0)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
         .help("\(action.detail) (\(shortcutText(for: action)))")
@@ -330,35 +315,61 @@ public struct ZenithCommandHubView: View {
 
     // MARK: - Running Apps
 
-    private var runningAppsSection: some View {
+    private var runningAppsModule: some View {
         let hogs = hubState.filteredTopHogs
         let cpu = hubState.hardwareSnapshot.cpu
-        return VStack(alignment: .leading, spacing: 4) {
-            ZenithSectionHeader(trimmedQuery.isEmpty ? "Running Apps" : "Matching Apps") {
-                Text("\(Int(round(cpu.totalUsagePercent)))% CPU · \(cpu.coreCount) cores")
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(trimmedQuery.isEmpty ? "Running Apps" : "Matching Apps")
+                    .textCase(.uppercase)
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.5)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 4)
+                Text(cpu.coreCount == 1 ? "1 core" : "\(cpu.coreCount) cores")
+                    .font(.system(size: 11))
+                    .monospacedDigit()
             }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
             .padding(.bottom, 2)
 
             if hogs.isEmpty {
                 Text(trimmedQuery.isEmpty ? "No app is using much CPU right now" : "No running app matches \u{201C}\(trimmedQuery)\u{201D}")
-                    .font(.system(size: 12))
+                    .font(.system(size: 12.5))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 14)
             } else {
-                VStack(spacing: 1) {
+                VStack(spacing: 0) {
                     ForEach(Array(hogs.enumerated()), id: \.element.pid) { index, hog in
-                        hogRow(index: index, hog: hog)
+                        HubAppRow(
+                            hog: hog,
+                            isHovered: hubState.hoveredProcessId == hog.pid,
+                            shortcutHint: index < 4 ? " (⌘\(index + 1))" : "",
+                            onQuit: { quit(hog) },
+                            onHover: { hovered in
+                                if hovered {
+                                    hubState.setHoveredProcess(hog.pid)
+                                } else {
+                                    hubState.clearHoveredProcess(ifCurrent: hog.pid)
+                                }
+                            }
+                        )
                     }
                 }
             }
 
             if !cpu.zombieProcesses.isEmpty {
                 zombieBanner(count: cpu.zombieProcesses.count)
-                    .padding(.horizontal, 2)
+                    .padding(.horizontal, 4)
                     .padding(.top, 4)
             }
         }
+        .padding(6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .hubModule()
     }
 
     private func zombieBanner(count: Int) -> some View {
@@ -378,113 +389,65 @@ public struct ZenithCommandHubView: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.yellow.opacity(0.12))
         )
     }
 
-    private func cpuColor(_ percent: Double) -> Color {
-        if percent > 50 { return ZenithTheme.danger }
-        if percent > 20 { return ZenithTheme.warning }
-        return .secondary
-    }
-
-    private func hogRow(index: Int, hog: ProcessTelemetry) -> some View {
-        let isHovered = hubState.hoveredProcessId == hog.pid
-        let shortcutHint = index < 4 ? " (⌘\(index + 1))" : ""
-        return HStack(spacing: 9) {
-            ProcessIconView(process: hog)
-
-            VStack(alignment: .leading, spacing: 0) {
-                Text(hog.name)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(HardwareTelemetryService.formatBytes(hog.memoryBytes))
-                    .font(.system(size: 11))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 6)
-
-            Text(verbatim: LocalizedNumber.percent(hog.cpuPercent))
-                .font(.system(size: 12, weight: .medium))
-                .monospacedDigit()
-                .foregroundStyle(cpuColor(hog.cpuPercent))
-
-            Button {
-                quit(hog)
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(isHovered ? AnyShapeStyle(ZenithTheme.danger) : AnyShapeStyle(.tertiary))
-            }
-            .buttonStyle(.plain)
-            .help("Quit \(hog.name)\(shortcutHint); asks first")
-            .accessibilityLabel("Quit \(hog.name)")
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .zenithRowBackground(isHovered: isHovered)
-        .help(Text(verbatim: "\(hog.name), PID \(hog.pid)"))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("\(hog.name), \(Int(round(hog.cpuPercent))) percent CPU, \(HardwareTelemetryService.formatBytes(hog.memoryBytes))"))
-        .onHover { hovered in
-            if hovered {
-                hubState.setHoveredProcess(hog.pid)
-            } else {
-                hubState.clearHoveredProcess(ifCurrent: hog.pid)
-            }
-        }
-    }
-
     // MARK: - Meters
 
-    private var metersRow: some View {
+    private func color(for level: HubGaugeLevel, base: Color) -> Color {
+        switch level {
+        case .normal: return base
+        case .warning: return ZenithTheme.warning
+        case .critical: return ZenithTheme.danger
+        }
+    }
+
+    private var metersModule: some View {
         let snapshot = hubState.hardwareSnapshot
         let cpuPercent = snapshot.cpu.totalUsagePercent
         let memory = snapshot.memory
         let disk = snapshot.disk
         let battery = snapshot.battery
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 14) {
-                HubMeterView(
+        return VStack(spacing: 12) {
+            HStack(alignment: .top, spacing: 8) {
+                HubRingGauge(
                     title: "CPU",
                     value: "\(Int(round(cpuPercent)))%",
-                    fraction: cpuPercent / 100,
-                    tint: cpuPercent > 75 ? ZenithTheme.danger : (cpuPercent > 40 ? ZenithTheme.warning : ZenithTheme.accent)
+                    fraction: HubStatus.ringFraction(percent: cpuPercent),
+                    tint: color(for: HubGaugeLevel.cpu(percent: cpuPercent), base: ZenithTheme.accent)
                 )
                 .help("CPU: \(LocalizedNumber.percent(cpuPercent)) across \(snapshot.cpu.coreCount) cores")
 
-                HubMeterView(
+                HubRingGauge(
                     title: "Memory",
                     value: "\(Int(round(memory.usedPercent)))%",
-                    fraction: memory.usedPercent / 100,
-                    tint: memory.pressureLevel == .critical ? ZenithTheme.danger : (memory.pressureLevel == .warning ? ZenithTheme.warning : ZenithTheme.accent)
+                    fraction: HubStatus.ringFraction(percent: memory.usedPercent),
+                    tint: color(for: HubGaugeLevel.memory(pressure: memory.pressureLevel), base: Color(nsColor: .systemOrange))
                 )
                 .help("Memory: \(HardwareTelemetryService.formatBytes(memory.usedBytes)) used of \(HardwareTelemetryService.formatBytes(memory.totalBytes)), \(memory.pressureLevel.rawValue) pressure")
 
-                HubMeterView(
-                    // "Free Space" as the title, so the value is just the size: "387,9 GB free" was cut off
-                    // in the island's four-meter row.
+                HubRingGauge(
+                    // "Free Space" as the title, so the value is just the size.
                     title: "Free Space",
-                    value: HardwareTelemetryService.formatBytes(disk.freeBytes),
-                    fraction: disk.usedPercent / 100,
-                    tint: disk.usedPercent > 90 ? ZenithTheme.danger : ZenithTheme.accent
+                    value: HubStatus.compactSize(bytes: disk.freeBytes),
+                    accessibilityValue: HardwareTelemetryService.formatBytes(disk.freeBytes),
+                    fraction: HubStatus.ringFraction(percent: disk.usedPercent),
+                    tint: color(for: HubGaugeLevel.disk(usedPercent: disk.usedPercent), base: Color(nsColor: .systemTeal)),
+                    valueSize: 12
                 )
                 .help("\(disk.volumeName): \(HardwareTelemetryService.formatBytes(disk.freeBytes)) free of \(HardwareTelemetryService.formatBytes(disk.totalBytes))")
 
                 if battery.hasBattery {
-                    HubMeterView(
+                    HubRingGauge(
                         title: battery.isCharging ? "Charging" : "Battery",
                         value: "\(battery.percentage)%",
-                        fraction: Double(battery.percentage) / 100,
-                        tint: battery.isCharging ? ZenithTheme.success : (battery.percentage <= 20 ? ZenithTheme.danger : ZenithTheme.success)
+                        fraction: HubStatus.ringFraction(percent: Double(battery.percentage)),
+                        tint: battery.isCharging || battery.percentage > 20 ? ZenithTheme.success : ZenithTheme.danger
                     )
                     .help("Battery \(battery.percentage)%, maximum capacity \(battery.healthPercent ?? 100)%, \(battery.cycleCount ?? 0) cycles, condition \(battery.condition)")
                 }
@@ -493,7 +456,7 @@ public struct ZenithCommandHubView: View {
             HubNetworkSpeedView()
 
             if !snapshot.bluetoothDevices.isEmpty {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     ForEach(snapshot.bluetoothDevices) { device in
                         HStack(spacing: 4) {
                             Image(systemName: device.icon)
@@ -507,13 +470,15 @@ public struct ZenithCommandHubView: View {
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel("\(device.name), battery \(device.batteryPercent) percent")
                     }
-                    Spacer(minLength: 0)
                 }
             }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity)
+        .hubModule()
     }
 
-    // MARK: - Controls
+    // MARK: - Clean and Boost
 
     private var cleanTitle: String {
         if cleaner.isCleaning { return String(localized: "Cleaning…") }
@@ -544,148 +509,87 @@ public struct ZenithCommandHubView: View {
             : String(localized: "Could not remove \(names.count) items, such as \(first). macOS may be protecting them, or an app is using them.")
     }
 
-    private var shieldBinding: Binding<Bool> {
-        Binding(
-            get: { privacyController.isRunning },
-            set: { wantsOn in
-                if wantsOn != privacyController.isRunning {
-                    privacyController.toggle()
-                }
-            }
-        )
-    }
+    /// Clean and Boost as two capsules under the tiles; they are on the island's dock while it has one.
+    private var cleanAndBoostRow: some View {
+        HStack(spacing: Self.spacing) {
+            capsuleButton(
+                title: Text(verbatim: cleanTitle),
+                symbol: "sparkles",
+                help: Text(verbatim: cleanHelp),
+                isDisabled: cleaner.isCleaning || cleaner.isScanning || (!hasNotScannedJunk && cleaner.selectedJunkSize == 0)
+            ) { runCleaner() }
 
-    /// Privacy Shield's row of the controls grid: label, switch, then the Clean and Boost buttons at the trailing edge.
-    private var controlsRow: some View {
-        GridRow {
-            HStack(spacing: 6) {
-                ZenithIconTile(systemName: "lock.shield.fill", tint: ZenithTint.privacy, size: 20)
-                Text("Privacy Shield")
-                    .font(.system(size: 12.5))
-                    .lineLimit(1)
-                    .fixedSize()
-            }
-            .accessibilityHidden(true)
-
-            Toggle("Privacy Shield", isOn: shieldBinding)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .disabled(privacyController.isTransitioning)
-                .help(privacyController.isRunning
-                        ? "On: sites are looked up over encrypted DNS through a local proxy"
-                        : "Off. Turn on to look sites up over encrypted DNS through a local proxy")
-
-            HStack(spacing: 8) {
-              // Clean and Boost are on the island's Tools tab while it has one.
-              if !hubState.launchButtonsOnIsland {
-                Button {
-                    runCleaner()
-                } label: {
-                    Label(cleanTitle, systemImage: "sparkles")
-                        .labelStyle(.titleAndIcon)
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .fixedSize()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(cleaner.isCleaning || cleaner.isScanning || (!hasNotScannedJunk && cleaner.selectedJunkSize == 0))
-                .help(cleanHelp)
-
-                Button {
-                    runBoost()
-                } label: {
-                    Label("Boost", systemImage: "bolt.fill")
-                        .labelStyle(.titleAndIcon)
-                        .fixedSize()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help("Free inactive memory and flush the DNS cache")
-              }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            capsuleButton(
+                title: Text("Boost"),
+                symbol: "bolt.fill",
+                help: Text("Free inactive memory and flush the DNS cache"),
+                isDisabled: false
+            ) { runBoost() }
         }
     }
 
-    // MARK: - Settings / Quit
+    private func capsuleButton(title: Text, symbol: String, help: Text, isDisabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                title
+                    .font(.system(size: 13, weight: .semibold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(isDisabled ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+            .frame(maxWidth: .infinity)
+            .frame(height: 36)
+            .hubCapsule()
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .help(help)
+    }
 
-    private var appRow: some View {
-        HStack(spacing: 0) {
-            menuStyleButton(id: "settings", title: "Settings…", shortcut: "⌘,") {
+    // MARK: - Footer
+
+    /// Listening Ports as a capsule, then Settings and Quit as round buttons.
+    private var footer: some View {
+        HStack(spacing: 8) {
+            HubPortsButton {
+                SettingsTab.requestSelection(.ports)
                 onClose()
                 onOpenPreferences()
             }
-            Spacer(minLength: 8)
-            menuStyleButton(id: "quit", title: "Quit Zenith", shortcut: "⌘Q") {
-                onQuit()
-            }
-        }
-    }
 
-    private func menuStyleButton(id: String, title: LocalizedStringKey, shortcut: String, action: @escaping () -> Void) -> some View {
-        let isHovered = hubState.hoveredFooterId == id
-        return Button(action: action) {
-            HStack(spacing: 8) {
-                Text(title)
-                    .font(.system(size: 13))
-                    .foregroundStyle(isHovered ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
-                ZenithShortcutText(shortcut, isOnSelection: isHovered)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(isHovered ? ZenithTheme.accent : Color.clear)
+            HubCircleButton(
+                symbol: "gearshape",
+                label: "Settings",
+                help: "Settings (⌘,)",
+                isHovered: hubState.hoveredFooterId == "settings",
+                action: {
+                    onClose()
+                    onOpenPreferences()
+                },
+                onHover: { hovering in setFooterHover("settings", hovering) }
             )
-            .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .onHover { hovering in
-            if hovering {
-                hubState.setHoveredFooter(id)
-            } else {
-                hubState.clearHoveredFooter(ifCurrent: id)
-            }
+
+            HubCircleButton(
+                symbol: "power",
+                label: "Quit Zenith",
+                help: "Quit Zenith (⌘Q)",
+                isHovered: hubState.hoveredFooterId == "quit",
+                action: onQuit,
+                onHover: { hovering in setFooterHover("quit", hovering) }
+            )
         }
     }
-}
 
-// MARK: - Meter
-
-/// A small labelled gauge: title, value, and a thin bar.
-struct HubMeterView: View {
-    let title: LocalizedStringKey
-    let value: String
-    let fraction: Double
-    let tint: Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Text(value)
-                .font(.system(size: 13, weight: .semibold))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.primary.opacity(0.1))
-                    Capsule()
-                        .fill(tint)
-                        .frame(width: max(3, proxy.size.width * min(max(fraction, 0), 1)))
-                }
-            }
-            .frame(height: 3)
+    private func setFooterHover(_ id: String, _ hovering: Bool) {
+        if hovering {
+            hubState.setHoveredFooter(id)
+        } else {
+            hubState.clearHoveredFooter(ifCurrent: id)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(title) + Text(verbatim: " \(value)"))
     }
 }
 
@@ -697,11 +601,11 @@ struct HubNetworkSpeedView: View {
     @ObservedObject private var monitor: NetworkSpeedMonitor = .shared
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 22) {
             item(symbol: "arrow.down", text: monitor.speed.formattedDownload)
             item(symbol: "arrow.up", text: monitor.speed.formattedUpload)
-            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity)
         // Measuring starts and stops with the popover (ZenithCommandHubController), not with this view.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Network speed"))
@@ -712,9 +616,9 @@ struct HubNetworkSpeedView: View {
     private func item(symbol: String, text: String) -> some View {
         HStack(spacing: 4) {
             Image(systemName: symbol)
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
             Text(verbatim: text)
-                .font(.system(size: 11.5))
+                .font(.system(size: 12, weight: .semibold))
                 .monospacedDigit()
         }
         .foregroundStyle(.secondary)
@@ -726,6 +630,7 @@ struct HubNetworkSpeedView: View {
 /// The icon of a running process: its app's icon when it has one (helpers use their app's), otherwise a symbol tile.
 struct ProcessIconView: View {
     let process: ProcessTelemetry
+    var size: CGFloat = 24
 
     var body: some View {
         Group {
@@ -735,10 +640,10 @@ struct ProcessIconView: View {
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
             } else {
-                ZenithIconTile(systemName: ProcessIconProvider.symbol(for: process.name), tint: Color(nsColor: .systemGray), size: 22)
+                ZenithIconTile(systemName: ProcessIconProvider.symbol(for: process.name), tint: Color(nsColor: .systemGray), size: size * 0.92)
             }
         }
-        .frame(width: 24, height: 24)
+        .frame(width: size, height: size)
     }
 }
 

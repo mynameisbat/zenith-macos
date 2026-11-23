@@ -236,7 +236,7 @@ struct ZenithCommandHubTests {
         let result = await state.boostSystem()
 
         #expect(!result.flushedDNS)
-        #expect(!result.message.contains("DNS"))
+        #expect(!result.message.contains("DNS flushed"))   // it may say that the flush needs an administrator
     }
 
     @Test("HUB-10: Boost system executes maintenance operations and refreshes snapshot")

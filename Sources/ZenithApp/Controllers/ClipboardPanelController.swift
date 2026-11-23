@@ -72,23 +72,26 @@ final class ClipboardPanel: NSPanel {
     }
 }
 
-/// Floating panel controller presenting clipboard history with frosted glass aesthetics.
+/// Floating panel controller presenting the clipboard history as a Liquid Glass strip docked near the bottom of the screen.
 @MainActor
 public final class ClipboardPanelController: NSObject, NSWindowDelegate {
     public static let shared = ClipboardPanelController()
 
-    // Dimensions
+    // Dimensions: the strip asks for this much and is docked near the bottom of the screen the pointer is on.
     public static let defaultWidth: CGFloat = ClipboardHistoryView.panelSize.width
     public static let defaultHeight: CGFloat = ClipboardHistoryView.panelSize.height
-    public static let margin: CGFloat = 12
 
     // Internal state
     private var panel: ClipboardPanel?
     private var hostingView: NSHostingView<AnyView>?
     private var localKeyMonitor: Any?
+    /// Turns a plain mouse wheel into sideways scrolling of the card row. Installed only while the panel shows.
+    private var localScrollMonitor: Any?
     private var isAnimating: Bool = false
     private var currentViewModel: ClipboardHistoryViewModel?
     private var previousActiveApplication: NSRunningApplication?
+    /// Bumped on every show: the view is rebuilt, so the search field takes focus and the row starts in order again.
+    private var showGeneration = 0
 
     public var onDismiss: (() -> Void)?
 
@@ -99,8 +102,6 @@ public final class ClipboardPanelController: NSObject, NSWindowDelegate {
     public var isVisible: Bool {
         panel?.isVisible ?? false
     }
-
-    public typealias PositioningMode = PanelPositioner.PositioningMode
 
     // MARK: - Setup & Configuration
 
@@ -142,9 +143,19 @@ public final class ClipboardPanelController: NSObject, NSWindowDelegate {
         configure(rootView: rootView)
     }
 
+    /// A new root view for the same view model (see `showGeneration`).
+    private func refreshRootView() {
+        guard let viewModel = currentViewModel, let hosted = hostingView else { return }
+        showGeneration += 1
+        hosted.rootView = AnyView(
+            ClipboardHistoryView(viewModel: viewModel) { [weak self] in self?.hide() }
+                .id(showGeneration)
+        )
+    }
+
     // MARK: - Show / Hide / Toggle Actions
 
-    public func show(positioningMode: PositioningMode = .nearMouse, store: ClipboardStore = .shared) {
+    public func show(store: ClipboardStore = .shared) {
         // Track the currently active application BEFORE Zenith steals key focus
         let frontmost = NSWorkspace.shared.frontmostApplication
         if let frontmost = frontmost, frontmost.bundleIdentifier != Bundle.main.bundleIdentifier {
@@ -164,18 +175,25 @@ public final class ClipboardPanelController: NSObject, NSWindowDelegate {
         guard let panel = panel else { return }
         guard !isAnimating else { return }
 
-        // Compute positioning geometry
-        let targetFrame = PanelPositioner.calculateFrame(
-            mouseLocation: NSEvent.mouseLocation,
-            panelSize: CGSize(width: Self.defaultWidth, height: Self.defaultHeight),
-            mode: positioningMode
-        )
+        refreshRootView()
 
-        panel.setFrame(targetFrame, display: true)
+        // Docked near the bottom of the screen the pointer is on, above the Dock; it rises into place unless the
+        // user asked for less motion.
+        let targetFrame = PanelPositioner.dockedFrame(
+            mouseLocation: NSEvent.mouseLocation,
+            preferredSize: CGSize(width: Self.defaultWidth, height: Self.defaultHeight)
+        )
+        var startFrame = targetFrame
+        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            startFrame.origin.y -= 14
+        }
+
+        panel.setFrame(startFrame, display: true)
         panel.alphaValue = 0.0
 
         // Install local key event monitor
         installKeyMonitor()
+        installScrollMonitor()
 
         // Bring to front and become key
         panel.makeKeyAndOrderFront(nil)
@@ -184,9 +202,10 @@ public final class ClipboardPanelController: NSObject, NSWindowDelegate {
         // Smooth fade-in
         isAnimating = true
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.14
+            context.duration = 0.18
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().alphaValue = 1.0
+            panel.animator().setFrame(targetFrame, display: true)
         } completionHandler: { [weak self] in
             MainActor.assumeIsolated {
                 self?.isAnimating = false
@@ -245,7 +264,7 @@ public final class ClipboardPanelController: NSObject, NSWindowDelegate {
         }
     }
 
-    public func toggle(positioningMode: PositioningMode = .nearMouse, store: ClipboardStore = .shared) {
+    public func toggle(store: ClipboardStore = .shared) {
         if isVisible {
             hide()
         } else {
@@ -253,7 +272,7 @@ public final class ClipboardPanelController: NSObject, NSWindowDelegate {
             if let frontmost = frontmost, frontmost.bundleIdentifier != Bundle.main.bundleIdentifier {
                 self.previousActiveApplication = frontmost
             }
-            show(positioningMode: positioningMode, store: store)
+            show(store: store)
         }
     }
 
@@ -281,10 +300,60 @@ public final class ClipboardPanelController: NSObject, NSWindowDelegate {
         }
     }
 
+    private func installScrollMonitor() {
+        guard localScrollMonitor == nil else { return }
+        localScrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard let self = self, self.isVisible, self.scrollCardRow(with: event) else { return event }
+            return nil
+        }
+    }
+
+    /// Scrolls the card row for a vertical mouse-wheel event over it. False (event untouched) for anything else.
+    private func scrollCardRow(with event: NSEvent) -> Bool {
+        guard let panel = panel, event.window === panel, let root = panel.contentView,
+              let change = ClipboardWheelScroll.offsetChange(
+                scrollingDeltaX: event.scrollingDeltaX,
+                scrollingDeltaY: event.scrollingDeltaY,
+                hasPreciseDeltas: event.hasPreciseScrollingDeltas,
+                hasPhase: event.phase != [] || event.momentumPhase != []
+              ),
+              let scrollView = Self.horizontalScrollView(in: root, at: event.locationInWindow),
+              let document = scrollView.documentView else { return false }
+        let clip = scrollView.contentView
+        let x = ClipboardWheelScroll.clampedOffset(
+            current: clip.bounds.origin.x, change: change,
+            contentWidth: document.frame.width, visibleWidth: clip.bounds.width
+        )
+        clip.scroll(to: NSPoint(x: x, y: clip.bounds.origin.y))
+        scrollView.reflectScrolledClipView(clip)
+        return true
+    }
+
+    /// The scroll view under the pointer that has more content than room, sideways.
+    private static func horizontalScrollView(in view: NSView, at windowPoint: NSPoint) -> NSScrollView? {
+        if let scrollView = view as? NSScrollView,
+           scrollView.convert(scrollView.bounds, to: nil).contains(windowPoint),
+           let document = scrollView.documentView, document.frame.width > scrollView.contentView.bounds.width {
+            return scrollView
+        }
+        for subview in view.subviews {
+            if let found = horizontalScrollView(in: subview, at: windowPoint) { return found }
+        }
+        return nil
+    }
+
+    private func uninstallScrollMonitor() {
+        if let monitor = localScrollMonitor {
+            NSEvent.removeMonitor(monitor)
+            localScrollMonitor = nil
+        }
+    }
+
     private func uninstallKeyMonitor() {
         if let monitor = localKeyMonitor {
             NSEvent.removeMonitor(monitor)
             localKeyMonitor = nil
         }
+        uninstallScrollMonitor()
     }
 }

@@ -13,7 +13,7 @@ public struct GeneralSettingsTab: View {
             ZenithSettingsSection("Startup") {
                 ZenithSettingsRow(
                     "Open at Login",
-                    subtitle: "Start Zenith in the menu bar when you log in.",
+                    subtitle: "Start Zenith when you log in.",
                     symbol: "power",
                     tint: ZenithTint.general
                 ) {

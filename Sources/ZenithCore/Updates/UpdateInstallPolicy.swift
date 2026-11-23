@@ -34,6 +34,8 @@ public enum UpdateCandidateRejection: Error, Equatable, Sendable, LocalizedError
     case versionMismatch(claimed: String, found: String)
     case notNewer(found: String, running: String)
     case signature(String)
+    /// The app inside the image needs a newer macOS than this Mac runs.
+    case needsNewerSystem(required: String, running: String)
 
     public var errorDescription: String? {
         switch self {
@@ -47,6 +49,8 @@ public enum UpdateCandidateRejection: Error, Equatable, Sendable, LocalizedError
             return String(localized: "The downloaded Zenith \(found) is not newer than this copy (\(running)). Nothing was changed.")
         case .signature(let detail):
             return String(localized: "The downloaded app is not signed by the same signer as this copy of Zenith (\(detail)). Nothing was changed.")
+        case .needsNewerSystem(let required, let running):
+            return String(localized: "The downloaded Zenith needs macOS \(required) or later, and this Mac runs macOS \(running). Nothing was changed.")
         }
     }
 }
@@ -101,12 +105,19 @@ public enum UpdateInstallPolicy {
     }
 
     /// nil when the candidate may be installed: it is Zenith, it is the version the release announced, that version is
-    /// strictly newer than the running one, and its signature satisfies the running app's designated requirement.
+    /// strictly newer than the running one, it runs on this Mac's macOS, and its signature satisfies the running
+    /// app's designated requirement.
+    ///
+    /// - Parameters:
+    ///   - minimumSystemVersion: the candidate's `LSMinimumSystemVersion`; nil when the key is absent (no limit).
+    ///   - system: the macOS this Mac runs.
     public static func candidateRejection(
         bundleIdentifier: String?,
         shortVersion: String?,
+        minimumSystemVersion: Any?,
         claimed: AppVersion,
         running: AppVersion,
+        system: AppVersion,
         signature: CandidateSignatureCheck
     ) -> UpdateCandidateRejection? {
         guard let bundleIdentifier, let shortVersion else { return .unreadableInfo }
@@ -115,6 +126,13 @@ public enum UpdateInstallPolicy {
             return .versionMismatch(claimed: claimed.description, found: String(shortVersion.prefix(AppVersion.maximumLength)))
         }
         guard found > running else { return .notNewer(found: found.description, running: running.description) }
+        if let minimumSystemVersion {
+            // A key that is there but unreadable is not guessed at: a real Zenith always has a plain `26.0`.
+            guard let text = minimumSystemVersion as? String, let required = AppVersion(text) else { return .unreadableInfo }
+            if system < required {
+                return .needsNewerSystem(required: required.shortDescription, running: system.shortDescription)
+            }
+        }
         if case .rejected(let detail) = signature { return .signature(detail) }
         return nil
     }

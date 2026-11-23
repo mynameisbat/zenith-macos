@@ -45,7 +45,7 @@ public struct CleanerSettingsTab: View {
         }
     }
 
-    /// A section asked for from elsewhere (the island's Uninstall button), once.
+    /// A section asked for from elsewhere (the island's Uninstall tool, which opens this Settings window), once.
     private func takePendingSection() {
         if let raw = CleanerSettingsLink.takePending(), let section = Section(rawValue: raw) {
             sectionModel.section = section
@@ -62,11 +62,22 @@ public struct CleanerSettingsTab: View {
 
     private var content: some View {
         VStack(spacing: 0) {
-            Picker("Cleaner", selection: $sectionModel.section) {
-                ForEach(Section.allCases) { Text($0.title).tag($0) }
+            // The segments at their natural width while they fit; a pop-up menu when a long translation does not
+            // (the bar used to run past the pane and clip "Uninstall").
+            ViewThatFits(in: .horizontal) {
+                Picker("Cleaner", selection: $sectionModel.section) {
+                    ForEach(Section.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                Picker("Cleaner", selection: $sectionModel.section) {
+                    ForEach(Section.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 24)
             .padding(.top, 14)
             .padding(.bottom, 4)

@@ -33,14 +33,27 @@ public struct UpdateRelease: Equatable, Sendable {
     public let assetSize: Int64
     /// Lower-case hex SHA-256 when the API publishes one (`digest: "sha256:…"`).
     public let sha256: String?
+    /// The macOS this release needs, from the `Minimum macOS: 26.0` line in its notes (`MinimumSystemMarker`); nil
+    /// when the notes state none, which counts as compatible (the staged app's own Info.plist is checked at install).
+    public let minimumSystemVersion: AppVersion?
 
-    public init(version: AppVersion, tag: String, assetName: String, downloadURL: URL, assetSize: Int64, sha256: String?) {
+    public init(
+        version: AppVersion, tag: String, assetName: String, downloadURL: URL, assetSize: Int64, sha256: String?,
+        minimumSystemVersion: AppVersion? = nil
+    ) {
         self.version = version
         self.tag = tag
         self.assetName = assetName
         self.downloadURL = downloadURL
         self.assetSize = assetSize
         self.sha256 = sha256
+        self.minimumSystemVersion = minimumSystemVersion
+    }
+
+    /// Whether a Mac running `system` can run this release. A release that states no minimum is taken as compatible.
+    public func isCompatible(withSystem system: AppVersion) -> Bool {
+        guard let minimumSystemVersion else { return true }
+        return system >= minimumSystemVersion
     }
 
     /// The release page, built from the checked tag (never the `html_url` of the response).
@@ -83,7 +96,16 @@ public enum UpdateReleaseParser {
         let tag_name: String?
         let draft: Bool?
         let prerelease: Bool?
+        /// Only the notes' marker line is read from it, so a body of the wrong type must not fail the whole release.
+        let body: LenientString?
         let assets: [RawAsset]?
+    }
+
+    private struct LenientString: Decodable {
+        let value: String?
+        init(from decoder: Decoder) throws {
+            value = try? decoder.singleValueContainer().decode(String.self)
+        }
     }
 
     private struct RawAsset: Decodable {
@@ -126,7 +148,8 @@ public enum UpdateReleaseParser {
             assetName: expectedName,
             downloadURL: url,
             assetSize: size,
-            sha256: asset.digest.flatMap(sha256Hex(fromDigest:))
+            sha256: asset.digest.flatMap(sha256Hex(fromDigest:)),
+            minimumSystemVersion: MinimumSystemMarker.parse(releaseNotes: raw.body?.value)
         ))
     }
 

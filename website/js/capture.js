@@ -395,17 +395,21 @@ function buildEditor(body, win) {
   win.classList.add('win-editor');
   body.innerHTML = `<div class="ed-stage"><canvas class="ed-canvas" aria-label="Capture being annotated"></canvas><input class="ed-text" type="text" hidden aria-label="Text"></div>
     <div class="ed-bar" role="toolbar" aria-label="Annotation tools">
-      <span class="ed-group">${TOOLS.map(([id, ic, label, key]) => `<button type="button" class="ed-btn" data-tool="${id}" aria-label="${label} (${key})" title="${label} (${key})">${icon(ic)}</button>`).join('')}</span>
-      <span class="ed-group">${COLORS.map((c) => `<button type="button" class="ed-color" data-color="${c}" style="--c:${c}" aria-label="Colour ${c}"></button>`).join('')}</span>
-      <span class="ed-group">${WIDTHS.map((w, i) => `<button type="button" class="ed-btn ed-w" data-width="${i}" aria-label="Line width ${i + 1}"><span style="height:${w + 1}px"></span></button>`).join('')}</span>
-      <span class="ed-group plain">
-        <button type="button" class="ed-btn" data-ed="undo" aria-label="Undo (⌘Z)" title="Undo (⌘Z)">${icon('undo')}</button>
-        <button type="button" class="ed-btn" data-ed="redo" aria-label="Redo (⇧⌘Z)" title="Redo (⇧⌘Z)">${icon('redo')}</button>
-      </span>
-      <span class="ed-group plain">
-        <button type="button" class="btn" data-ed="save">Save…</button>
-        <button type="button" class="btn btn-primary" data-ed="copy">${icon('copy')}Copy</button>
-      </span>
+      <div class="ed-row">
+        <span class="ed-group">${TOOLS.map(([id, ic, label, key]) => `<button type="button" class="ed-btn" data-tool="${id}" aria-label="${label} (${key})" title="${label} (${key})">${icon(ic)}</button>`).join('')}</span>
+        <span class="ed-group">${WIDTHS.map((w, i) => `<button type="button" class="ed-btn ed-w" data-width="${i}" aria-label="Line width ${i + 1}"><span style="height:${w + 1}px"></span></button>`).join('')}</span>
+        <span class="ed-group plain">
+          <button type="button" class="ed-btn" data-ed="undo" aria-label="Undo (⌘Z)" title="Undo (⌘Z)">${icon('undo')}</button>
+          <button type="button" class="ed-btn" data-ed="redo" aria-label="Redo (⇧⌘Z)" title="Redo (⇧⌘Z)">${icon('redo')}</button>
+        </span>
+      </div>
+      <div class="ed-row">
+        <span class="ed-group">${COLORS.map((c) => `<button type="button" class="ed-color" data-color="${c}" style="--c:${c}" aria-label="Colour ${c}"></button>`).join('')}</span>
+        <span class="ed-group plain">
+          <button type="button" class="btn" data-ed="save">Save…</button>
+          <button type="button" class="btn" data-ed="copy">${icon('copy')}Copy</button>
+        </span>
+      </div>
     </div>`;
   const cv = $('.ed-canvas', body);
   body.addEventListener('click', (e) => {
@@ -538,7 +542,7 @@ function fitCanvas() {
   const stage = $('#win-editor .ed-stage');
   const cv = $('.ed-canvas', stage);
   const sw = stage.clientWidth - 32;
-  const sh = stage.clientHeight - 32;
+  const sh = stage.clientHeight - 146; // 16 above, and room under for the floating toolbar
   // Never larger than the capture was on screen.
   const k = Math.min(sw / cv.width, sh / cv.height, 1 / (ed.base?.dpr || 1));
   cv.style.width = `${Math.max(40, cv.width * k)}px`;
