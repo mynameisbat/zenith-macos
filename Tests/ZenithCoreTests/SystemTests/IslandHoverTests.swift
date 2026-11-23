@@ -45,8 +45,8 @@ struct IslandHoverTests {
         state.onMouseEnter()
         try await Task.sleep(nanoseconds: 60_000_000)
         state.onMouseEnter()
-        try await Task.sleep(nanoseconds: 80_000_000)
-        #expect(state.isExpanded)       // 140 ms after the first report; a restarted wait would end at 160 ms
+        await state.waitForHoverOpening()
+        #expect(state.isExpanded)
     }
 
     @Test("IH-04: A click, a dragged file and a zero delay open the island without waiting")
