@@ -2,7 +2,7 @@
 // Everything is made up and stays in the browser; nothing here talks to a server.
 
 // Keep equal to Sources/ZenithCore/Models/ZenithVersion.swift.
-export const VERSION = '2.6.0';
+export const VERSION = '3.0.0';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
