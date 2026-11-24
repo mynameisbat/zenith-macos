@@ -4,7 +4,7 @@
 @class CGVirtualDisplayDescriptor;
 
 @interface CGVirtualDisplayMode : NSObject
-- (instancetype)initWithWidth:(NSUInteger)width height:(NSUInteger)height refreshRate:(CGFloat)refreshRate;
+- (instancetype)initWithWidth:(unsigned int)width height:(unsigned int)height refreshRate:(double)refreshRate;
 @end
 
 @interface CGVirtualDisplaySettings : NSObject
@@ -19,7 +19,7 @@
 @end
 
 @interface CGVirtualDisplayDescriptor : NSObject
-@property(retain, nonatomic) dispatch_queue_t dispatchQueue;
+@property(retain, nonatomic) dispatch_queue_t queue;
 @property(retain, nonatomic) NSString *name;
 @property(nonatomic) unsigned int maxPixelsHigh;
 @property(nonatomic) unsigned int maxPixelsWide;
@@ -53,21 +53,36 @@
     descriptor.name = name;
     descriptor.maxPixelsWide = (unsigned int)width;
     descriptor.maxPixelsHigh = (unsigned int)height;
-    descriptor.sizeInMillimeters = CGSizeMake(1600, 1000);
-    descriptor.dispatchQueue = dispatch_get_main_queue();
+    descriptor.sizeInMillimeters = CGSizeMake(527, 296);
+    descriptor.queue = dispatch_queue_create("app.zenith.virtualdisplay", DISPATCH_QUEUE_SERIAL);
     descriptor.vendorID = 0x3456;
     descriptor.productID = 0x1234;
     descriptor.serialNum = 0x0001;
 
     CGVirtualDisplay *display = [[CGVirtualDisplay alloc] initWithDescriptor:descriptor];
-    if (!display) return nil;
+    if (!display) {
+        NSLog(@"[ZenithVirtualDisplayBridge] display initWithDescriptor returned nil");
+        return nil;
+    }
 
-    CGVirtualDisplayMode *mode = [[CGVirtualDisplayMode alloc] initWithWidth:width height:height refreshRate:refreshRate];
+    NSMutableArray<CGVirtualDisplayMode *> *modes = [NSMutableArray array];
+    CGVirtualDisplayMode *hidpiMode = nil;
+    if (hiDPI && width >= 2 && height >= 2) {
+        hidpiMode = [[CGVirtualDisplayMode alloc] initWithWidth:(unsigned int)(width / 2) height:(unsigned int)(height / 2) refreshRate:(double)refreshRate];
+        if (hidpiMode) [modes addObject:hidpiMode];
+    }
+    CGVirtualDisplayMode *nativeMode = [[CGVirtualDisplayMode alloc] initWithWidth:(unsigned int)width height:(unsigned int)height refreshRate:(double)refreshRate];
+    if (nativeMode) [modes addObject:nativeMode];
+
     CGVirtualDisplaySettings *settings = [[CGVirtualDisplaySettings alloc] init];
     settings.hiDPI = hiDPI ? 1 : 0;
-    settings.modes = @[mode];
+    settings.modes = modes;
 
-    if (![display applySettings:settings]) {
+    BOOL ok = [display applySettings:settings];
+    CGDisplayModeRef dm = CGDisplayCopyDisplayMode(display.displayID);
+    NSLog(@"[ZenithVirtualDisplayBridge] hidpiMode=%@ nativeMode=%@ modes=%lu applySettings=%d displayID=%u dm=%@", hidpiMode, nativeMode, (unsigned long)modes.count, ok, display.displayID, dm);
+    if (dm) CGDisplayModeRelease(dm);
+    if (!ok) {
         return nil;
     }
 

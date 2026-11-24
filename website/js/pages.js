@@ -52,6 +52,11 @@ function mountDisplays(el) {
         <span style="font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--text-sec);width:34px;text-align:right;">85%</span>
       </div>
     </div>
+    <div style="display:flex;justify-content:flex-end;padding-top:2px;">
+      <button class="hub-pill" style="border:0;background:rgba(255,255,255,0.08);color:var(--text-sec);font-size:11.5px;padding:5px 12px;border-radius:12px;cursor:pointer;display:flex;align-items:center;gap:5px;">
+        <span>Display Settings…</span>
+      </button>
+    </div>
   </div>`;
   el.querySelectorAll('input[type="range"]').forEach((slider) => {
     const val = slider.parentElement.querySelector('span:last-child');

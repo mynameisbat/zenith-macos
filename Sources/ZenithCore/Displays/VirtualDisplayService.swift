@@ -1,7 +1,10 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import ObjectiveC
+#if canImport(ZenithDisplayPrivate)
 import ZenithDisplayPrivate
+#endif
 
 /// Presets for virtual HiDPI displays.
 public enum VirtualDisplayResolution: String, CaseIterable, Identifiable, Sendable {
@@ -43,29 +46,71 @@ public protocol VirtualDisplayManaging: Sendable {
     func destroyVirtualDisplay()
 }
 
-/// The system implementation calling ZenithVirtualDisplayBridge.
+/// The system implementation managing CGVirtualDisplay via dynamic runtime invocation.
 public final class SystemVirtualDisplayManager: VirtualDisplayManaging, @unchecked Sendable {
-    private var bridge: ZenithVirtualDisplayBridge?
+    private var activeDisplay: AnyObject?
 
     public init() {}
 
     public var isSupported: Bool {
-        ZenithVirtualDisplayBridge.isSupported()
+        NSClassFromString("CGVirtualDisplay") != nil
     }
 
     public func createVirtualDisplay(name: String, width: Int, height: Int, refreshRate: Double, hiDPI: Bool) -> UInt32? {
-        bridge?.destroy()
-        let b = ZenithVirtualDisplayBridge(name: name, width: UInt(width), height: UInt(height), refreshRate: refreshRate, hiDPI: hiDPI)
-        guard let b, b.displayID != 0 else {
+        destroyVirtualDisplay()
+
+        guard let descClass = NSClassFromString("CGVirtualDisplayDescriptor") as? NSObject.Type,
+              let dispClass = NSClassFromString("CGVirtualDisplay") as? NSObject.Type,
+              let modeClass = NSClassFromString("CGVirtualDisplayMode") as? NSObject.Type,
+              let settClass = NSClassFromString("CGVirtualDisplaySettings") as? NSObject.Type else {
             return nil
         }
-        self.bridge = b
-        return b.displayID
+
+        let desc = descClass.init()
+        desc.setValue(name, forKey: "name")
+        desc.setValue(UInt32(width), forKey: "maxPixelsWide")
+        desc.setValue(UInt32(height), forKey: "maxPixelsHigh")
+        desc.setValue(CGSize(width: 527, height: 296), forKey: "sizeInMillimeters")
+        desc.setValue(UInt32(0x3456), forKey: "vendorID")
+        desc.setValue(UInt32(0x1234), forKey: "productID")
+        desc.setValue(UInt32(1), forKey: "serialNum")
+        desc.setValue(DispatchQueue.main, forKey: "queue")
+
+        typealias ModeInitFn = @convention(c) (AnyObject, Selector, UInt32, UInt32, Double) -> AnyObject
+        let modeInit = unsafeBitCast(class_getMethodImplementation(modeClass, NSSelectorFromString("initWithWidth:height:refreshRate:")), to: ModeInitFn.self)
+
+        var modes: [AnyObject] = []
+        if hiDPI && width >= 2 && height >= 2 {
+            if let hidpiAlloc = modeClass.perform(NSSelectorFromString("alloc"))?.takeUnretainedValue() {
+                let hidpi = modeInit(hidpiAlloc, NSSelectorFromString("initWithWidth:height:refreshRate:"), UInt32(width / 2), UInt32(height / 2), refreshRate)
+                modes.append(hidpi)
+            }
+        }
+        if let nativeAlloc = modeClass.perform(NSSelectorFromString("alloc"))?.takeUnretainedValue() {
+            let native = modeInit(nativeAlloc, NSSelectorFromString("initWithWidth:height:refreshRate:"), UInt32(width), UInt32(height), refreshRate)
+            modes.append(native)
+        }
+
+        let sett = settClass.init()
+        sett.setValue(modes, forKey: "modes")
+        sett.setValue(UInt32(hiDPI ? 1 : 0), forKey: "hiDPI")
+
+        guard let dispAlloc = dispClass.perform(NSSelectorFromString("alloc"))?.takeUnretainedValue() else { return nil }
+        typealias DispInitFn = @convention(c) (AnyObject, Selector, AnyObject) -> AnyObject?
+        let dispInit = unsafeBitCast(class_getMethodImplementation(dispClass, NSSelectorFromString("initWithDescriptor:")), to: DispInitFn.self)
+        guard let display = dispInit(dispAlloc, NSSelectorFromString("initWithDescriptor:"), desc) else { return nil }
+
+        typealias ApplyFn = @convention(c) (AnyObject, Selector, AnyObject) -> Bool
+        let apply = unsafeBitCast(class_getMethodImplementation(dispClass, NSSelectorFromString("applySettings:")), to: ApplyFn.self)
+        guard apply(display, NSSelectorFromString("applySettings:"), sett) else { return nil }
+
+        self.activeDisplay = display
+        let id = (display.value(forKey: "displayID") as? UInt32) ?? 0
+        return id != 0 ? id : nil
     }
 
     public func destroyVirtualDisplay() {
-        bridge?.destroy()
-        bridge = nil
+        activeDisplay = nil
     }
 }
 

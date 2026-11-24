@@ -29,7 +29,7 @@ export const TOOLS = {
   system: { title: 'System', detail: 'Running apps, CPU, memory, storage and network speed', icon: 'cpu', tint: '#8e8e93', page: 'system' },
   ports: { title: 'Ports', detail: 'Processes listening on network ports', icon: 'globe', tint: '#64c4f8', settingsTab: 'ports' },
   homebrew: { title: 'Homebrew', detail: 'Installed and outdated Homebrew packages', icon: 'box', tint: '#a98467', settingsTab: 'homebrew' },
-  displays: { title: 'Displays', detail: 'Brightness and volume of each display', icon: 'display', tint: '#64c4f8', page: 'displays' },
+  displays: { title: 'Displays', detail: 'Brightness, volume, resolution, refresh rate and HiDPI virtual displays', icon: 'display', tint: '#64c4f8', page: 'displays' },
   settings: { title: 'Settings', detail: 'Open Zenith’s settings', icon: 'gear', tint: '#d8d8de', settingsTab: 'general' },
   quit: { title: 'Quit Zenith', detail: 'Quit Zenith', icon: 'power', tint: '#d8d8de', run: 'quit' },
   allTools: { title: 'All Tools', detail: 'Every tool, in groups', icon: 'grid', tint: '#d8d8de', page: 'tools' },

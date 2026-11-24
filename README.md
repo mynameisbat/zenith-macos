@@ -202,7 +202,22 @@ Nothing here deletes without asking: each action shows what will go (the largest
 - **Turning it off**: the system proxy is put back first, the proxy stops accepting new connections, and connections other apps already have open (a download, a stream) are allowed to finish, for up to 30 seconds, before whatever is left is closed. Quitting Zenith while the shield is on ends every connection that goes through it, because those connections end inside Zenith's process.
 - **Limits**: it is not a VPN and does not hide your IP address or the addresses you connect to. It only covers traffic from apps that honour the system proxy, and only the primary network service. Tracker blocking works at the domain level only: it cannot remove an ad that is served from the same domain as the page, and it does not look inside HTTPS. SOCKS and PAC proxy settings are ignored, and the local proxy has no authentication. The anti-DPI split has not been verified against a real filtering network.
 
-### 8. 🔊 Native Audio Feedback
+### 8. 🖥 Display Controls, Resolution & Virtual Displays
+- **Hardware Brightness & Volume Control (Phase 1)**:
+  - Hardware **DDC/CI control** for external monitors via Apple Silicon I2C/IOAVService (brightness, volume, chip auto-detection on `0x37` or `0xB7` for DisplayPort-to-HDMI bridges).
+  - Apple native `DisplayServices` for built-in Retina displays and Apple Studio/Pro displays.
+  - Software **Gamma Dimmer** fallback for non-DDC screens so every monitor dims smoothly.
+  - Dedicated Island Displays page (under 380 pt) with quick sliders.
+- **Resolution & Refresh Rate Management (Phase 2)**:
+  - Full desktop GUI resolution modes and refresh rates (up to 120 Hz ProMotion).
+  - **15-second automatic safety revert countdown**: prevents unviewable screen blackouts when selecting unsupported display modes.
+  - Dedicated Displays tab in Zenith Settings (`SettingsTab.displays`) with quick link from the Island.
+- **Virtual Display & HiDPI Simulation (Phase 3)**:
+  - Create simulated Retina displays (4K UHD 3840×2160, 5K UHD 5120×2880, 2K QHD 2560×1440) via native macOS CoreGraphics `CGVirtualDisplay` bridge.
+  - Forces macOS to generate crisp HiDPI Retina text and UI assets for non-Retina external monitors or headless remote streaming.
+  - One-click toggle with resolution presets directly in Zenith Settings.
+
+### 9. 🔊 Native Audio Feedback
 - 14 customizable native macOS sound cues (Pop, Tink, Hero, Bottle, Funk, Ping, Purr, Submarine, etc.) with custom sound file import (`.wav`, `.aiff`, `.m4a`).
 
 ---

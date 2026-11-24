@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import CoreGraphics
 @testable import ZenithCore
 
 /// Reads this Mac's real displays, read-only: lists them, asks DisplayServices whether it can change each one's
@@ -46,6 +47,34 @@ struct DisplayE2EReadOnlyTests {
             print("DE-02 sample modes: \(topModes)")
             #expect(current != nil)
             #expect(!modes.isEmpty)
+        }
+    }
+
+    @Test("DE-03: Real virtual display creation, validation and teardown")
+    func testRealVirtualDisplay() async {
+        let manager = SystemVirtualDisplayManager()
+        #expect(manager.isSupported)
+
+        print("DE-03: Creating 4K HiDPI virtual display on real macOS Window Server...")
+        let id = manager.createVirtualDisplay(
+            name: "Zenith Test Virtual HiDPI",
+            width: 3840,
+            height: 2160,
+            refreshRate: 60.0,
+            hiDPI: true
+        )
+        print("DE-03: Allocated virtual displayID: \(String(describing: id))")
+        #expect(id != nil && id != 0)
+
+        if let id {
+            let bounds = CGDisplayBounds(id)
+            print("DE-03: Virtual display active bounds: \(bounds)")
+            #expect(bounds.width == 1920)
+            #expect(bounds.height == 1080)
+
+            print("DE-03: Tearing down virtual display...")
+            manager.destroyVirtualDisplay()
+            print("DE-03: Virtual display teardown complete")
         }
     }
 }
