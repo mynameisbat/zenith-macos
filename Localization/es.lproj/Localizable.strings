@@ -1156,3 +1156,41 @@
 "Open Link" = "Abrir enlace";
 "Browse" = "Explorar";
 "Paste “%@”" = "Pegar «%@»";
+
+"Displays" = "Pantallas";
+"Brightness and volume of each display" = "Brillo y volumen de cada pantalla";
+"Built-in Display" = "Pantalla integrada";
+"Display" = "Pantalla";
+"Looking for displays…" = "Buscando pantallas…";
+"No displays found" = "No se encontraron pantallas";
+"Reading the display…" = "Leyendo pantalla…";
+"Brightness can't be changed on this display" = "No se puede cambiar el brillo en esta pantalla";
+"Software dimming" = "Atenuación por software";
+"The picture is dimmed in software. The screen's own backlight stays as it is." = "La imagen se atenúa por software. La luz de fondo de la pantalla permanece como está.";
+"Brightness of %@" = "Brillo de %@";
+"Volume of %@" = "Volumen de %@";
+
+"Resolution" = "Resolución";
+"Refresh Rate" = "Frecuencia de actualización";
+"Show all resolutions" = "Mostrar todas las resoluciones";
+"Default for display" = "Por omisión de la pantalla";
+"Confirm Display Setting" = "Confirmar ajuste de pantalla";
+"Reverting in %d seconds…" = "Restaurando en %d segundos…";
+"Keep Changes" = "Conservar cambios";
+"Revert" = "Revertir";
+"Display Settings…" = "Ajustes de pantalla…";
+"Built-in Apple display." = "Pantalla Apple integrada.";
+"External monitor connected over cable." = "Monitor externo conectado por cable.";
+"Show low resolution and scaled modes" = "Mostrar resoluciones bajas y modos escalados";
+"Brightness & Picture" = "Brillo e imagen";
+"Resolution & Refresh" = "Resolución y frecuencia";
+"Retina" = "Retina";
+"Default" = "Por omisión";
+
+"Virtual Display & HiDPI" = "Pantalla virtual y HiDPI";
+"Enable Virtual Display" = "Activar pantalla virtual";
+"Virtual Display Active" = "Pantalla virtual activa";
+"Creates a high-resolution virtual screen in software to produce sharp Retina text and UI on 1080p/2K monitors." = "Crea una pantalla virtual de alta resolución por software para obtener texto y UI nítidos tipo Retina en monitores 1080p/2K.";
+"4K UHD (3840 × 2160)" = "4K UHD (3840 × 2160)";
+"5K UHD (5120 × 2880)" = "5K UHD (5120 × 2880)";
+"2K QHD (2560 × 1440)" = "2K QHD (2560 × 1440)";

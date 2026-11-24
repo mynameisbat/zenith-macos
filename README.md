@@ -153,7 +153,10 @@ The certificate that signs a release is what installed copies trust for automati
 - **Keep Awake asks for how long**: clicking the mug while Keep Awake is off shows 15 min, 1 h, 2 h, 5 h and Until Turned Off right on the dock (or at the bottom of the Tools page); clicking it while on turns it off. While it is on, the line above the dock says how long is left when the pointer is on the mug. The other modes (while chosen apps run, while on the power adapter) are in the mug's right-click menu.
 - **Your own dock**: the dock holds up to six tools of your choice, in your order, followed by All Tools (which stays, as the way to everything else). On the Tools page press **Edit**: click a tool to put it on the dock or take it off, drag the icons on the strip at the bottom to reorder them, **Reset** for the original six, **Done** when finished. Right-clicking an icon on the dock itself offers Move Left, Move Right, Remove from Dock and Edit Dock…. Every change is saved as you make it.
 - **Tools page** (the dock's last icon): every tool with its full name, in four groups (Capture, Everyday, Clean Up, System). Settings and Quit are two small buttons in the page's top corner, apart from the tools.
-- **Pages**: All Tools and System open *inside* the island, which grows down to fit them but never gets wider than 380 pt, so it does not cover the menu bar's status items (System is what the machine is doing: running apps, CPU, memory, storage and network speed; Privacy Shield and Keep Awake are switches on the dock and the Tools page, and a right-click on them gives Keep Awake's durations and Privacy Shield's settings). Uninstall App, Cleaner, Ports, Homebrew and Settings are bigger than that and open Zenith's Settings window on the right tab. A page stays open when the pointer leaves it; close it with its ✕, with Escape, with the back arrow (one step back) or by clicking anywhere else. While a page is open the island takes the keyboard for its search and text fields without bringing Zenith in front, and notices use the floating panel under the page. While the island has its dock the Command Hub leaves out its quick-action grid and its Clean and Boost buttons; typing in the hub's search field still finds and runs an action.
+- **Pages**: All Tools, System and Displays open *inside* the island, which grows down to fit them but never gets wider than 380 pt, so it does not cover the menu bar's status items:
+  - **Displays**: sliders for brightness and volume on each display (DDC/CI, Apple native and gamma software dimming), with a link to Display Settings in Settings for resolution and refresh rate controls.
+  - **System**: what the machine is doing: running apps, CPU, memory, storage and network speed (Privacy Shield and Keep Awake are switches on the dock and the Tools page, and a right-click on them gives Keep Awake's durations and Privacy Shield's settings).
+  - Uninstall App, Cleaner, Ports, Homebrew, Displays and Settings are bigger than that and open Zenith's Settings window on the right tab. A page stays open when the pointer leaves it; close it with its ✕, with Escape, with the back arrow (one step back) or by clicking anywhere else. While a page is open the island takes the keyboard for its search and text fields without bringing Zenith in front, and notices use the floating panel under the page. While the island has its dock the Command Hub leaves out its quick-action grid and its Clean and Boost buttons; typing in the hub's search field still finds and runs an action.
 - **No menu bar icon by default**: everything is reached from the island, and the tools that need more room open the Settings window. Opening Zenith again from Finder or Spotlight while it runs shows the settings, so there is always a way in. The icon and the Command Hub popover come back with Settings → Dynamic Island → Behavior → Menu Bar Icon, and by themselves whenever the tool dock is switched off.
 - **Full-screen apps**: the island hides while an app is full screen on its display, both a real macOS full-screen Space and an app that covers the whole display with its own window (a game, a video player). Notices then use the floating panel. An app that goes full screen without a change of app is noticed only when the pointer comes near the island, a notice is about to show, or the app is activated again.
 - **Behavior settings** (Settings → Dynamic Island → Behavior): Tool Dock, Menu Bar Icon, Hover Delay, Swipe Gestures and Hide in Full-Screen Apps. Each switch can be turned off.
@@ -199,7 +202,22 @@ Nothing here deletes without asking: each action shows what will go (the largest
 - **Turning it off**: the system proxy is put back first, the proxy stops accepting new connections, and connections other apps already have open (a download, a stream) are allowed to finish, for up to 30 seconds, before whatever is left is closed. Quitting Zenith while the shield is on ends every connection that goes through it, because those connections end inside Zenith's process.
 - **Limits**: it is not a VPN and does not hide your IP address or the addresses you connect to. It only covers traffic from apps that honour the system proxy, and only the primary network service. Tracker blocking works at the domain level only: it cannot remove an ad that is served from the same domain as the page, and it does not look inside HTTPS. SOCKS and PAC proxy settings are ignored, and the local proxy has no authentication. The anti-DPI split has not been verified against a real filtering network.
 
-### 8. 🔊 Native Audio Feedback
+### 8. 🖥 Display Controls, Resolution & Virtual Displays
+- **Hardware Brightness & Volume Control (Phase 1)**:
+  - Hardware **DDC/CI control** for external monitors via Apple Silicon I2C/IOAVService (brightness, volume, chip auto-detection on `0x37` or `0xB7` for DisplayPort-to-HDMI bridges).
+  - Apple native `DisplayServices` for built-in Retina displays and Apple Studio/Pro displays.
+  - Software **Gamma Dimmer** fallback for non-DDC screens so every monitor dims smoothly.
+  - Dedicated Island Displays page (under 380 pt) with quick sliders.
+- **Resolution & Refresh Rate Management (Phase 2)**:
+  - Full desktop GUI resolution modes and refresh rates (up to 120 Hz ProMotion).
+  - **15-second automatic safety revert countdown**: prevents unviewable screen blackouts when selecting unsupported display modes.
+  - Dedicated Displays tab in Zenith Settings (`SettingsTab.displays`) with quick link from the Island.
+- **Virtual Display & HiDPI Simulation (Phase 3)**:
+  - Create simulated Retina displays (4K UHD 3840×2160, 5K UHD 5120×2880, 2K QHD 2560×1440) via native macOS CoreGraphics `CGVirtualDisplay` bridge.
+  - Forces macOS to generate crisp HiDPI Retina text and UI assets for non-Retina external monitors or headless remote streaming.
+  - One-click toggle with resolution presets directly in Zenith Settings.
+
+### 9. 🔊 Native Audio Feedback
 - 14 customizable native macOS sound cues (Pop, Tink, Hero, Bottle, Funk, Ping, Purr, Submarine, etc.) with custom sound file import (`.wav`, `.aiff`, `.m4a`).
 
 ---

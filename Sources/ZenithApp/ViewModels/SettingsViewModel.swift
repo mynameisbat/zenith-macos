@@ -14,6 +14,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case cleaner = "Cleaner"
     case homebrew = "Homebrew"
     case permissions = "Permissions"
+    case displays = "Displays"
 
     public var id: String { rawValue }
 
@@ -29,6 +30,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .cleaner: return "sparkles"
         case .homebrew: return "shippingbox.fill"
         case .permissions: return "hand.raised.fill"
+        case .displays: return "display"
         }
     }
 
@@ -44,6 +46,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .cleaner: return "Caches & Junk"
         case .homebrew: return "Packages & Updates"
         case .permissions: return "Screen & Access"
+        case .displays: return "Resolution & Refresh"
         }
     }
 
@@ -60,6 +63,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .cleaner: return String(localized: "Cleaner")
         case .homebrew: return String(localized: "Homebrew")
         case .permissions: return String(localized: "Permissions")
+        case .displays: return String(localized: "Displays")
         }
     }
 
@@ -76,6 +80,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .cleaner: return ["junk", "cache", "disk", "storage", "uninstall"]
         case .homebrew: return ["brew", "package", "formula", "cask", "install", "upgrade"]
         case .permissions: return ["accessibility", "screen recording", "automation", "calendar"]
+        case .displays: return ["display", "screen", "monitor", "resolution", "refresh", "hz", "hidpi", "brightness"]
         }
     }
 
@@ -83,7 +88,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .general, .shortcuts, .audio, .island, .snippets:
             return "WORKSPACE"
-        case .privacy, .ports, .cleaner, .homebrew, .permissions:
+        case .privacy, .ports, .cleaner, .homebrew, .permissions, .displays:
             return "SYSTEM & SECURITY"
         }
     }

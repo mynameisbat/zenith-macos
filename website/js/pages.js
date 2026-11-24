@@ -28,6 +28,44 @@ function mountSystem(el) {
   return () => { clearInterval(ticker); off.forEach((f) => f()); el.removeEventListener('click', handleQuitClicks); };
 }
 
+function mountDisplays(el) {
+  el.innerHTML = `<div class="displays-page" style="padding:14px;display:flex;flex-direction:column;gap:10px;">
+    <div class="hub-module" style="padding:12px;border-radius:18px;display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:13px;font-weight:600;color:var(--text-sec);">${icon('screen')}</span>
+        <b style="font-size:13px;font-weight:600;color:var(--text-pri);flex:1;">Built-in Retina Display</b>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="color:var(--text-sec);">${icon('sun')}</span>
+        <input type="range" min="0" max="100" value="70" style="flex:1;accent-color:#64c4f8;" aria-label="Brightness of Built-in Retina Display">
+        <span style="font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--text-sec);width:34px;text-align:right;">70%</span>
+      </div>
+    </div>
+    <div class="hub-module" style="padding:12px;border-radius:18px;display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:13px;font-weight:600;color:var(--text-sec);">${icon('screen')}</span>
+        <b style="font-size:13px;font-weight:600;color:var(--text-pri);flex:1;">Studio Monitor 27</b>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="color:var(--text-sec);">${icon('sun')}</span>
+        <input type="range" min="0" max="100" value="85" style="flex:1;accent-color:#64c4f8;" aria-label="Brightness of Studio Monitor 27">
+        <span style="font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--text-sec);width:34px;text-align:right;">85%</span>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding-top:2px;">
+      <button class="hub-pill" style="border:0;background:rgba(255,255,255,0.08);color:var(--text-sec);font-size:11.5px;padding:5px 12px;border-radius:12px;cursor:pointer;display:flex;align-items:center;gap:5px;">
+        <span>Display Settings…</span>
+      </button>
+    </div>
+  </div>`;
+  el.querySelectorAll('input[type="range"]').forEach((slider) => {
+    const val = slider.parentElement.querySelector('span:last-child');
+    slider.addEventListener('input', () => { if (val) val.textContent = `${slider.value}%`; });
+  });
+  return () => {};
+}
+
 export function initPages() {
   island.registerPage('system', { mount: mountSystem });
+  island.registerPage('displays', { mount: mountDisplays });
 }

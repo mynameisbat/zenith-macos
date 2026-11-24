@@ -1156,3 +1156,41 @@
 "Open Link" = "リンクを開く";
 "Browse" = "移動";
 "Paste “%@”" = "「%@」をペースト";
+
+"Displays" = "ディスプレイ";
+"Brightness and volume of each display" = "各ディスプレイの明るさと音量";
+"Built-in Display" = "内蔵ディスプレイ";
+"Display" = "ディスプレイ";
+"Looking for displays…" = "ディスプレイを検索中…";
+"No displays found" = "ディスプレイが見つかりません";
+"Reading the display…" = "ディスプレイを読み込み中…";
+"Brightness can't be changed on this display" = "このディスプレイでは明るさを変更できません";
+"Software dimming" = "ソフトウェア減光";
+"The picture is dimmed in software. The screen's own backlight stays as it is." = "画面はソフトウェアで減光されます。ディスプレイ自体のバックライトはそのままです。";
+"Brightness of %@" = "%@ の明るさ";
+"Volume of %@" = "%@ の音量";
+
+"Resolution" = "解像度";
+"Refresh Rate" = "リフレッシュレート";
+"Show all resolutions" = "すべての解像度を表示";
+"Default for display" = "ディスプレイのデフォルト";
+"Confirm Display Setting" = "ディスプレイ設定の確認";
+"Reverting in %d seconds…" = "%d秒後に元に戻します…";
+"Keep Changes" = "変更を維持";
+"Revert" = "元に戻す";
+"Display Settings…" = "ディスプレイ設定…";
+"Built-in Apple display." = "内蔵Appleディスプレイ。";
+"External monitor connected over cable." = "ケーブル接続された外部モニター。";
+"Show low resolution and scaled modes" = "低解像度および拡大縮小モードを表示";
+"Brightness & Picture" = "輝度と画像";
+"Resolution & Refresh" = "解像度とリフレッシュレート";
+"Retina" = "Retina";
+"Default" = "デフォルト";
+
+"Virtual Display & HiDPI" = "仮想ディスプレイとHiDPI";
+"Enable Virtual Display" = "仮想ディスプレイを有効化";
+"Virtual Display Active" = "仮想ディスプレイがアクティブ";
+"Creates a high-resolution virtual screen in software to produce sharp Retina text and UI on 1080p/2K monitors." = "ソフトウェアで高解像度の仮想画面を作成し、1080p/2Kモニターで鮮明なRetinaテキストとUIを表示します。";
+"4K UHD (3840 × 2160)" = "4K UHD (3840 × 2160)";
+"5K UHD (5120 × 2880)" = "5K UHD (5120 × 2880)";
+"2K QHD (2560 × 1440)" = "2K QHD (2560 × 1440)";

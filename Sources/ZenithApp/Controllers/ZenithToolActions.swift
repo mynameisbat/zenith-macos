@@ -10,6 +10,8 @@ enum ZenithToolActions {
     /// does what the hub's button did.
     static func run(_ tool: IslandTool) {
         if let page = tool.page {
+            // The Displays page is sized by how many displays there are, and its values are read as it opens.
+            if page == .displays { DisplayBrightnessService.shared.pageWillOpen() }
             ZenithIslandState.shared.openPage(page)
             return
         }
@@ -32,7 +34,7 @@ enum ZenithToolActions {
         case .homebrew:
             HomebrewSettingsLink.request()
             openSettings()
-        case .system, .allTools: break  // pages of the island, handled above
+        case .system, .allTools, .displays: break  // pages of the island, handled above
         }
     }
 

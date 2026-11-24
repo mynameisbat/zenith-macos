@@ -15,6 +15,7 @@ extension SettingsTab {
         case .cleaner: return ZenithTint.cleaner
         case .homebrew: return HomebrewSettingsTab.tint
         case .permissions: return ZenithTint.permissions
+        case .displays: return ZenithTint.displays
         }
     }
 }
@@ -263,6 +264,8 @@ public struct ZenithPreferencesView: View {
                     HomebrewSettingsTab()
                 case .permissions:
                     PermissionsGuideView(viewModel: viewModel)
+                case .displays:
+                    DisplaysSettingsTab()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

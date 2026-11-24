@@ -152,6 +152,7 @@ public enum ZenithTint {
     public static let privacy = Color(nsColor: .systemGreen)
     public static let cleaner = Color(nsColor: .systemPurple)
     public static let permissions = Color(nsColor: .systemBlue)
+    public static let displays = Color(nsColor: .systemTeal)
     public static let island = Color(white: 0.14)
     public static let timer = Color(nsColor: .systemOrange)
     public static let calendar = Color(nsColor: .systemRed)

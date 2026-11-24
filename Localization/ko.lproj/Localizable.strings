@@ -1156,3 +1156,41 @@
 "Open Link" = "링크 열기";
 "Browse" = "이동";
 "Paste “%@”" = "“%@” 붙여넣기";
+
+"Displays" = "디스플레이";
+"Brightness and volume of each display" = "각 디스플레이의 밝기 및 음량";
+"Built-in Display" = "내장 디스플레이";
+"Display" = "디스플레이";
+"Looking for displays…" = "디스플레이 검색 중…";
+"No displays found" = "디스플레이를 찾을 수 없음";
+"Reading the display…" = "디스플레이 읽는 중…";
+"Brightness can't be changed on this display" = "이 디스플레이에서는 밝기를 변경할 수 없습니다";
+"Software dimming" = "소프트웨어 디밍";
+"The picture is dimmed in software. The screen's own backlight stays as it is." = "화면이 소프트웨어로 어두워집니다. 화면 자체의 백라이트는 그대로 유지됩니다.";
+"Brightness of %@" = "%@의 밝기";
+"Volume of %@" = "%@의 음량";
+
+"Resolution" = "해상도";
+"Refresh Rate" = "재생률";
+"Show all resolutions" = "모든 해상도 보기";
+"Default for display" = "디스플레이 기본값";
+"Confirm Display Setting" = "디스플레이 설정 확인";
+"Reverting in %d seconds…" = "%d초 후 원래대로 복원됨…";
+"Keep Changes" = "변경사항 유지";
+"Revert" = "복원";
+"Display Settings…" = "디스플레이 설정…";
+"Built-in Apple display." = "내장 Apple 디스플레이.";
+"External monitor connected over cable." = "케이블로 연결된 외장 모니터.";
+"Show low resolution and scaled modes" = "낮은 해상도 및 조절된 모드 표시";
+"Brightness & Picture" = "밝기 및 화면";
+"Resolution & Refresh" = "해상도 및 재생률";
+"Retina" = "Retina";
+"Default" = "기본값";
+
+"Virtual Display & HiDPI" = "가상 디스플레이 및 HiDPI";
+"Enable Virtual Display" = "가상 디스플레이 활성화";
+"Virtual Display Active" = "가상 디스플레이 활성화됨";
+"Creates a high-resolution virtual screen in software to produce sharp Retina text and UI on 1080p/2K monitors." = "1080p/2K 모니터에서 선명한 Retina 텍스트와 UI를 생성하도록 소프트웨어로 고해상도 가상 화면을 만듭니다.";
+"4K UHD (3840 × 2160)" = "4K UHD (3840 × 2160)";
+"5K UHD (5120 × 2880)" = "5K UHD (5120 × 2880)";
+"2K QHD (2560 × 1440)" = "2K QHD (2560 × 1440)";

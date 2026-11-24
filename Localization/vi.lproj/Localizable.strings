@@ -1156,3 +1156,41 @@
 "Open Link" = "Mở liên kết";
 "Browse" = "Duyệt";
 "Paste “%@”" = "Dán “%@”";
+
+"Displays" = "Màn hình";
+"Brightness and volume of each display" = "Độ sáng và âm lượng của từng màn hình";
+"Built-in Display" = "Màn hình tích hợp";
+"Display" = "Màn hình";
+"Looking for displays…" = "Đang tìm màn hình…";
+"No displays found" = "Không tìm thấy màn hình";
+"Reading the display…" = "Đang đọc màn hình…";
+"Brightness can't be changed on this display" = "Không thể chỉnh độ sáng trên màn hình này";
+"Software dimming" = "Làm tối bằng phần mềm";
+"The picture is dimmed in software. The screen's own backlight stays as it is." = "Hình ảnh được làm tối bằng phần mềm. Đèn nền của màn hình vẫn giữ nguyên.";
+"Brightness of %@" = "Độ sáng của %@";
+"Volume of %@" = "Âm lượng của %@";
+
+"Resolution" = "Độ phân giải";
+"Refresh Rate" = "Tần số quét";
+"Show all resolutions" = "Hiện tất cả độ phân giải";
+"Default for display" = "Mặc định cho màn hình";
+"Confirm Display Setting" = "Xác nhận thiết lập màn hình";
+"Reverting in %d seconds…" = "Tự động hoàn tác sau %d giây…";
+"Keep Changes" = "Giữ thay đổi";
+"Revert" = "Hoàn tác";
+"Display Settings…" = "Cài đặt màn hình…";
+"Built-in Apple display." = "Màn hình Apple tích hợp.";
+"External monitor connected over cable." = "Màn hình ngoài kết nối qua cáp.";
+"Show low resolution and scaled modes" = "Hiện các độ phân giải thấp và chế độ thu phóng";
+"Brightness & Picture" = "Độ sáng & Hình ảnh";
+"Resolution & Refresh" = "Độ phân giải & Tần số quét";
+"Retina" = "Retina";
+"Default" = "Mặc định";
+
+"Virtual Display & HiDPI" = "Màn hình ảo & HiDPI";
+"Enable Virtual Display" = "Bật màn hình ảo";
+"Virtual Display Active" = "Màn hình ảo đang hoạt động";
+"Creates a high-resolution virtual screen in software to produce sharp Retina text and UI on 1080p/2K monitors." = "Tạo màn hình ảo độ phân giải cao bằng phần mềm để mang lại văn bản và giao diện Retina sắc nét trên màn hình 1080p/2K.";
+"4K UHD (3840 × 2160)" = "4K UHD (3840 × 2160)";
+"5K UHD (5120 × 2880)" = "5K UHD (5120 × 2880)";
+"2K QHD (2560 × 1440)" = "2K QHD (2560 × 1440)";

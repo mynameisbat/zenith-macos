@@ -1156,3 +1156,41 @@
 "Open Link" = "打开链接";
 "Browse" = "浏览";
 "Paste “%@”" = "粘贴“%@”";
+
+"Displays" = "显示器";
+"Brightness and volume of each display" = "每个显示器的亮度和音量";
+"Built-in Display" = "内建显示器";
+"Display" = "显示器";
+"Looking for displays…" = "正在寻找显示器…";
+"No displays found" = "未找到显示器";
+"Reading the display…" = "正在读取显示器…";
+"Brightness can't be changed on this display" = "无法在此显示器上调整亮度";
+"Software dimming" = "软件调暗";
+"The picture is dimmed in software. The screen's own backlight stays as it is." = "图像通过软件调暗。屏幕本身的背光保持不变。";
+"Brightness of %@" = "%@ 的亮度";
+"Volume of %@" = "%@ 的音量";
+
+"Resolution" = "分辨率";
+"Refresh Rate" = "刷新率";
+"Show all resolutions" = "显示所有分辨率";
+"Default for display" = "显示器默认";
+"Confirm Display Setting" = "确认显示设置";
+"Reverting in %d seconds…" = "将在 %d 秒后复原…";
+"Keep Changes" = "保留更改";
+"Revert" = "复原";
+"Display Settings…" = "显示器设置…";
+"Built-in Apple display." = "内建 Apple 显示屏。";
+"External monitor connected over cable." = "通过线缆连接的外接显示器。";
+"Show low resolution and scaled modes" = "显示低分辨率和缩放模式";
+"Brightness & Picture" = "亮度与画面";
+"Resolution & Refresh" = "分辨率与刷新率";
+"Retina" = "Retina";
+"Default" = "默认";
+
+"Virtual Display & HiDPI" = "虚拟显示器与 HiDPI";
+"Enable Virtual Display" = "启用虚拟显示器";
+"Virtual Display Active" = "虚拟显示器已激活";
+"Creates a high-resolution virtual screen in software to produce sharp Retina text and UI on 1080p/2K monitors." = "通过软件创建高分辨率虚拟屏幕，在 1080p/2K 显示器上呈现清晰的 Retina 文本与界面。";
+"4K UHD (3840 × 2160)" = "4K UHD (3840 × 2160)";
+"5K UHD (5120 × 2880)" = "5K UHD (5120 × 2880)";
+"2K QHD (2560 × 1440)" = "2K QHD (2560 × 1440)";
