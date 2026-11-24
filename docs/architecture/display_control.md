@@ -88,8 +88,12 @@ Lưu ý khi cài đặt:
 - Tích hợp liên kết "Display Settings…" từ trang Displays trên Island để mở trực tiếp tab Displays trong Settings.
 - Đầy đủ unit tests (`DisplayModeServiceTests`) bọc qua seam `DisplayConfiguring` cách ly phần cứng.
 
-**Giai đoạn 3 (thử nghiệm, sau một switch mặc định tắt): màn ảo / HiDPI**
-- Màn ảo 3840×2160 với `hiDPI = 1`, mirror màn thật vào nó để có "trông như 1920×1080" sắc nét trên màn 1080p. Màn ảo chỉ sống cùng process Zenith: thoát app thì mirror biến mất và cửa sổ bị sắp xếp lại. Cần kiểm chứng trên máy macOS 27 trước khi hứa với người dùng.
+**Giai đoạn 3: màn ảo / HiDPI (ĐÃ XONG)**
+- Target C/ObjC `ZenithDisplayPrivate` bọc an toàn `CGVirtualDisplay` (CoreGraphics private) với `ZenithVirtualDisplayBridge`.
+- `VirtualDisplayService` trong `ZenithCore` quản lý vòng đời màn ảo (4K 3840×2160, 5K 5120×2880, 2K 2560×1440 HiDPI).
+- UI tích hợp trong tab Settings Displays (`DisplaysSettingsTab`): bật/tắt màn ảo và chọn preset độ phân giải.
+- Đầy đủ unit tests (`VirtualDisplayServiceTests`) với seam `VirtualDisplayManaging`.
+- Màn ảo chỉ sống cùng process Zenith và được hệ thống giải phóng tự động khi app thoát.
 
 ## 6. Rủi ro
 

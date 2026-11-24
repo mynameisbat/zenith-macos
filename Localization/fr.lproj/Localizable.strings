@@ -1186,3 +1186,11 @@
 "Resolution & Refresh" = "Résolution et fréquence";
 "Retina" = "Retina";
 "Default" = "Par défaut";
+
+"Virtual Display & HiDPI" = "Écran virtuel et HiDPI";
+"Enable Virtual Display" = "Activer l'écran virtuel";
+"Virtual Display Active" = "Écran virtuel actif";
+"Creates a high-resolution virtual screen in software to produce sharp Retina text and UI on 1080p/2K monitors." = "Crée un écran virtuel haute résolution par logiciel pour afficher du texte et une interface Retina nets sur les moniteurs 1080p/2K.";
+"4K UHD (3840 × 2160)" = "4K UHD (3840 × 2160)";
+"5K UHD (5120 × 2880)" = "5K UHD (5120 × 2880)";
+"2K QHD (2560 × 1440)" = "2K QHD (2560 × 1440)";

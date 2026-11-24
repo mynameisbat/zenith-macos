@@ -1186,3 +1186,11 @@
 "Resolution & Refresh" = "解像度とリフレッシュレート";
 "Retina" = "Retina";
 "Default" = "デフォルト";
+
+"Virtual Display & HiDPI" = "仮想ディスプレイとHiDPI";
+"Enable Virtual Display" = "仮想ディスプレイを有効化";
+"Virtual Display Active" = "仮想ディスプレイがアクティブ";
+"Creates a high-resolution virtual screen in software to produce sharp Retina text and UI on 1080p/2K monitors." = "ソフトウェアで高解像度の仮想画面を作成し、1080p/2Kモニターで鮮明なRetinaテキストとUIを表示します。";
+"4K UHD (3840 × 2160)" = "4K UHD (3840 × 2160)";
+"5K UHD (5120 × 2880)" = "5K UHD (5120 × 2880)";
+"2K QHD (2560 × 1440)" = "2K QHD (2560 × 1440)";

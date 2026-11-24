@@ -1186,3 +1186,11 @@
 "Resolution & Refresh" = "分辨率与刷新率";
 "Retina" = "Retina";
 "Default" = "默认";
+
+"Virtual Display & HiDPI" = "虚拟显示器与 HiDPI";
+"Enable Virtual Display" = "启用虚拟显示器";
+"Virtual Display Active" = "虚拟显示器已激活";
+"Creates a high-resolution virtual screen in software to produce sharp Retina text and UI on 1080p/2K monitors." = "通过软件创建高分辨率虚拟屏幕，在 1080p/2K 显示器上呈现清晰的 Retina 文本与界面。";
+"4K UHD (3840 × 2160)" = "4K UHD (3840 × 2160)";
+"5K UHD (5120 × 2880)" = "5K UHD (5120 × 2880)";
+"2K QHD (2560 × 1440)" = "2K QHD (2560 × 1440)";

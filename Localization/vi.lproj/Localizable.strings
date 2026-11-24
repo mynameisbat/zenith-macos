@@ -1186,3 +1186,11 @@
 "Resolution & Refresh" = "Độ phân giải & Tần số quét";
 "Retina" = "Retina";
 "Default" = "Mặc định";
+
+"Virtual Display & HiDPI" = "Màn hình ảo & HiDPI";
+"Enable Virtual Display" = "Bật màn hình ảo";
+"Virtual Display Active" = "Màn hình ảo đang hoạt động";
+"Creates a high-resolution virtual screen in software to produce sharp Retina text and UI on 1080p/2K monitors." = "Tạo màn hình ảo độ phân giải cao bằng phần mềm để mang lại văn bản và giao diện Retina sắc nét trên màn hình 1080p/2K.";
+"4K UHD (3840 × 2160)" = "4K UHD (3840 × 2160)";
+"5K UHD (5120 × 2880)" = "5K UHD (5120 × 2880)";
+"2K QHD (2560 × 1440)" = "2K QHD (2560 × 1440)";

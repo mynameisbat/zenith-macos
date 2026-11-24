@@ -12,14 +12,17 @@ public struct DisplaysSettingsTab: View {
 
     @ObservedObject private var modeService: DisplayModeService
     @ObservedObject private var brightnessService: DisplayBrightnessService
+    @ObservedObject private var virtualDisplayService: VirtualDisplayService
     @StateObject private var state = DisplaysTabState()
 
     public init(
         modeService: DisplayModeService = .shared,
-        brightnessService: DisplayBrightnessService = .shared
+        brightnessService: DisplayBrightnessService = .shared,
+        virtualDisplayService: VirtualDisplayService = .shared
     ) {
         _modeService = ObservedObject(wrappedValue: modeService)
         _brightnessService = ObservedObject(wrappedValue: brightnessService)
+        _virtualDisplayService = ObservedObject(wrappedValue: virtualDisplayService)
     }
 
     private var activeDisplayID: UInt32 {
@@ -53,6 +56,8 @@ public struct DisplaysSettingsTab: View {
                 if let display = currentDisplay {
                     displayDetailSection(display: display)
                 }
+
+                virtualDisplaySection
             }
         }
         .onAppear {
@@ -288,6 +293,55 @@ public struct DisplaysSettingsTab: View {
                             .font(.system(size: 11.5, weight: .semibold).monospacedDigit())
                             .foregroundColor(ZenithTheme.Island.textSecondary)
                             .frame(width: 38, alignment: .trailing)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Virtual Display Section
+
+    private var virtualDisplaySection: some View {
+        ZenithSettingsSection(
+            "Virtual Display & HiDPI",
+            footer: "Creates a high-resolution virtual screen in software to produce sharp Retina text and UI on 1080p/2K monitors."
+        ) {
+            ZenithSettingsRow(
+                "Enable Virtual Display",
+                subtitle: virtualDisplayService.isActive
+                    ? LocalizedStringKey("Virtual Display Active")
+                    : LocalizedStringKey("Disabled"),
+                symbol: "sparkles.tv",
+                tint: ZenithTint.displays
+            ) {
+                Toggle(
+                    "Enable Virtual Display",
+                    isOn: Binding(
+                        get: { virtualDisplayService.isActive },
+                        set: { _ in virtualDisplayService.toggle() }
+                    )
+                )
+                .toggleStyle(.switch)
+                .labelsHidden()
+            }
+
+            if virtualDisplayService.isActive {
+                ZenithSettingsDivider(inset: 44)
+
+                ZenithSettingsRow(
+                    "Resolution",
+                    subtitle: LocalizedStringKey(virtualDisplayService.resolution.descriptionTitle),
+                    symbol: "aspectratio",
+                    tint: ZenithTint.displays
+                ) {
+                    Picker("Resolution", selection: $virtualDisplayService.resolution) {
+                        ForEach(VirtualDisplayResolution.allCases) { res in
+                            Text(res.rawValue).tag(res)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .onChange(of: virtualDisplayService.resolution) {
+                        virtualDisplayService.start()
                     }
                 }
             }

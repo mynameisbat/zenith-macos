@@ -39,10 +39,19 @@ let package = Package(
     ],
     dependencies: [],
     targets: [
+        // Objective-C bridge for private display features (CGVirtualDisplay, Phase 3)
+        .target(
+            name: "ZenithDisplayPrivate",
+            dependencies: [],
+            path: "Sources/ZenithDisplayPrivate",
+            publicHeadersPath: "include"
+        ),
         // Core business logic, protocols, domain models, and test mocks
         .target(
             name: "ZenithCore",
-            dependencies: [],
+            dependencies: [
+                "ZenithDisplayPrivate"
+            ],
             path: "Sources/ZenithCore"
         ),
         // macOS application layer: NSApplication, Menu Bar, Windows & SwiftUI Views
