@@ -1169,3 +1169,20 @@
 "The picture is dimmed in software. The screen's own backlight stays as it is." = "L'image est assombrie de façon logicielle. Le rétroéclairage de l'écran reste tel quel.";
 "Brightness of %@" = "Luminosité de %@";
 "Volume of %@" = "Volume de %@";
+
+"Resolution" = "Résolution";
+"Refresh Rate" = "Fréquence d'actualisation";
+"Show all resolutions" = "Afficher toutes les résolutions";
+"Default for display" = "Par défaut pour l'écran";
+"Confirm Display Setting" = "Confirmer le réglage de l'écran";
+"Reverting in %d seconds…" = "Rétablissement dans %d secondes…";
+"Keep Changes" = "Conserver les modifications";
+"Revert" = "Rétablir";
+"Display Settings…" = "Réglages de l'écran…";
+"Built-in Apple display." = "Écran Apple intégré.";
+"External monitor connected over cable." = "Moniteur externe connecté par câble.";
+"Show low resolution and scaled modes" = "Afficher les basses résolutions et modes mis à l'échelle";
+"Brightness & Picture" = "Luminosité et image";
+"Resolution & Refresh" = "Résolution et fréquence";
+"Retina" = "Retina";
+"Default" = "Par défaut";

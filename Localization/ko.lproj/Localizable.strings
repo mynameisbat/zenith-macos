@@ -1169,3 +1169,20 @@
 "The picture is dimmed in software. The screen's own backlight stays as it is." = "화면이 소프트웨어로 어두워집니다. 화면 자체의 백라이트는 그대로 유지됩니다.";
 "Brightness of %@" = "%@의 밝기";
 "Volume of %@" = "%@의 음량";
+
+"Resolution" = "해상도";
+"Refresh Rate" = "재생률";
+"Show all resolutions" = "모든 해상도 보기";
+"Default for display" = "디스플레이 기본값";
+"Confirm Display Setting" = "디스플레이 설정 확인";
+"Reverting in %d seconds…" = "%d초 후 원래대로 복원됨…";
+"Keep Changes" = "변경사항 유지";
+"Revert" = "복원";
+"Display Settings…" = "디스플레이 설정…";
+"Built-in Apple display." = "내장 Apple 디스플레이.";
+"External monitor connected over cable." = "케이블로 연결된 외장 모니터.";
+"Show low resolution and scaled modes" = "낮은 해상도 및 조절된 모드 표시";
+"Brightness & Picture" = "밝기 및 화면";
+"Resolution & Refresh" = "해상도 및 재생률";
+"Retina" = "Retina";
+"Default" = "기본값";

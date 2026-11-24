@@ -29,6 +29,21 @@ struct IslandDisplaysPage: View {
                     ForEach(service.displays) { display in
                         IslandDisplayCard(display: display, service: service)
                     }
+
+                    Button {
+                        ZenithIslandState.shared.close()
+                        ZenithToolActions.openSettings(on: .displays)
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "slider.horizontal.below.rectangle")
+                            Text("Display Settings…")
+                        }
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundColor(ZenithTheme.Island.textSecondary)
+                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(IslandDisplaysPageSizing.padding)

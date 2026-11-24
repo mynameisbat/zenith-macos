@@ -77,14 +77,16 @@ Lưu ý khi cài đặt:
 
 ## 5. Lộ trình
 
-**Giai đoạn 1: độ sáng (khoảng 1 PR)**
+**Giai đoạn 1: độ sáng (ĐÃ XONG)**
 - `DDCPacket`, `EDID`, `DDCTransport` + `SimulatedDDCMonitor`, kèm test: checksum, null message, unsupported, chip `0xB7`, gộp lệnh slider.
 - `DisplayBrightnessService` với ba backend: DDC, DisplayServices (màn tích hợp/Apple), gamma (dự phòng). Lưu giá trị cuối theo EDID; mọi thay đổi gọi `objectWillChange.send()`.
 - `IslandPage.displays` + `IslandTool.displays`; thêm render `island-page-displays` vào `--render-screenshots` với màn giả.
 
-**Giai đoạn 2: độ phân giải và tần số quét**
-- `DisplayModeService` qua API public, lọc `isUsableForDesktopGUI`, gom mode HiDPI và mode thường như System Settings.
-- Tab Settings "Displays" với hộp thoại tự quay lại sau 15 giây. Tùy chọn: vị trí và mirror.
+**Giai đoạn 2: độ phân giải và tần số quét (ĐÃ XONG)**
+- `DisplayModeService` qua API public (`CGDisplayCopyAllDisplayModes`, `CGConfigureDisplayWithDisplayMode`), lọc `isUsableForDesktopGUI`, gom mode HiDPI và mode thường.
+- Tab Settings "Displays" (`DisplaysSettingsTab` trong `SettingsTab.displays`) với cơ chế an toàn: tự hoàn tác sau 15 giây nếu không xác nhận "Keep Changes".
+- Tích hợp liên kết "Display Settings…" từ trang Displays trên Island để mở trực tiếp tab Displays trong Settings.
+- Đầy đủ unit tests (`DisplayModeServiceTests`) bọc qua seam `DisplayConfiguring` cách ly phần cứng.
 
 **Giai đoạn 3 (thử nghiệm, sau một switch mặc định tắt): màn ảo / HiDPI**
 - Màn ảo 3840×2160 với `hiDPI = 1`, mirror màn thật vào nó để có "trông như 1920×1080" sắc nét trên màn 1080p. Màn ảo chỉ sống cùng process Zenith: thoát app thì mirror biến mất và cửa sổ bị sắp xếp lại. Cần kiểm chứng trên máy macOS 27 trước khi hứa với người dùng.

@@ -58,6 +58,12 @@ struct ZenithSettingsSection<Content: View>: View {
         self.content = content()
     }
 
+    init(title: Text, footer: Text? = nil, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.footer = footer
+        self.content = content()
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title {

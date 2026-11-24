@@ -1169,3 +1169,20 @@
 "The picture is dimmed in software. The screen's own backlight stays as it is." = "La imagen se atenúa por software. La luz de fondo de la pantalla permanece como está.";
 "Brightness of %@" = "Brillo de %@";
 "Volume of %@" = "Volumen de %@";
+
+"Resolution" = "Resolución";
+"Refresh Rate" = "Frecuencia de actualización";
+"Show all resolutions" = "Mostrar todas las resoluciones";
+"Default for display" = "Por omisión de la pantalla";
+"Confirm Display Setting" = "Confirmar ajuste de pantalla";
+"Reverting in %d seconds…" = "Restaurando en %d segundos…";
+"Keep Changes" = "Conservar cambios";
+"Revert" = "Revertir";
+"Display Settings…" = "Ajustes de pantalla…";
+"Built-in Apple display." = "Pantalla Apple integrada.";
+"External monitor connected over cable." = "Monitor externo conectado por cable.";
+"Show low resolution and scaled modes" = "Mostrar resoluciones bajas y modos escalados";
+"Brightness & Picture" = "Brillo e imagen";
+"Resolution & Refresh" = "Resolución y frecuencia";
+"Retina" = "Retina";
+"Default" = "Por omisión";

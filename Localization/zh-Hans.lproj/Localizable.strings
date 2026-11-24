@@ -1169,3 +1169,20 @@
 "The picture is dimmed in software. The screen's own backlight stays as it is." = "图像通过软件调暗。屏幕本身的背光保持不变。";
 "Brightness of %@" = "%@ 的亮度";
 "Volume of %@" = "%@ 的音量";
+
+"Resolution" = "分辨率";
+"Refresh Rate" = "刷新率";
+"Show all resolutions" = "显示所有分辨率";
+"Default for display" = "显示器默认";
+"Confirm Display Setting" = "确认显示设置";
+"Reverting in %d seconds…" = "将在 %d 秒后复原…";
+"Keep Changes" = "保留更改";
+"Revert" = "复原";
+"Display Settings…" = "显示器设置…";
+"Built-in Apple display." = "内建 Apple 显示屏。";
+"External monitor connected over cable." = "通过线缆连接的外接显示器。";
+"Show low resolution and scaled modes" = "显示低分辨率和缩放模式";
+"Brightness & Picture" = "亮度与画面";
+"Resolution & Refresh" = "分辨率与刷新率";
+"Retina" = "Retina";
+"Default" = "默认";

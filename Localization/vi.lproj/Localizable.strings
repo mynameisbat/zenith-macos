@@ -1169,3 +1169,20 @@
 "The picture is dimmed in software. The screen's own backlight stays as it is." = "Hình ảnh được làm tối bằng phần mềm. Đèn nền của màn hình vẫn giữ nguyên.";
 "Brightness of %@" = "Độ sáng của %@";
 "Volume of %@" = "Âm lượng của %@";
+
+"Resolution" = "Độ phân giải";
+"Refresh Rate" = "Tần số quét";
+"Show all resolutions" = "Hiện tất cả độ phân giải";
+"Default for display" = "Mặc định cho màn hình";
+"Confirm Display Setting" = "Xác nhận thiết lập màn hình";
+"Reverting in %d seconds…" = "Tự động hoàn tác sau %d giây…";
+"Keep Changes" = "Giữ thay đổi";
+"Revert" = "Hoàn tác";
+"Display Settings…" = "Cài đặt màn hình…";
+"Built-in Apple display." = "Màn hình Apple tích hợp.";
+"External monitor connected over cable." = "Màn hình ngoài kết nối qua cáp.";
+"Show low resolution and scaled modes" = "Hiện các độ phân giải thấp và chế độ thu phóng";
+"Brightness & Picture" = "Độ sáng & Hình ảnh";
+"Resolution & Refresh" = "Độ phân giải & Tần số quét";
+"Retina" = "Retina";
+"Default" = "Mặc định";

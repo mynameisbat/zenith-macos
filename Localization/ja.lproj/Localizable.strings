@@ -1169,3 +1169,20 @@
 "The picture is dimmed in software. The screen's own backlight stays as it is." = "画面はソフトウェアで減光されます。ディスプレイ自体のバックライトはそのままです。";
 "Brightness of %@" = "%@ の明るさ";
 "Volume of %@" = "%@ の音量";
+
+"Resolution" = "解像度";
+"Refresh Rate" = "リフレッシュレート";
+"Show all resolutions" = "すべての解像度を表示";
+"Default for display" = "ディスプレイのデフォルト";
+"Confirm Display Setting" = "ディスプレイ設定の確認";
+"Reverting in %d seconds…" = "%d秒後に元に戻します…";
+"Keep Changes" = "変更を維持";
+"Revert" = "元に戻す";
+"Display Settings…" = "ディスプレイ設定…";
+"Built-in Apple display." = "内蔵Appleディスプレイ。";
+"External monitor connected over cable." = "ケーブル接続された外部モニター。";
+"Show low resolution and scaled modes" = "低解像度および拡大縮小モードを表示";
+"Brightness & Picture" = "輝度と画像";
+"Resolution & Refresh" = "解像度とリフレッシュレート";
+"Retina" = "Retina";
+"Default" = "デフォルト";
