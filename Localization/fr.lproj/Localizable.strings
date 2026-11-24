@@ -1156,3 +1156,16 @@
 "Open Link" = "Ouvrir le lien";
 "Browse" = "Parcourir";
 "Paste “%@”" = "Coller « %@ »";
+
+"Displays" = "Écrans";
+"Brightness and volume of each display" = "Luminosité et volume de chaque écran";
+"Built-in Display" = "Écran intégré";
+"Display" = "Écran";
+"Looking for displays…" = "Recherche des écrans…";
+"No displays found" = "Aucun écran trouvé";
+"Reading the display…" = "Lecture de l'écran…";
+"Brightness can't be changed on this display" = "La luminosité ne peut pas être modifiée sur cet écran";
+"Software dimming" = "Atténuation logicielle";
+"The picture is dimmed in software. The screen's own backlight stays as it is." = "L'image est assombrie de façon logicielle. Le rétroéclairage de l'écran reste tel quel.";
+"Brightness of %@" = "Luminosité de %@";
+"Volume of %@" = "Volume de %@";

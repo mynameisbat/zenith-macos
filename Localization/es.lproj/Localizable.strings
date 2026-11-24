@@ -1156,3 +1156,16 @@
 "Open Link" = "Abrir enlace";
 "Browse" = "Explorar";
 "Paste “%@”" = "Pegar «%@»";
+
+"Displays" = "Pantallas";
+"Brightness and volume of each display" = "Brillo y volumen de cada pantalla";
+"Built-in Display" = "Pantalla integrada";
+"Display" = "Pantalla";
+"Looking for displays…" = "Buscando pantallas…";
+"No displays found" = "No se encontraron pantallas";
+"Reading the display…" = "Leyendo pantalla…";
+"Brightness can't be changed on this display" = "No se puede cambiar el brillo en esta pantalla";
+"Software dimming" = "Atenuación por software";
+"The picture is dimmed in software. The screen's own backlight stays as it is." = "La imagen se atenúa por software. La luz de fondo de la pantalla permanece como está.";
+"Brightness of %@" = "Brillo de %@";
+"Volume of %@" = "Volumen de %@";

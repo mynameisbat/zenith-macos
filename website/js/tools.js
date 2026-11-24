@@ -6,7 +6,7 @@ export const TOOL_GROUPS = [
   { id: 'capture', title: 'Capture', tools: ['area', 'screen', 'record', 'ocr'] },
   { id: 'everyday', title: 'Everyday', tools: ['clipboard', 'cleaning', 'privacyShield', 'keepAwake'] },
   { id: 'cleanup', title: 'Clean Up', tools: ['clean', 'uninstall', 'cleaner', 'boost'] },
-  { id: 'system', title: 'System', tools: ['system', 'ports', 'homebrew'] },
+  { id: 'system', title: 'System', tools: ['system', 'ports', 'homebrew', 'displays'] },
 ];
 
 // `shortcut` is the id of the shortcut that does the same (Settings → Shortcuts); `page` is the island page it opens (only
@@ -29,6 +29,7 @@ export const TOOLS = {
   system: { title: 'System', detail: 'Running apps, CPU, memory, storage and network speed', icon: 'cpu', tint: '#8e8e93', page: 'system' },
   ports: { title: 'Ports', detail: 'Processes listening on network ports', icon: 'globe', tint: '#64c4f8', settingsTab: 'ports' },
   homebrew: { title: 'Homebrew', detail: 'Installed and outdated Homebrew packages', icon: 'box', tint: '#a98467', settingsTab: 'homebrew' },
+  displays: { title: 'Displays', detail: 'Brightness and volume of each display', icon: 'display', tint: '#64c4f8', page: 'displays' },
   settings: { title: 'Settings', detail: 'Open Zenith’s settings', icon: 'gear', tint: '#d8d8de', settingsTab: 'general' },
   quit: { title: 'Quit Zenith', detail: 'Quit Zenith', icon: 'power', tint: '#d8d8de', run: 'quit' },
   allTools: { title: 'All Tools', detail: 'Every tool, in groups', icon: 'grid', tint: '#d8d8de', page: 'tools' },
@@ -39,6 +40,7 @@ export const TOOLS = {
 export const PAGES = {
   system: { title: 'System', icon: 'cpu', size: [380, 476] },
   tools: { title: 'Tools', icon: 'grid', size: [380, 430] },
+  displays: { title: 'Displays', icon: 'display', size: [380, 240] },
 };
 
 // ---------------------------------------------------------------- the dock layout (IslandDockLayout)

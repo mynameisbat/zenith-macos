@@ -3,8 +3,8 @@ import AppKit
 import ZenithCore
 
 /// A page of the island: a strip with the way back, the page's name and a close button, and below it one of Zenith's
-/// tools, drawn where it used to have a window. Only the two that fit the island's 380 pt are pages (System and
-/// Tools); the others open Zenith's Settings window.
+/// tools, drawn where it used to have a window. Only the ones that fit the island's 380 pt are pages (System,
+/// Tools and Displays); the others open Zenith's Settings window.
 ///
 /// The tools are the same views the Command Hub shows. The island's window is dark (`ZenithIslandPanel` sets the
 /// appearance), so they arrive in their dark look on the island's black.
@@ -103,6 +103,8 @@ struct IslandPageView: View {
             IslandSystemPage(islandState: islandState)
         case .tools:
             IslandAllToolsPage(islandState: islandState)
+        case .displays:
+            IslandDisplaysPage()
         }
     }
 }

@@ -1156,3 +1156,16 @@
 "Open Link" = "打开链接";
 "Browse" = "浏览";
 "Paste “%@”" = "粘贴“%@”";
+
+"Displays" = "显示器";
+"Brightness and volume of each display" = "每个显示器的亮度和音量";
+"Built-in Display" = "内建显示器";
+"Display" = "显示器";
+"Looking for displays…" = "正在寻找显示器…";
+"No displays found" = "未找到显示器";
+"Reading the display…" = "正在读取显示器…";
+"Brightness can't be changed on this display" = "无法在此显示器上调整亮度";
+"Software dimming" = "软件调暗";
+"The picture is dimmed in software. The screen's own backlight stays as it is." = "图像通过软件调暗。屏幕本身的背光保持不变。";
+"Brightness of %@" = "%@ 的亮度";
+"Volume of %@" = "%@ 的音量";

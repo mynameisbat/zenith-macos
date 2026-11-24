@@ -21,6 +21,7 @@ enum IslandToolStyle {
         case .system: return Color(nsColor: .systemGray)
         case .ports: return ZenithTint.network
         case .homebrew: return HomebrewSettingsTab.tint
+        case .displays: return Color(nsColor: .systemOrange)
         case .settings, .quit, .allTools: return Color(white: 0.24)
         }
     }

@@ -1,0 +1,33 @@
+import Testing
+import Foundation
+@testable import ZenithCore
+
+/// Reads this Mac's real displays, read-only: lists them, asks DisplayServices whether it can change each one's
+/// brightness, and sends DDC "Get VCP" requests to external monitors. It never sets anything (no DDC "Set VCP", no
+/// DisplayServices write, no gamma change). Opt in with `ZENITH_E2E_DISPLAY=1`.
+private let displayE2EEnabled = ProcessInfo.processInfo.environment["ZENITH_E2E_DISPLAY"] == "1"
+
+@Suite("Display hardware (opt-in, read-only)", .enabled(if: displayE2EEnabled), .serialized)
+@MainActor
+struct DisplayE2EReadOnlyTests {
+    @Test("DE-01: The real inventory lists the displays, and an external monitor on DDC answers a brightness read")
+    func testRealDisplays() async {
+        let inventory = SystemDisplayInventory()
+        let displays = inventory.onlineDisplays()
+        print("DE-01 displays: \(displays.map { "\($0.id) \($0.name) builtIn=\($0.isBuiltIn) key=\($0.key)" })")
+        #expect(!displays.isEmpty)
+
+        let native = DisplayServicesBridge()
+        for display in displays {
+            print("DE-01 \(display.name): DisplayServices canChange=\(native.canChangeBrightness(of: display.id)) value=\(String(describing: native.brightness(of: display.id)))")
+        }
+
+        let links = await Task.detached { inventory.ddcLinks(for: displays) }.value
+        for (id, link) in links.sorted(by: { $0.key < $1.key }) {
+            print("DE-01 display \(id): DDC chip 0x\(String(link.initialChip, radix: 16)) edid=\(String(describing: link.edid?.productName)) manufacturer=\(link.edid?.manufacturerID ?? "-")")
+            let device = DDCDevice(transport: link.transport, initialChip: link.initialChip)
+            let result = await Task.detached { (device.read(VCPCode.brightness), device.read(VCPCode.volume), device.chip) }.value
+            print("DE-01 display \(id): brightness=\(result.0) volume=\(result.1) chip=0x\(String(result.2, radix: 16))")
+        }
+    }
+}

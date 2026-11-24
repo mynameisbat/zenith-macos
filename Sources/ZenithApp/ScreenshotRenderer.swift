@@ -284,6 +284,27 @@ enum ScreenshotRenderer {
         }
         island.close()
 
+        // The Displays page, with made-up displays: a laptop's own, a monitor that takes brightness and volume over DDC,
+        // and one that can only be dimmed in software. Never this Mac's displays.
+        let displaysService = DisplayBrightnessService(previewDisplays: [
+            ControlledDisplay(id: 1, name: "Built-in Retina Display", isBuiltIn: true, backend: .appleNative, brightness: 0.62),
+            ControlledDisplay(id: 2, name: "Studio Monitor 27", isBuiltIn: false, backend: .ddc, brightness: 0.7, volume: 0.3),
+            ControlledDisplay(id: 3, name: "Projector", isBuiltIn: false, backend: .gamma, brightness: 0.85)
+        ])
+        IslandDisplaysPage.serviceProvider = { displaysService }
+        defer { IslandDisplaysPage.serviceProvider = { .shared } }
+        island.openPage(.displays)
+        let displaysPageSize = geometry.expandedSize(page: .displays, showsDock: true)
+        save("island-page-displays", ZenithDynamicIslandView(geometry: geometry).frame(width: displaysPageSize.width, height: displaysPageSize.height))
+        if showsNotchVariants {
+            let size = notchedGeometry.expandedSize(page: .displays, showsDock: true)
+            save("island-page-displays-notch", ZStack(alignment: .top) {
+                ZenithDynamicIslandView(geometry: notchedGeometry)
+                Rectangle().fill(Color.red.opacity(0.4)).frame(width: 186, height: 32)
+            }.frame(width: size.width, height: size.height))
+        }
+        island.close()
+
         // The annotation editor on the made-up picture.
         if let png = sampleImagePNG(),
            let source = CGImageSourceCreateWithData(png as CFData, nil),

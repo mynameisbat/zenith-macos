@@ -23,8 +23,8 @@ struct IslandToolsTests {
         #expect(Set(grouped.compactMap(\.hubAction)) == Set(ZenithHubAction.allCases))
         let reachable = Set(grouped.compactMap(\.page)).union([IslandTool.settings.page, IslandTool.allTools.page].compactMap { $0 })
         #expect(reachable == Set(IslandPage.allCases))
-        // Only System and Tools are pages of the island; the big ones are the Settings window's.
-        #expect(Set(IslandPage.allCases) == [.system, .tools])
+        // Only System, Tools and Displays are pages of the island; the big ones are the Settings window's.
+        #expect(Set(IslandPage.allCases) == [.system, .tools, .displays])
 
         for tool in IslandTool.allCases {
             #expect(!tool.title.isEmpty && !tool.detail.isEmpty && !tool.icon.isEmpty)
@@ -39,7 +39,7 @@ struct IslandToolsTests {
         for tool in [IslandTool.uninstall, .cleaner, .ports, .homebrew, .settings] {
             #expect(tool.opensSettingsWindow && tool.page == nil, "\(tool.rawValue)")
         }
-        for tool in [IslandTool.system, .allTools] {
+        for tool in [IslandTool.system, .allTools, .displays] {
             #expect(tool.page != nil && !tool.opensSettingsWindow, "\(tool.rawValue)")
         }
         #expect(IslandTool.allCases.filter(\.opensSettingsWindow).count == 5)

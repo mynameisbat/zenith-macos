@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import os
 
 /// A full page the island grows into: one of Zenith's tools, drawn inside the island instead of in a window.
 ///
@@ -7,7 +8,7 @@ import CoreGraphics
 /// close button, Escape or a click anywhere else. Leaving it with the pointer does not close it, because a page is
 /// something to work in (lists to scroll, fields to type in, confirmations that appear elsewhere on screen).
 ///
-/// There are two, and neither is wider than the island (`ZenithIslandGeometry.expandedWidth`, 380 pt): the island is a
+/// There are three, and none is wider than the island (`ZenithIslandGeometry.expandedWidth`, 380 pt): the island is a
 /// black bar over the menu bar, and a wider one would cover the status items beside the notch. Everything that needs
 /// more room (Settings, the Cleaner, Ports, Homebrew) opens in Zenith's Settings window instead.
 public enum IslandPage: String, CaseIterable, Sendable, Identifiable {
@@ -15,6 +16,8 @@ public enum IslandPage: String, CaseIterable, Sendable, Identifiable {
     case system
     /// Every tool, in groups (`IslandTool.groups`): what the dock's last button opens.
     case tools
+    /// The brightness (and, over DDC, the volume) of every display.
+    case displays
 
     public var id: String { rawValue }
 
@@ -22,6 +25,7 @@ public enum IslandPage: String, CaseIterable, Sendable, Identifiable {
         switch self {
         case .system: return String(localized: "System")
         case .tools: return String(localized: "Tools")
+        case .displays: return String(localized: "Displays")
         }
     }
 
@@ -29,6 +33,7 @@ public enum IslandPage: String, CaseIterable, Sendable, Identifiable {
         switch self {
         case .system: return "cpu"
         case .tools: return "square.grid.2x2.fill"
+        case .displays: return "sun.max.fill"
         }
     }
 
@@ -39,7 +44,35 @@ public enum IslandPage: String, CaseIterable, Sendable, Identifiable {
         case .system: return CGSize(width: ZenithIslandGeometry.expandedWidth, height: 476)
         // Four groups of four tiles in a row each, and under them the dock strip.
         case .tools: return CGSize(width: ZenithIslandGeometry.expandedWidth, height: 430)
+        case .displays:
+            return CGSize(width: ZenithIslandGeometry.expandedWidth, height: IslandDisplaysPageSizing.contentHeight(forDisplays: IslandDisplaysPageSizing.displayCount))
         }
+    }
+}
+
+/// How tall the Displays page is: a card per display. The island's window is sized when a page opens, so the number of
+/// displays is kept here (`DisplayBrightnessService` sets it each time it looks at the displays) and the page opens at
+/// the right height. More than four scroll.
+public enum IslandDisplaysPageSizing {
+    private static let count = OSAllocatedUnfairLock(initialState: 0)
+
+    public static var displayCount: Int {
+        get { count.withLock { $0 } }
+        set { count.withLock { $0 = max(newValue, 0) } }
+    }
+
+    /// A card is 64 pt with a brightness slider and 90 with a volume slider too: 88 each, 10 pt between and 14 pt
+    /// around, so the usual one or two displays fit exactly and a crowded page scrolls. With no display there is one
+    /// line of text.
+    public static let cardHeight: CGFloat = 88
+    public static let spacing: CGFloat = 10
+    public static let padding: CGFloat = 14
+    public static let maxVisibleCards = 4
+
+    public static func contentHeight(forDisplays count: Int) -> CGFloat {
+        let cards = min(max(count, 1), maxVisibleCards)
+        guard count > 0 else { return 2 * padding + 64 }
+        return 2 * padding + CGFloat(cards) * cardHeight + CGFloat(cards - 1) * spacing
     }
 }
 
@@ -54,7 +87,7 @@ public enum IslandTool: String, CaseIterable, Sendable, Identifiable {
     case area, screen, record, ocr
     case clipboard, cleaning, privacyShield, keepAwake
     case clean, uninstall, cleaner, boost
-    case system, ports, homebrew
+    case system, ports, homebrew, displays
     case settings, quit, allTools
 
     public var id: String { rawValue }
@@ -73,7 +106,7 @@ public enum IslandTool: String, CaseIterable, Sendable, Identifiable {
             Group(id: "capture", title: String(localized: "Capture"), tools: [.area, .screen, .record, .ocr]),
             Group(id: "everyday", title: String(localized: "Everyday"), tools: [.clipboard, .cleaning, .privacyShield, .keepAwake]),
             Group(id: "cleanup", title: String(localized: "Clean Up"), tools: [.clean, .uninstall, .cleaner, .boost]),
-            Group(id: "system", title: String(localized: "System"), tools: [.system, .ports, .homebrew])
+            Group(id: "system", title: String(localized: "System"), tools: [.system, .ports, .homebrew, .displays])
         ]
     }
 
@@ -95,6 +128,7 @@ public enum IslandTool: String, CaseIterable, Sendable, Identifiable {
         switch self {
         case .system: return .system
         case .allTools: return .tools
+        case .displays: return .displays
         default: return nil
         }
     }
@@ -126,6 +160,7 @@ public enum IslandTool: String, CaseIterable, Sendable, Identifiable {
         case .system: return String(localized: "System")
         case .ports: return String(localized: "Ports")
         case .homebrew: return String(localized: "Homebrew")
+        case .displays: return String(localized: "Displays")
         case .settings: return String(localized: "Settings")
         case .quit: return String(localized: "Quit Zenith")
         default: return String(localized: "All Tools")
@@ -145,6 +180,7 @@ public enum IslandTool: String, CaseIterable, Sendable, Identifiable {
         case .system: return String(localized: "Running apps, CPU, memory, storage and network speed")
         case .ports: return String(localized: "Processes listening on network ports")
         case .homebrew: return String(localized: "Installed and outdated Homebrew packages")
+        case .displays: return String(localized: "Brightness and volume of each display")
         case .settings: return String(localized: "Open Zenith's settings")
         case .quit: return String(localized: "Quit Zenith")
         default: return String(localized: "Every tool, in groups")
@@ -163,6 +199,7 @@ public enum IslandTool: String, CaseIterable, Sendable, Identifiable {
         case .system: return IslandPage.system.icon
         case .ports: return "network"
         case .homebrew: return "shippingbox.fill"
+        case .displays: return IslandPage.displays.icon
         case .settings: return "gearshape.fill"
         case .quit: return "power"
         default: return IslandPage.tools.icon

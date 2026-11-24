@@ -1156,3 +1156,16 @@
 "Open Link" = "リンクを開く";
 "Browse" = "移動";
 "Paste “%@”" = "「%@」をペースト";
+
+"Displays" = "ディスプレイ";
+"Brightness and volume of each display" = "各ディスプレイの明るさと音量";
+"Built-in Display" = "内蔵ディスプレイ";
+"Display" = "ディスプレイ";
+"Looking for displays…" = "ディスプレイを検索中…";
+"No displays found" = "ディスプレイが見つかりません";
+"Reading the display…" = "ディスプレイを読み込み中…";
+"Brightness can't be changed on this display" = "このディスプレイでは明るさを変更できません";
+"Software dimming" = "ソフトウェア減光";
+"The picture is dimmed in software. The screen's own backlight stays as it is." = "画面はソフトウェアで減光されます。ディスプレイ自体のバックライトはそのままです。";
+"Brightness of %@" = "%@ の明るさ";
+"Volume of %@" = "%@ の音量";

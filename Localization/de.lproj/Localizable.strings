@@ -1156,3 +1156,16 @@
 "Open Link" = "Link öffnen";
 "Browse" = "Durchsehen";
 "Paste “%@”" = "„%@“ einsetzen";
+
+"Displays" = "Monitore";
+"Brightness and volume of each display" = "Helligkeit und Lautstärke jedes Monitors";
+"Built-in Display" = "Integriertes Display";
+"Display" = "Monitor";
+"Looking for displays…" = "Suche nach Monitoren…";
+"No displays found" = "Keine Monitore gefunden";
+"Reading the display…" = "Monitor wird gelesen…";
+"Brightness can't be changed on this display" = "Helligkeit kann auf diesem Monitor nicht geändert werden";
+"Software dimming" = "Software-Abdunklung";
+"The picture is dimmed in software. The screen's own backlight stays as it is." = "Das Bild wird per Software abgedunkelt. Die Hintergrundbeleuchtung des Bildschirms bleibt unverändert.";
+"Brightness of %@" = "Helligkeit von %@";
+"Volume of %@" = "Lautstärke von %@";
