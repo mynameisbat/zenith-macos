@@ -19,7 +19,9 @@ struct DDCPacketTests {
     @Test("DDC-01: 'Get VCP' is 82 01 code and a checksum over 6E, 51 and the frame")
     func testGetRequest() {
         #expect(DDCPacket.getRequest(code: VCPCode.brightness) == [0x82, 0x01, 0x10, 0xAC])
-        #expect(DDCPacket.getRequest(code: VCPCode.volume) == [0x82, 0x01, 0x62, 0x6E ^ 0x51 ^ 0x82 ^ 0x01 ^ 0x62])
+        let volumeChecksum: UInt8 = 0x6E ^ 0x51 ^ 0x82 ^ 0x01 ^ 0x62
+        let expectedVolumeRequest: [UInt8] = [0x82, 0x01, 0x62, volumeChecksum]
+        #expect(DDCPacket.getRequest(code: VCPCode.volume) == expectedVolumeRequest)
         #expect(VCPCode.brightness == 0x10 && VCPCode.contrast == 0x12 && VCPCode.volume == 0x62)
     }
 
