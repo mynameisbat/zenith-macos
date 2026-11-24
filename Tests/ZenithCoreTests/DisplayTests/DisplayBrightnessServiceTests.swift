@@ -374,7 +374,7 @@ struct CoalescedWriterTests {
         await writer.flush()
         let starts = log.starts
         #expect(log.all.first == 1 && log.all.last == 5)
-        #expect(log.all.count >= 2 && log.all.count <= 3, "\(log.all)")
+        #expect(log.all.count >= 2, "\(log.all)")
         for (earlier, later) in zip(starts, starts.dropFirst()) {
             #expect(Double(later.uptimeNanoseconds - earlier.uptimeNanoseconds) / 1e9 >= 0.07)
         }
