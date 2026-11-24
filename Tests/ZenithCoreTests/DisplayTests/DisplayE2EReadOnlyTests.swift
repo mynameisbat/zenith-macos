@@ -30,4 +30,22 @@ struct DisplayE2EReadOnlyTests {
             print("DE-01 display \(id): brightness=\(result.0) volume=\(result.1) chip=0x\(String(result.2, radix: 16))")
         }
     }
+
+    @Test("DE-02: The real display configuring lists modes and current mode for each display")
+    func testRealDisplayModes() {
+        let inventory = SystemDisplayInventory()
+        let configuring = SystemDisplayConfiguring()
+        let displays = inventory.onlineDisplays()
+        #expect(!displays.isEmpty)
+
+        for display in displays {
+            let current = configuring.currentMode(for: display.id)
+            let modes = configuring.allModes(for: display.id)
+            print("DE-02 \(display.name): currentMode=\(current?.fullTitle ?? "none") totalModes=\(modes.count)")
+            let topModes = modes.prefix(5).map(\.fullTitle).joined(separator: " | ")
+            print("DE-02 sample modes: \(topModes)")
+            #expect(current != nil)
+            #expect(!modes.isEmpty)
+        }
+    }
 }
